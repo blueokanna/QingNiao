@@ -63,6 +63,17 @@ if ($holders -match [regex]::Escape($Package)) {
     Write-Result "FAIL" "default SMS role NOT held (holders: $($holders.Trim()))"
 }
 
+# Some OEM telephony stacks still consult the legacy secure setting; a mismatch
+# makes SmsManager reject sends even though the role is held.
+$legacy = (Invoke-Adb @("shell", "settings", "get", "secure", "sms_default_application") | Out-String).Trim()
+if ($legacy -eq $Package) {
+    Write-Result "PASS" "legacy sms_default_application matches"
+} elseif ([string]::IsNullOrWhiteSpace($legacy) -or $legacy -eq "null") {
+    Write-Result "WARN" "legacy sms_default_application is empty; re-select the default SMS app in system settings if sends fail"
+} else {
+    Write-Result "WARN" "legacy sms_default_application is '$legacy' (expected $Package)"
+}
+
 $dump = (Invoke-Adb @("shell", "dumpsys", "package", $Package) | Out-String)
 foreach ($permission in @("READ_SMS", "SEND_SMS", "RECEIVE_SMS", "RECEIVE_MMS", "POST_NOTIFICATIONS")) {
     if ($dump -match "$permission\s*:\s*granted=true") {
