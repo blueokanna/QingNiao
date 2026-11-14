@@ -1,2 +1,0 @@
-fn(State<AppState>, HeaderMap, Query<EnvelopeQuery>) -> impl std::future::Future<Output = Result<axum::Json<PullView>, ApiError>> {pull_envelopes}
-fn(State<AppState>, HeaderMap, Query<EnvelopeQuery>) -> impl std::future::Future<Output = Result<axum::Json<PullView>, ApiError>> {pull_envelopes}: Handler<_, AppState>

@@ -1,2 +1,0 @@
-fn(State<AppState>, HeaderMap, RawQuery) -> impl std::future::Future<Output = Result<Json<PullView>, ApiError>> {pull_envelopes}
-fn(State<AppState>, HeaderMap, RawQuery) -> impl std::future::Future<Output = Result<Json<PullView>, ApiError>> {pull_envelopes}: Handler<_, AppState>
