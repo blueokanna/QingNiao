@@ -6,7 +6,6 @@ import '../aurora/aurora_widgets.dart';
 import 'format.dart';
 import 'message_hub.dart';
 import 'message_repository.dart';
-import 'message_widgets.dart';
 import 'models.dart';
 
 class ComposeScreen extends StatefulWidget {
@@ -217,6 +216,11 @@ class _ComposeScreenState extends State<ComposeScreen> {
                   : '${_recipients.length} 位收件人',
               actions: [
                 AuroraIconButton(
+                  icon: Icons.schedule_rounded,
+                  tooltip: '定时发送',
+                  onPressed: _sending ? null : _schedule,
+                ),
+                AuroraIconButton(
                   icon: Icons.send_rounded,
                   tooltip: '发送',
                   filled: true,
@@ -268,14 +272,15 @@ class _ComposeScreenState extends State<ComposeScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Row(
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 2,
                     children: [
                       TextButton.icon(
                         onPressed: _sending ? null : _pickContact,
                         icon: const Icon(Icons.person_add_alt_outlined, size: 18),
                         label: const Text('从联系人选择'),
                       ),
-                      const SizedBox(width: 6),
                       TextButton.icon(
                         onPressed: _sending ? null : _pickAttachment,
                         icon: const Icon(Icons.attach_file_rounded, size: 18),
@@ -354,28 +359,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 24),
                 ],
-              ),
-            ),
-            AnimatedBuilder(
-              animation: _body,
-              builder: (context, _) => MessageComposer(
-                controller: _body,
-                focusNode: _bodyFocus,
-                segment: MessageFormat.segment(_body.text),
-                sending: _sending,
-                showTools: false,
-                hintText: '写下消息…',
-                onSend: _send,
-                onAttach: _pickAttachment,
-                onSchedule: _schedule,
-                onPickSim: _pickSim,
-                simLabel: _sims.isEmpty
-                    ? null
-                    : (_sims.where((sim) => sim.id == _simId).isEmpty
-                          ? '选择 SIM'
-                          : 'SIM ${_sims.where((sim) => sim.id == _simId).first.slot}'),
-                attachments: _attachment == null ? 0 : 1,
               ),
             ),
           ],
