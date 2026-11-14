@@ -1,7 +1,5 @@
 import 'dart:math' as math;
 
-/// 时间、号码与短信分段的轻量格式化工具。
-/// 分段估算与 Rust 引擎的 GSM-7 / UCS-2 规则保持一致，接入后由引擎结果覆盖。
 abstract final class MessageFormat {
   static const _weekdays = ['一', '二', '三', '四', '五', '六', '日'];
 
@@ -80,7 +78,6 @@ abstract final class MessageFormat {
     return '${(value / 1024 / 1024).toStringAsFixed(1)} MB';
   }
 
-  /// GSM-7 扩展字符按 2 个 septet 计。
   static const _gsmExtended = r'^{}\[~]|€';
 
   static SegmentInfo segment(String body) {

@@ -7,7 +7,6 @@ import '../aurora/aurora_widgets.dart';
 import '../messaging/models.dart';
 import '../messaging/message_widgets.dart';
 
-/// 外观工作台：色板、气泡、动效与字号的实时预览。
 class AppearanceScreen extends StatelessWidget {
   const AppearanceScreen({super.key});
 

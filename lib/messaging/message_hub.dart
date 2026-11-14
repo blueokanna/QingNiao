@@ -5,8 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'message_repository.dart';
 import 'models.dart';
 
-/// 收件箱共享状态：会话、SIM、权限与搜索条件。
-/// 所有页面监听同一个实例，事件通道只订阅一次。
 class MessageHub extends ChangeNotifier {
   MessageHub(this.repository);
 

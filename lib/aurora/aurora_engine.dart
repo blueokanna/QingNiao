@@ -3,16 +3,10 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 
-/// 动效档位。由用户设置，并可被运行时帧耗时自动降级覆盖。
 enum AuroraMotionLevel { full, balanced, reduced }
 
-/// 渲染质量。极光引擎根据真实帧耗时自动调整。
 enum AuroraQuality { full, balanced, efficient }
 
-/// 一个由极光引擎统一驱动的弹簧。
-///
-/// 页面中不创建 `AnimationController`，所有按压、指示器、banner 位移
-/// 都注册到同一个 [Ticker]，减少 vsync 订阅与对象分配。
 class AuroraSpring extends ChangeNotifier {
   AuroraSpring({
     double value = 0,
@@ -112,13 +106,7 @@ class AuroraSpring extends ChangeNotifier {
   }
 }
 
-/// 极光引擎：全局集中调度与统一渲染。
-///
-/// * 只持有一个 [Ticker]，驱动所有 [AuroraSpring]；
-/// * 极光背景使用被限频的共享时钟，页面切换不会重启时间线；
-/// * 通过 [SchedulerBinding.addTimingsCallback] 观察 build/raster 耗时，
-///   在卡顿时自动降低背景复杂度与动画频率；
-/// * 滚动期间让氛围动效退避，把 GPU 预算留给列表。
+/// Coordinates app-owned springs and the backdrop; Flutter owns route tickers.
 class AuroraEngine extends ChangeNotifier {
   AuroraEngine._() {
     _clock = ValueNotifier<double>(0);
@@ -154,7 +142,6 @@ class AuroraEngine extends ChangeNotifier {
   double get elapsedSeconds => _elapsedSeconds;
   double get averageFrameMs => _averageFrameMs;
 
-  /// 背景最低重绘频率：完整 30fps、平衡 24fps、省电 15fps。
   int get backdropFps => switch (_quality) {
     AuroraQuality.full => _motionLevel == AuroraMotionLevel.full ? 30 : 20,
     AuroraQuality.balanced => 24,
@@ -287,7 +274,6 @@ class AuroraEngine extends ChangeNotifier {
       }
     }
 
-    // 背景与氛围动效按质量档位限频，避免每帧 rAF 级别的无谓重绘。
     final interval = 1 / (_scrolling ? math.min(backdropFps, 20) : backdropFps);
     _emitAccumulator += dt;
     if (_backdropEnabled && !_reduceMotion && _emitAccumulator >= interval) {
@@ -331,7 +317,6 @@ class AuroraEngine extends ChangeNotifier {
     }
   }
 
-  /// 调试面板用：手动重置自动画质。
   void resetQuality() {
     _quality = AuroraQuality.full;
     _badFrames = 0;

@@ -1,37 +1,18 @@
-//! 短信分段计算：GSM-7（含扩展表）与 UCS-2。
-//!
-//! 计费口径说明：
-//! - `GSM-7` 下 `length` 是 **septet** 数，扩展表字符（`^ { } \ [ ] ~ | €`）
-//!   占 2 个 septet，与运营商的计费单元一致。
-//! - `UCS-2` 下 `length` 是 UTF-16 码元数，emoji 占 2 个码元。
-//! - `remaining` 表示“当前最后一条还能再输入多少个计费单元”，
-//!   `max_chars` 表示当前这一条的容量（单条 160/70，级联 153/67）。
 
-/// GSM-7 单条容量（septet）。
 pub const GSM7_SINGLE: u32 = 160;
-/// GSM-7 级联时每条容量（septet）。
 pub const GSM7_MULTI: u32 = 153;
-/// UCS-2 单条容量（UTF-16 码元）。
 pub const UCS2_SINGLE: u32 = 70;
-/// UCS-2 级联时每条容量（UTF-16 码元）。
 pub const UCS2_MULTI: u32 = 67;
 
-/// 分段结果。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Segmentation {
-    /// 编码名：`GSM-7` 或 `UCS-2`。
     pub encoding: String,
-    /// 需要发送的短信条数（空正文为 0）。
     pub segments: u32,
-    /// 已使用的计费单元数（见模块注释）。
     pub length: u32,
-    /// 最后一条剩余可输入单元数。
     pub remaining: u32,
-    /// 当前条容量（单条或级联容量）。
     pub max_chars: u32,
 }
 
-/// 计算分段信息。
 pub fn segmentation(body: &str) -> Segmentation {
     let mut gsm_units: u32 = 0;
     let mut gsm_ok = true;
@@ -83,9 +64,7 @@ fn build(encoding: &str, units: u32, single: u32, multi: u32) -> Segmentation {
     }
 }
 
-/// 字符在 GSM-7 中的计费单元数，`None` 表示不可编码（需要 UCS-2）。
 pub fn gsm7_cost(ch: char) -> Option<u32> {
-    // 扩展表：ESC + 单字符，占 2 septet。
     if matches!(
         ch,
         '^' | '{' | '}' | '\\' | '[' | ']' | '~' | '|' | '€' | '\u{0C}'
@@ -93,7 +72,6 @@ pub fn gsm7_cost(ch: char) -> Option<u32> {
         return Some(2);
     }
     if ch.is_ascii() {
-        // 默认表覆盖全部可打印 ASCII（反引号除外）以及 CR/LF。
         if ch == '\n' || ch == '\r' {
             return Some(1);
         }
@@ -105,7 +83,6 @@ pub fn gsm7_cost(ch: char) -> Option<u32> {
         }
         return None;
     }
-    // GSM-7 默认表中的非 ASCII 字符。
     match ch {
         '¤' | '£' | '¥' | 'è' | 'é' | 'ù' | 'ì' | 'ò' | 'Ç' | 'Ø' | 'ø' | 'Å' | 'å' | 'Δ'
         | 'Φ' | 'Γ' | 'Λ' | 'Ω' | 'Π' | 'Ψ' | 'Σ' | 'Θ' | 'Ξ' | 'Æ' | 'æ' | 'ß' | 'É' | '¡'
@@ -168,7 +145,6 @@ mod tests {
     fn handles_newlines_and_cr() {
         assert_eq!(gsm7_cost('\n'), Some(1));
         assert_eq!(gsm7_cost('\r'), Some(1));
-        // CRLF 是 2 septet，不改变编码表
         let result = segmentation("line1\r\nline2");
         assert_eq!(result.encoding, "GSM-7");
         assert_eq!(result.length, 12);
@@ -191,7 +167,6 @@ mod tests {
 
     #[test]
     fn emoji_counts_two_units() {
-        // 35 个 emoji = 70 码元，恰好一条
         let single = segmentation(&"🌿".repeat(35));
         assert_eq!(single.encoding, "UCS-2");
         assert_eq!(single.length, 70);
@@ -203,7 +178,6 @@ mod tests {
         assert_eq!(over.segments, 2);
         assert_eq!(over.remaining, 62);
 
-        // 中英混排：只要含中文就整体切到 UCS-2
         let mixed = segmentation("你好, world");
         assert_eq!(mixed.encoding, "UCS-2");
         assert_eq!(mixed.length, 9);

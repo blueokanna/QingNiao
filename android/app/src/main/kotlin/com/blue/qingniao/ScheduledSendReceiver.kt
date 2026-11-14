@@ -6,9 +6,6 @@ import android.content.Intent
 import android.provider.Telephony
 import android.telephony.SubscriptionManager
 
-/**
- * 定时短信到点发送。普通短信走系统 SmsManager；失败时发通知而不是静默丢弃。
- */
 class ScheduledSendReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getLongExtra("id", -1)
@@ -33,7 +30,6 @@ class ScheduledSendReceiver : BroadcastReceiver() {
                     }
                 }
             } catch (_: Exception) {
-                // 后台任务不应崩溃；下一次打开应用仍能看到待发送项。
             } finally {
                 pending.finish()
             }

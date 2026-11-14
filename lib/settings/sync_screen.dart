@@ -7,9 +7,8 @@ import '../aurora/aurora_widgets.dart';
 import '../messaging/format.dart';
 import '../messaging/message_repository.dart';
 import '../messaging/models.dart';
+import '../sync/sync_engine.dart';
 
-/// 青鸟同步：设备身份、指纹、配对与手动同步。
-/// 正文以 X25519 + AES-256-GCM 信封加密，服务器只保存密文。
 class SyncScreen extends StatefulWidget {
   const SyncScreen({super.key, required this.repository});
 
@@ -20,6 +19,7 @@ class SyncScreen extends StatefulWidget {
 }
 
 class _SyncScreenState extends State<SyncScreen> {
+  late final SyncEngine _engine = SyncEngine(widget.repository);
   Map<String, dynamic>? _status;
   bool _loading = true;
   bool _busy = false;
@@ -31,42 +31,52 @@ class _SyncScreenState extends State<SyncScreen> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _engine.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     try {
-      final status = await widget.repository.syncStatus();
+      final status = await _engine.status();
       if (!mounted) return;
       setState(() {
         _status = status;
         _loading = false;
-        _error = null;
+        _error = status['error'] == null ? null : '${status['error']}';
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = messageError(error);
+        _error = _syncError(error);
       });
     }
   }
 
+  String _syncError(Object error) =>
+      error is SyncException ? error.message : messageError(error);
+
   bool get _enabled => _status?['enabled'] == true;
   String get _server => '${_status?['serverUrl'] ?? ''}';
-  String get _fingerprint => '${_status?['fingerprint'] ?? '尚未生成'}';
+  String get _fingerprint {
+    final value = '${_status?['fingerprint'] ?? ''}';
+    return value.isEmpty ? '尚未生成' : value;
+  }
+
+  String get _pairingCode => '${_status?['pairingCode'] ?? ''}';
 
   Future<void> _configure({String? url, bool? enabled}) async {
     setState(() => _busy = true);
     try {
-      final status = await widget.repository.syncConfigure(
+      await _engine.configure(
         serverUrl: url ?? _server,
         enabled: enabled ?? _enabled,
       );
-      if (!mounted) return;
-      setState(() {
-        _status = status;
-        _error = null;
-      });
+      await _load();
     } catch (error) {
-      if (mounted) setState(() => _error = messageError(error));
+      if (mounted) setState(() => _error = _syncError(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -122,15 +132,11 @@ class _SyncScreenState extends State<SyncScreen> {
     if (code == null || code.trim().isEmpty) return;
     setState(() => _busy = true);
     try {
-      final status = await widget.repository.syncPair(code.trim());
-      if (!mounted) return;
-      setState(() {
-        _status = status;
-        _error = null;
-      });
-      showAuroraSnack(context, '配对成功，接下来只传输加密信封');
+      await _engine.join(code.trim());
+      await _load();
+      if (mounted) showAuroraSnack(context, '配对成功，接下来只传输加密信封');
     } catch (error) {
-      if (mounted) setState(() => _error = messageError(error));
+      if (mounted) setState(() => _error = _syncError(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -139,12 +145,11 @@ class _SyncScreenState extends State<SyncScreen> {
   Future<void> _syncNow() async {
     setState(() => _busy = true);
     try {
-      final status = await widget.repository.syncNow();
-      if (!mounted) return;
-      setState(() => _status = status);
-      showAuroraSnack(context, '已同步 · 待发送 ${status['pending'] ?? 0} 条');
+      final result = await _engine.syncNow();
+      await _load();
+      if (mounted) showAuroraSnack(context, result.message);
     } catch (error) {
-      if (mounted) setState(() => _error = messageError(error));
+      if (mounted) setState(() => _error = _syncError(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -166,11 +171,11 @@ class _SyncScreenState extends State<SyncScreen> {
     );
     if (confirmed != true) return;
     try {
-      await widget.repository.syncReset();
+      await _engine.reset();
       await _load();
       if (mounted) showAuroraSnack(context, '已重置同步身份');
     } catch (error) {
-      if (mounted) showAuroraSnack(context, messageError(error));
+      if (mounted) showAuroraSnack(context, _syncError(error));
     }
   }
 
@@ -295,6 +300,22 @@ class _SyncScreenState extends State<SyncScreen> {
                       subtitle: _server.isEmpty ? '未设置' : _server,
                       icon: Icons.dns_outlined,
                       onTap: _busy ? null : _editServer,
+                      showDivider: true,
+                    ),
+                    AuroraSettingTile(
+                      title: '本机配对码',
+                      subtitle: _pairingCode.isEmpty ? '启用同步后生成' : _pairingCode,
+                      icon: Icons.key_rounded,
+                      trailing: _pairingCode.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: '复制配对码',
+                              onPressed: () async {
+                                await Clipboard.setData(ClipboardData(text: _pairingCode));
+                                if (context.mounted) showAuroraSnack(context, '配对码已复制');
+                              },
+                              icon: const Icon(Icons.copy_rounded, size: 18),
+                            ),
                       showDivider: true,
                     ),
                     AuroraSettingTile(

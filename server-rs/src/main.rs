@@ -1,12 +1,3 @@
-//! 青鸟短信同步服务（最小实现）。
-//!
-//! 服务器只做三件事：
-//! 1. 维护一个由配对码连接的设备空间（space）；
-//! 2. 保存设备提交的**不透明密文信封**；
-//! 3. 为每台设备提供按游标拉取与长轮询。
-//!
-//! 它不持有任何私钥，也无法解密正文。默认监听 `127.0.0.1:8787`，
-//! 通过 `--bind 0.0.0.0:8787` 对外提供服务；生产环境请放在 TLS 反向代理之后。
 
 use std::{
     collections::HashMap,
@@ -33,9 +24,6 @@ const MAX_ENVELOPES: usize = 8192;
 const MAX_ENVELOPE_BYTES: usize = 4096;
 const PAIRING_TTL_SECS: i64 = 600;
 
-// ---------------------------------------------------------------------------
-// 数据模型
-// ---------------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Default)]
 struct Store {
@@ -144,9 +132,6 @@ impl Store {
     }
 }
 
-// ---------------------------------------------------------------------------
-// 请求 / 响应
-// ---------------------------------------------------------------------------
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -268,7 +253,6 @@ fn new_token() -> String {
 }
 
 fn new_pairing_code() -> String {
-    // 去掉 0/O/1/I 等易混字符。
     const ALPHABET: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let mut rng = rand::thread_rng();
     (0..8)
@@ -347,9 +331,6 @@ fn devices_view(space: &Space) -> Vec<DeviceView> {
         .collect()
 }
 
-// ---------------------------------------------------------------------------
-// 路由
-// ---------------------------------------------------------------------------
 
 fn router(state: AppState) -> Router {
     Router::new()
@@ -484,7 +465,6 @@ async fn join_space(
             device_id: device.id.clone(),
         },
     );
-    // 配对码使用一次后即失效，避免被重放。
     store.pairings.remove(&code);
     store.save(&state.data);
     Ok(Json(AuthView {
@@ -531,7 +511,6 @@ async fn pairing_code(
     let timestamp = now();
     let mut store = state.store.lock().unwrap();
     store.prune_pairings(timestamp);
-    // 同一空间只保留最新一个配对码，避免旧码长期可用。
     store
         .pairings
         .retain(|_, pairing| pairing.space_id != auth.space_id);
@@ -679,9 +658,6 @@ async fn revoke_device(
     Ok(Json(json!({ "revoked": id, "serverTime": now() })))
 }
 
-// ---------------------------------------------------------------------------
-// 启动
-// ---------------------------------------------------------------------------
 
 fn parse_args() -> (SocketAddr, PathBuf) {
     let mut bind = "127.0.0.1:8787".to_string();
@@ -748,9 +724,6 @@ async fn main() {
     }
 }
 
-// ---------------------------------------------------------------------------
-// 测试
-// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {

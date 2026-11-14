@@ -27,14 +27,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-/**
- * 青鸟短信的 Android 平台桥。
- *
- * 只处理“需要系统 API”的事情：provider 查询、联系人、附件字节、回收站删除、
- * 定时闹钟、备份导出、统计。验证码、搜索、加密由 Rust 引擎完成。
- *
- * 通过 MainActivity 的同一个 MethodChannel 接入：未识别的调用交给这里。
- */
 class AuroraBridge(private val activity: Activity) {
     private val context: Context get() = activity
     private val handler = Handler(Looper.getMainLooper())
@@ -58,6 +50,11 @@ class AuroraBridge(private val activity: Activity) {
                     result.success(null)
                 }
                 "stats" -> result.success(stats())
+                "syncState" -> result.success(syncPrefs.getString("state", "") ?: "")
+                "syncStateSet" -> {
+                    syncPrefs.edit().putString("state", call.argument<String>("json") ?: "").apply()
+                    result.success(null)
+                }
                 "syncStatus" -> result.success(syncStatus())
                 "syncConfigure" -> {
                     syncPrefs.edit()
@@ -205,6 +202,16 @@ class AuroraBridge(private val activity: Activity) {
                     store.cancelScheduled(id)
                     null
                 }
+                "remoteMessagesSince" -> remoteMessagesSince(
+                    store,
+                    call.argument<Number>("since")?.toLong() ?: 0L,
+                )
+                "insertRemoteMessage" -> insertRemoteMessage(
+                    requireNotNull(call.argument<String>("address")),
+                    requireNotNull(call.argument<String>("body")),
+                    requireNotNull(call.argument<Number>("date")).toLong(),
+                    call.argument<Number>("subscriptionId")?.toInt() ?: -1,
+                )
                 else -> throw IllegalArgumentException("不支持的操作：${call.method}")
             }
         }
@@ -216,7 +223,8 @@ class AuroraBridge(private val activity: Activity) {
         "pin", "archive", "block", "unblock", "blocked", "attachmentData",
         "schedule", "scheduled", "cancelScheduled", "dataDir", "openUrl",
         "stats", "exportBackup", "importBackup", "syncStatus", "syncConfigure",
-        "syncPair", "syncNow", "syncReset",
+        "syncPair", "syncNow", "syncReset", "syncState", "syncStateSet",
+        "remoteMessagesSince", "insertRemoteMessage",
     )
 
     private fun requireAccess() {
@@ -238,9 +246,6 @@ class AuroraBridge(private val activity: Activity) {
 
     private fun granted(permission: String) = context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
-    // ------------------------------------------------------------------
-    // 会话
-    // ------------------------------------------------------------------
 
     private fun conversations(store: AuroraStore, query: String, filter: String): List<Map<String, Any?>> {
         val hidden = store.hiddenIds()
@@ -411,9 +416,6 @@ class AuroraBridge(private val activity: Activity) {
         return map
     }
 
-    // ------------------------------------------------------------------
-    // 消息
-    // ------------------------------------------------------------------
 
     private fun messages(store: AuroraStore, threadId: Long, before: Long, limit: Int): List<Map<String, Any?>> {
         val hidden = store.hiddenIds()
@@ -651,9 +653,6 @@ class AuroraBridge(private val activity: Activity) {
         return expired.size
     }
 
-    // ------------------------------------------------------------------
-    // SIM / 附件 / 定时 / 备份
-    // ------------------------------------------------------------------
 
     private fun subscriptions(): List<Map<String, Any?>> {
         if (context.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) return emptyList()
@@ -805,6 +804,58 @@ class AuroraBridge(private val activity: Activity) {
         values.put(MediaStore.MediaColumns.IS_PENDING, 0)
         context.contentResolver.update(uri, values, null, null)
         return true
+    }
+
+    private fun remoteMessagesSince(store: AuroraStore, since: Long): List<Map<String, Any?>> {
+        val hidden = store.hiddenIds()
+        val remote = store.remoteIds()
+        val rows = mutableListOf<Map<String, Any?>>()
+        context.contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf("_id", "thread_id", "address", "body", "date", "type", "sub_id"),
+            "date>?",
+            arrayOf(since.toString()),
+            "date ASC",
+        )?.use { cursor ->
+            while (cursor.moveToNext() && rows.size < 120) {
+                val id = cursor.getLong(0)
+                if (id in hidden || id in remote) continue
+                val body = cursor.getString(3) ?: ""
+                if (body.isBlank()) continue
+                rows.add(
+                    mapOf(
+                        "id" to id,
+                        "threadId" to cursor.getLong(1),
+                        "address" to (cursor.getString(2) ?: "未知号码"),
+                        "body" to body,
+                        "date" to cursor.getLong(4),
+                        "type" to cursor.getInt(5),
+                        "subscriptionId" to cursor.getInt(6),
+                    ),
+                )
+            }
+        }
+        return rows
+    }
+
+    private fun insertRemoteMessage(address: String, body: String, date: Long, subId: Int): Long {
+        require(address.isNotBlank()) { "远端消息缺少号码" }
+        require(body.isNotBlank()) { "远端消息缺少正文" }
+        val values = ContentValues().apply {
+            put("address", address)
+            put("body", body)
+            put("date", date)
+            put("date_sent", date)
+            put("read", 0)
+            put("seen", 0)
+            put("type", Telephony.Sms.MESSAGE_TYPE_INBOX)
+            if (subId >= 0) put("sub_id", subId)
+        }
+        val uri = context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values)
+            ?: throw IllegalArgumentException("无法写入系统短信库")
+        val id = ContentUris.parseId(uri)
+        AuroraStore(context).use { it.markRemote(id) }
+        return id
     }
 
     private fun syncStatus(): Map<String, Any?> = mapOf(

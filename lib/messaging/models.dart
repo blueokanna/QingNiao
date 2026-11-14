@@ -1,7 +1,5 @@
 import 'dart:typed_data';
 
-/// 短信 / 彩信的本地领域模型。所有字段都做了防御式解析，
-/// 平台层字段缺失时不会影响界面渲染。
 enum MessageTransport { sms, mms }
 
 enum DeliveryState { none, sending, sent, delivered, failed }

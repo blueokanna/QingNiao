@@ -7,10 +7,6 @@ import 'package:material_new_shapes/material_new_shapes.dart';
 import 'aurora_engine.dart';
 import 'aurora_theme.dart';
 
-/// Material 3 Expressive 形状库（AndroidX graphics-shapes 的 Flutter 实现）。
-///
-/// 头像、FAB、导航指示器与徽章使用同一套形状语言，并在状态变化时
-/// 通过 [Morph] 连续形变，而不是硬切图标。
 abstract final class AuroraShapes {
   static final List<RoundedPolygon> avatars = [
     MaterialShapes.cookie9Sided,
@@ -65,7 +61,6 @@ abstract final class AuroraShapes {
   }
 }
 
-/// 圆形/超椭圆/饼干形头像。首次进入时形状由地址稳定决定。
 class AuroraAvatar extends StatelessWidget {
   const AuroraAvatar({
     super.key,
@@ -146,7 +141,6 @@ class AuroraAvatar extends StatelessWidget {
   }
 }
 
-/// 头像文字：号码取末两位，姓名取首字，服务号取末两位数字。
 String _initials(String? label, String seed) {
   final text = (label ?? '').trim();
   final source = text.isEmpty ? seed.trim() : text;
@@ -241,7 +235,6 @@ class _ShapeAvatarPainter extends CustomPainter {
       old.glow != glow;
 }
 
-/// 以 M3 形状裁切的容器，用于 FAB、导航指示器与强调卡片。
 class AuroraShapeContainer extends StatelessWidget {
   const AuroraShapeContainer({
     super.key,
@@ -376,8 +369,6 @@ class _ContainerPainter extends CustomPainter {
       old.rotate != rotate;
 }
 
-/// 缓慢呼吸的品牌花朵，用于空状态与引导页。由极光引擎统一时钟驱动，
-/// 滚动/省电时自动降频。
 class AuroraBloom extends StatefulWidget {
   const AuroraBloom({super.key, this.size = 120, this.static = false});
 

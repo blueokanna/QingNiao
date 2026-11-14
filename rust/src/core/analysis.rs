@@ -1,38 +1,23 @@
-//! 短信正文分析：分类、OTP（验证码）提取、链接提取。
-//!
-//! 提取策略是保守的：只有在出现验证码类关键词、且过滤掉日期/金额/电话/
-//! 订单号等干扰后**唯一**存在的候选才会被当作验证码返回。
-//! 返回的下标是 UTF-16 码元下标，Dart 侧可直接用于 `TextSpan` 高亮。
 
 use crate::core::segment;
 use crate::core::utf16;
 
-/// 超过该字节数的正文只分析前缀，避免病态输入拖慢 UI。
 const MAX_BODY_BYTES: usize = 64 * 1024;
 const OTP_MIN: usize = 4;
 const OTP_MAX: usize = 8;
-/// 候选与关键词之间允许的最大字符间隔。
 const KEYWORD_WINDOW: usize = 20;
-/// 订单号关键词与数字之间允许的最大字符间隔（仅“关键词在前”这一侧）。
 const ORDER_WINDOW: usize = 3;
 const MAX_LINK_CHARS: usize = 512;
 
-/// 单条正文的分析结果。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Analysis {
     /// `verification` / `promotion` / `finance` / `personal`。
     pub category: String,
-    /// 提取到的验证码（纯数字 4-8 位）。
     pub otp: Option<String>,
-    /// `otp` 在正文中的起始 UTF-16 码元下标。
     pub otp_start: u32,
-    /// `otp` 在正文中的结束 UTF-16 码元下标（不含）。
     pub otp_end: u32,
-    /// 是否成功提取到验证码。
     pub is_otp: bool,
-    /// 正文中第一个 http(s) 链接。
     pub link: Option<String>,
-    /// 复用 `segment` 模块的分段结果。
     pub segments: u32,
     pub encoding: String,
     pub remaining: u32,
@@ -93,7 +78,6 @@ const ORDER_KEYWORDS: &[&str] = &[
     "invoice",
 ];
 
-/// 快递/取件类通知：四分类里没有独立物流类目，统一归入 `personal`。
 const LOGISTICS_KEYWORDS: &[&str] = &["快递", "取件", "驿站", "派送", "物流"];
 
 #[derive(Clone, Copy, Debug)]
@@ -126,7 +110,6 @@ fn fold_ascii(ch: char) -> char {
     }
 }
 
-/// 在字符序列中查找全部关键词出现位置（不重叠）。
 fn keyword_spans(hay: &[char], keywords: &[&str]) -> Vec<Span> {
     let mut spans = Vec::new();
     for keyword in keywords {
@@ -151,7 +134,6 @@ fn keyword_spans(hay: &[char], keywords: &[&str]) -> Vec<Span> {
     spans
 }
 
-/// 分析一条正文。空串与超长输入都安全。
 pub fn analyze(body: &str) -> Analysis {
     let text = if body.len() > MAX_BODY_BYTES {
         utf16::truncate_bytes(body, MAX_BODY_BYTES)
@@ -171,7 +153,6 @@ pub fn analyze(body: &str) -> Analysis {
     let category = if !verification.is_empty() {
         "verification"
     } else if !logistics.is_empty() {
-        // 快递/取件通知优先按个人消息归类，避免被“优惠”等词误判成推广
         "personal"
     } else if !finance.is_empty() {
         "finance"
@@ -214,7 +195,6 @@ pub fn analyze(body: &str) -> Analysis {
     }
 }
 
-/// 收集 4-8 位纯数字候选，并按值去重。
 fn collect_candidates(chars: &[char], orders: &[Span], phones: &[Span]) -> Vec<Span> {
     let mut out: Vec<Span> = Vec::new();
     let mut index = 0;
@@ -260,7 +240,6 @@ fn collect_candidates(chars: &[char], orders: &[Span], phones: &[Span]) -> Vec<S
     out
 }
 
-/// 数字两侧必须是 ASCII 词边界（`A123456B` / `_123456` 不算）。
 fn is_bounded(chars: &[char], start: usize, end: usize) -> bool {
     let prev_ok = start == 0 || {
         let ch = chars[start - 1];
@@ -286,7 +265,6 @@ fn is_date_like(chars: &[char], start: usize, end: usize) -> bool {
     }
     if length == 4 {
         let value = digits_value(&chars[start..end]);
-        // 19xx / 20xx 年份
         if (1900..=2099).contains(&value) {
             return true;
         }
@@ -318,7 +296,6 @@ fn is_amount_like(chars: &[char], start: usize, end: usize) -> bool {
     if end < chars.len() && UNIT.contains(&chars[end]) {
         return true;
     }
-    // 千分位或小数分组：1,234 / 12.50
     if start >= 2
         && (chars[start - 1] == ',' || chars[start - 1] == '.')
         && chars[start - 2].is_ascii_digit()
@@ -335,8 +312,6 @@ fn is_amount_like(chars: &[char], start: usize, end: usize) -> bool {
 }
 
 fn is_order_like(start: usize, orders: &[Span]) -> bool {
-    // 只把“订单号 123456”这种关键词紧邻在前的数字视为订单号；
-    // 关键词在后的情况交给 OTP 关键词邻近判定处理，避免把验证码误吞掉。
     orders
         .iter()
         .any(|span| span.end <= start && start - span.end <= ORDER_WINDOW)
@@ -350,7 +325,6 @@ fn is_repetitive(digits: &[char]) -> bool {
     if digits.iter().all(|&ch| ch == first) {
         return true;
     }
-    // 过长的连续递增/递减序列（1234567 / 7654321）视为占位数字
     if digits.len() >= 7 {
         let mut ascending = true;
         let mut descending = true;
@@ -371,7 +345,6 @@ fn is_repetitive(digits: &[char]) -> bool {
     false
 }
 
-/// 识别由数字与分隔符组成、位数 >= 11 的电话号码片段。
 fn phone_spans(chars: &[char]) -> Vec<Span> {
     let mut spans = Vec::new();
     let mut index = 0;
@@ -511,7 +484,6 @@ mod tests {
 
     #[test]
     fn otp_offsets_are_utf16_units() {
-        // emoji 占 2 个码元，下标不能按字节或字符计算
         let result = analyze("🌿验证码：654321");
         assert_eq!(result.otp.as_deref(), Some("654321"));
         assert_eq!(result.otp_start, 6);
@@ -533,12 +505,9 @@ mod tests {
 
     #[test]
     fn ambiguous_candidates_are_rejected() {
-        // 两个候选都紧邻验证码关键词 -> 不猜
         assert!(analyze("验证码 123456，备用验证码 654321").otp.is_none());
-        // 一个候选邻关键词、另一个是订单号 -> 只保留唯一候选
         let result = analyze("验证码 123456，订单号 765432");
         assert_eq!(result.otp.as_deref(), Some("123456"));
-        // 没有验证码关键词时不提取
         assert!(analyze("订单 123456").otp.is_none());
     }
 
@@ -607,7 +576,6 @@ mod tests {
         assert_eq!(analyze("退订回T").category, "promotion");
         assert_eq!(analyze("今晚一起吃饭吗").category, "personal");
         assert_eq!(analyze("您的验证码已发送").category, "verification");
-        // 快递/取件通知归入 personal，且“取件码”不会被当成验证码
         let delivery = analyze("您的快递已到菜鸟驿站，取件码 123456");
         assert_eq!(delivery.category, "personal");
         assert!(delivery.otp.is_none());
@@ -618,7 +586,6 @@ mod tests {
         let body = format!("验证码 123456 {}", "x".repeat(70_000));
         let result = analyze(&body);
         assert_eq!(result.otp.as_deref(), Some("123456"));
-        // 超长正文按 64KB 截断后再分段
         assert!(result.segments > 100);
         assert!(!analyze(&"😀".repeat(20_000)).is_otp);
     }

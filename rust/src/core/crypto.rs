@@ -1,11 +1,6 @@
-//! 端到端同步信封加密。
-//!
-//! 方案：X25519 静态密钥 + HKDF-SHA256（`info = "qingniao-envelope-v1"`）
-//! + AES-256-GCM（12 字节随机 nonce）。每个信封携带临时公钥，
-//! HKDF 的 salt 绑定“临时公钥 || 接收方静态公钥”，避免密钥复用混淆。
-//! 所有 base64 均为 URL_SAFE_NO_PAD。
-//!
-//! 密钥持久化在 `<data_dir>/device_identity.json`（unix 上尽力设为 0600）。
+
+//! Envelope confidentiality only: this format does not authenticate the sender.
+//! Identity files currently rely on app-private storage, not Android Keystore.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -28,14 +23,12 @@ use zeroize::{Zeroize, Zeroizing};
 
 use crate::core::store;
 
-/// 密钥文件名。
 pub const IDENTITY_FILE: &str = "device_identity.json";
 const HKDF_INFO: &[u8] = b"qingniao-envelope-v1";
 const KEY_LEN: usize = 32;
 const NONCE_LEN: usize = 12;
 const PUBLIC_KEY_LEN: usize = 32;
 
-/// 设备身份（对外暴露的公开部分）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DeviceIdentity {
     pub device_id: String,
@@ -43,7 +36,6 @@ pub struct DeviceIdentity {
     pub fingerprint: String,
 }
 
-/// 加密信封。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Envelope {
     pub ephemeral_public_key: String,
@@ -51,7 +43,6 @@ pub struct Envelope {
     pub ciphertext: String,
 }
 
-/// 本地静态密钥对。
 pub struct Identity {
     device_id: String,
     secret: StaticSecret,
@@ -59,7 +50,6 @@ pub struct Identity {
 }
 
 impl Identity {
-    /// 生成新身份。
     pub fn generate() -> Self {
         let secret = StaticSecret::random_from_rng(OsRng);
         let public = PublicKey::from(&secret);
@@ -70,7 +60,6 @@ impl Identity {
         }
     }
 
-    /// 从已有私钥字节恢复身份。
     pub fn from_secret_bytes(device_id: &str, secret_bytes: [u8; PUBLIC_KEY_LEN]) -> Self {
         let secret = StaticSecret::from(secret_bytes);
         let public = PublicKey::from(&secret);
@@ -97,7 +86,6 @@ impl Identity {
         format_fingerprint(self.public.as_bytes())
     }
 
-    /// 持久化所需的私钥字节（调用方负责清零）。
     fn secret_bytes(&self) -> [u8; KEY_LEN] {
         self.secret.to_bytes()
     }
@@ -111,7 +99,6 @@ impl Identity {
     }
 }
 
-/// 解密信封需要本地静态私钥。
 pub fn open(
     identity: &Identity,
     ephemeral_public_key: &[u8; PUBLIC_KEY_LEN],
@@ -133,7 +120,6 @@ pub fn open(
     String::from_utf8(plaintext).ok()
 }
 
-/// 加密到目标公钥。
 pub fn seal(
     recipient_public_key: &[u8; PUBLIC_KEY_LEN],
     plaintext: &str,
@@ -179,7 +165,6 @@ fn derive_key(
     Some(okm)
 }
 
-/// 公钥指纹：SHA-256 取前 16 字节，8 组 4 位大写 hex，用 `-` 连接。
 pub fn format_fingerprint(public_key: &[u8]) -> String {
     let digest = Sha256::digest(public_key);
     let mut output = String::with_capacity(39);
@@ -192,7 +177,6 @@ pub fn format_fingerprint(public_key: &[u8]) -> String {
     output
 }
 
-/// 解码 base64（兼容带 `=` 填充与标准字母表的输入）。
 pub fn decode_base64(text: &str) -> Option<Vec<u8>> {
     let trimmed = text.trim();
     if trimmed.is_empty() {
@@ -205,7 +189,6 @@ pub fn decode_base64(text: &str) -> Option<Vec<u8>> {
         .or_else(|| STANDARD.decode(trimmed).ok())
 }
 
-/// 解析 32 字节公钥。
 pub fn decode_public_key(text: &str) -> Option<[u8; PUBLIC_KEY_LEN]> {
     let bytes = decode_base64(text)?;
     if bytes.len() != PUBLIC_KEY_LEN {
@@ -220,7 +203,6 @@ fn identity_path(dir: &Path) -> PathBuf {
     dir.join(IDENTITY_FILE)
 }
 
-/// 读取或创建身份文件。文件损坏时备份为 `.bak` 并重新生成。
 pub fn load_or_create(dir: &Path) -> Option<Identity> {
     let path = identity_path(dir);
     if let Ok(data) = fs::read(&path) {
@@ -321,7 +303,6 @@ static SYNC: Lazy<Mutex<SyncState>> = Lazy::new(|| {
     })
 });
 
-/// 初始化同步身份（需要先调用 `engine_init`）。返回公开信息。
 pub fn sync_init() -> Option<DeviceIdentity> {
     let dir = store::data_dir()?;
     let mut state = SYNC.lock();
@@ -335,7 +316,6 @@ pub fn sync_init() -> Option<DeviceIdentity> {
     state.identity.as_ref().map(|identity| identity.to_public())
 }
 
-/// 计算任意公钥的指纹；输入非法时返回空串。
 pub fn sync_fingerprint(public_key_base64: &str) -> String {
     match decode_public_key(public_key_base64) {
         Some(key) => format_fingerprint(&key),
@@ -343,13 +323,11 @@ pub fn sync_fingerprint(public_key_base64: &str) -> String {
     }
 }
 
-/// 加密给目标公钥。
 pub fn sync_encrypt(target_public_key_base64: &str, plaintext: &str) -> Option<Envelope> {
     let target = decode_public_key(target_public_key_base64)?;
     seal(&target, plaintext)
 }
 
-/// 用本地静态私钥解密。
 pub fn sync_decrypt(
     ephemeral_public_key_base64: &str,
     nonce_base64: &str,
@@ -363,7 +341,6 @@ pub fn sync_decrypt(
     open(identity, &ephemeral, &nonce, &ciphertext)
 }
 
-/// 删除密钥文件并清空缓存。返回文件是否已被清除（或本来就不存在）。
 pub fn sync_reset() -> bool {
     let mut state = SYNC.lock();
     let dir = match state.dir.clone().or_else(store::data_dir) {
@@ -414,7 +391,6 @@ mod tests {
         let ciphertext = decode_base64(&envelope.ciphertext).expect("ciphertext");
         let opened = open(&bob, &ephemeral, &nonce, &ciphertext).expect("open");
         assert_eq!(opened, plaintext);
-        // 发送方（错误私钥）无法解出
         assert!(open(&alice, &ephemeral, &nonce, &ciphertext).is_none());
     }
 
@@ -439,13 +415,11 @@ mod tests {
         ciphertext[0] ^= 0x01;
         assert!(open(&bob, &ephemeral, &nonce, &ciphertext).is_none());
 
-        // 篡改 nonce 同样失败
         let mut wrong_nonce = decode_base64(&envelope.nonce).unwrap();
         wrong_nonce[0] ^= 0x01;
         let ciphertext = decode_base64(&envelope.ciphertext).unwrap();
         assert!(open(&bob, &ephemeral, &wrong_nonce, &ciphertext).is_none());
 
-        // 截断/空输入失败而不是 panic
         assert!(open(&bob, &ephemeral, &[], &ciphertext).is_none());
         assert!(open(&bob, &ephemeral, &nonce, &[]).is_none());
     }
@@ -459,7 +433,6 @@ mod tests {
 
         let data = decode_base64("").is_none();
         assert!(data);
-        // 带填充的标准 base64 也能解码
         let padded = STANDARD.encode([1u8, 2, 3]);
         assert_eq!(decode_base64(&padded).as_deref(), Some(&[1u8, 2, 3][..]));
     }
@@ -475,7 +448,6 @@ mod tests {
             assert_eq!(group.len(), 4);
             assert!(group.chars().all(|ch| ch.is_ascii_hexdigit() && !ch.is_ascii_lowercase()));
         }
-        // 同一公钥稳定，不同公钥不同
         assert_eq!(fingerprint, format_fingerprint(&identity.public_key_bytes()));
         assert_ne!(fingerprint, Identity::generate().fingerprint());
         assert_eq!(
@@ -524,7 +496,6 @@ mod tests {
 
     #[test]
     fn sync_apis_need_engine_init() {
-        // 全局状态可能被其它测试影响，这里只验证未初始化/空输入不会 panic
         assert!(sync_encrypt("bad", "x").is_none());
         assert!(sync_decrypt("bad", "bad", "bad").is_none());
     }

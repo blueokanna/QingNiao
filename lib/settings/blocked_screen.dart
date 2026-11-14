@@ -6,7 +6,6 @@ import '../messaging/format.dart';
 import '../messaging/message_repository.dart';
 import '../messaging/models.dart';
 
-/// 黑名单：被屏蔽的号码不再触发通知，并在收件箱中降权显示。
 class BlockedScreen extends StatefulWidget {
   const BlockedScreen({super.key, required this.repository});
 

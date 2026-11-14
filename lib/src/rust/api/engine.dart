@@ -7,19 +7,15 @@ import '../frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-/// 批量分析正文，顺序与输入一致。
 Future<List<MessageAnalysis>> analyzeMessages({required List<String> bodies}) =>
     RustLib.instance.api.crateApiEngineAnalyzeMessages(bodies: bodies);
 
-/// 初始化数据目录（幂等）。同时设置 store / crypto / search 的根目录。
 Future<bool> engineInit({required String dataDir}) =>
     RustLib.instance.api.crateApiEngineEngineInit(dataDir: dataDir);
 
-/// 全量重建索引，返回索引的文档数。
 Future<int> indexMessages({required List<SearchDoc> docs}) =>
     RustLib.instance.api.crateApiEngineIndexMessages(docs: docs);
 
-/// 检索。空查询返回空列表，`limit` 上限 100。
 Future<List<SearchHit>> searchMessages({
   required String query,
   required int limit,
@@ -28,14 +24,11 @@ Future<List<SearchHit>> searchMessages({
   limit: limit,
 );
 
-/// 当前索引文档数。
 Future<int> indexedCount() => RustLib.instance.api.crateApiEngineIndexedCount();
 
-/// 计算 GSM-7 / UCS-2 分段。
 Future<Segmentation> segmentMessage({required String body}) =>
     RustLib.instance.api.crateApiEngineSegmentMessage(body: body);
 
-/// 把消息放入回收站。`engine_init` 之后可用。
 Future<bool> trashAdd({
   required PlatformInt64 id,
   required PlatformInt64 threadId,
@@ -52,19 +45,15 @@ Future<bool> trashAdd({
   kind: kind,
 );
 
-/// 回收站条目（最近删除的在前）。
 Future<List<TrashEntry>> trashEntries() =>
     RustLib.instance.api.crateApiEngineTrashEntries();
 
-/// 从回收站恢复（移出回收站）。返回该条目是否存在。
 Future<bool> trashRestore({required PlatformInt64 id}) =>
     RustLib.instance.api.crateApiEngineTrashRestore(id: id);
 
-/// 从回收站永久删除。返回该条目是否存在。
 Future<bool> trashRemove({required PlatformInt64 id}) =>
     RustLib.instance.api.crateApiEngineTrashRemove(id: id);
 
-/// 按保留天数清理回收站，`0` 表示永久保留。返回清理数量。
 Future<int> trashPurge({required int retentionDays}) =>
     RustLib.instance.api.crateApiEngineTrashPurge(retentionDays: retentionDays);
 
@@ -74,11 +63,9 @@ Future<String?> settingsGet({required String key}) =>
 Future<bool> settingsSet({required String key, required String value}) =>
     RustLib.instance.api.crateApiEngineSettingsSet(key: key, value: value);
 
-/// 解码 M-Retrieve.conf。非法输入返回 `None`。
 Future<DecodedMms?> decodeMmsPdu({required List<int> pdu}) =>
     RustLib.instance.api.crateApiEngineDecodeMmsPdu(pdu: pdu);
 
-/// 编码 M-Retrieve.conf（`multipart.mixed`：文本 + 附件）。
 Future<Uint8List> encodeMmsPdu({
   required List<String> recipients,
   required String text,
@@ -91,17 +78,14 @@ Future<Uint8List> encodeMmsPdu({
   attachments: attachments,
 );
 
-/// 初始化（或加载）本机同步身份。必须先调用 `engine_init`。
 Future<DeviceIdentity?> syncInit() =>
     RustLib.instance.api.crateApiEngineSyncInit();
 
-/// 计算公钥指纹（8 组 4 位大写 hex）。输入非法返回空串。
 Future<String> syncFingerprint({required String publicKeyBase64}) => RustLib
     .instance
     .api
     .crateApiEngineSyncFingerprint(publicKeyBase64: publicKeyBase64);
 
-/// 加密给目标设备公钥。失败返回 `None`。
 Future<EncryptedEnvelope?> syncEncrypt({
   required String targetPublicKeyBase64,
   required String plaintext,
@@ -110,7 +94,6 @@ Future<EncryptedEnvelope?> syncEncrypt({
   plaintext: plaintext,
 );
 
-/// 使用本机静态私钥解密。失败返回 `None`。
 Future<String?> syncDecrypt({
   required String ephemeralPublicKeyBase64,
   required String nonceBase64,
@@ -121,7 +104,6 @@ Future<String?> syncDecrypt({
   ciphertextBase64: ciphertextBase64,
 );
 
-/// 删除密钥文件并清空缓存。
 Future<bool> syncReset() => RustLib.instance.api.crateApiEngineSyncReset();
 
 class DecodedMms {
@@ -217,7 +199,6 @@ class EncryptedEnvelope {
           ciphertext == other.ciphertext;
 }
 
-/// 单条正文的分析结果。`otp_start` / `otp_end` 为 UTF-16 码元下标。
 class MessageAnalysis {
   final String category;
   final String? otp;
@@ -402,7 +383,6 @@ class Segmentation {
           maxChars == other.maxChars;
 }
 
-/// snippet 内的 UTF-16 范围。
 class TextRange {
   final int start;
   final int end;

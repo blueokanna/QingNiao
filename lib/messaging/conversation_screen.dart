@@ -14,8 +14,6 @@ import 'message_widgets.dart';
 import 'models.dart';
 import 'trash_screen.dart';
 
-/// 会话详情。消息按天分组、相邻气泡收拢圆角；
-/// 列表使用 reverse 保持输入时的位置稳定，新消息从底部进入。
 class ConversationScreen extends StatefulWidget {
   const ConversationScreen({
     super.key,

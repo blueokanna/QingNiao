@@ -1,20 +1,3 @@
-//! WAP-230/WSP 的 M-Retrieve.conf 子集编解码。
-//!
-//! 支持解码：
-//! - 头字段 `X-Mms-Message-Type(0x8C)`、`X-Mms-Transaction-Id(0x98)`、`Date(0x85)`、
-//!   `From(0x89)`、`To(0x97)`、`Cc(0x82)`、`Bcc(0x81)`、`Subject(0x96)`、
-//!   `Content-Type(0x84)`、`Message-Class(0x8A)`、`X-Mms-Expiry(0x88)` 等；
-//! - 多部分正文（`multipart.mixed` / `multipart.related` / `multipart.alternative`），
-//!   每个部分为 `HeadersLen DataLen Headers Data`；
-//! - 文本部分 `text/plain`（UTF-8 / UTF-16，GB2312 尽力而为）；
-//! - 附件：`image/jpeg|png|gif`、`audio/amr` 以及其它未知媒体类型。
-//!
-//! 支持编码：生成 `multipart.mixed`（文本部分 + 附件部分），带上述头部，
-//! `Date` 使用当前时间，`From` 使用 insert-address-token。
-//!
-//! 对截断、长度非法、超大（> 2MB）输入返回 `None`，不 panic。
-//! WSP 底层原语（uintvar / value-length / text-string / 媒体类型表）见
-//! `crate::core::wsp`。
 
 use crate::core::wsp::{
     charset_from_name, decode_text, is_multipart, read_text_bytes, read_text_string,
@@ -22,14 +5,12 @@ use crate::core::wsp::{
     write_value_length, Cursor, CHARSET_UTF8,
 };
 
-/// 允许解码的最大 PDU 字节数。
 pub const MAX_PDU_BYTES: usize = 2 * 1024 * 1024;
 const MAX_PARTS: u32 = 64;
 const TEXT_PLAIN_INDEX: u8 = 3;
 const MULTIPART_MIXED_INDEX: u8 = 35;
 const MESSAGE_TYPE_RETRIEVE_CONF: u8 = 132;
 
-/// 附件。
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Attachment {
     pub mime: String,
@@ -37,7 +18,6 @@ pub struct Attachment {
     pub data: Vec<u8>,
 }
 
-/// 解码后的彩信。
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DecodedMms {
     pub sender: String,
@@ -49,13 +29,6 @@ pub struct DecodedMms {
     pub message_type: i32,
 }
 
-/// 读取 Encoded-string-value。兼容三种实际出现过的编码：
-/// 1. `Text-string`；
-/// 2. `Value-length ( Short-integer charset Text-string )`（Android 编码器写法）；
-/// 3. `Value-length ( Address-present-token Encoded-string-value )`（规范写法，
-///    内部还可能再套一层 value-length）。
-///
-/// 做法是在 value-length 划定的区间内依次跳过可选令牌/字符集，然后读文本串。
 fn read_encoded_string(cursor: &mut Cursor) -> Option<String> {
     let first = cursor.peek()?;
     let bounded = if first < 0x20 {
@@ -70,7 +43,6 @@ fn read_encoded_string(cursor: &mut Cursor) -> Option<String> {
     if scan < region_end && cursor.data[scan] == 0x80 {
         scan += 1;
     }
-    // 内层 value-length
     if scan < region_end && cursor.data[scan] < 0x20 {
         let byte = cursor.data[scan];
         if byte <= 30 {
@@ -83,7 +55,6 @@ fn read_encoded_string(cursor: &mut Cursor) -> Option<String> {
             scan = (scan + 1).min(region_end);
         }
     }
-    // 字符集（short-integer）
     let mut charset = None;
     if scan < region_end && cursor.data[scan] >= 0x80 {
         charset = Some((cursor.data[scan] & 0x7F) as u32);
@@ -102,12 +73,10 @@ fn read_encoded_string(cursor: &mut Cursor) -> Option<String> {
     Some(value)
 }
 
-/// 地址字段：From / To / Cc / Bcc。
 fn read_address_value(cursor: &mut Cursor) -> Option<String> {
     read_encoded_string(cursor).map(|value| clean_address(&value))
 }
 
-/// 去掉 `/TYPE=PLMN` 之类的地址类型后缀与包裹引号。
 fn clean_address(value: &str) -> String {
     let trimmed = value.trim();
     let without_type = match trimmed.find('/') {
@@ -117,7 +86,6 @@ fn clean_address(value: &str) -> String {
     without_type.trim().trim_matches('"').to_string()
 }
 
-/// 跳过无法识别的头部/参数值（保证至少推进一个字节）。
 fn skip_value(cursor: &mut Cursor) {
     let first = match cursor.peek() {
         Some(byte) => byte,
@@ -135,7 +103,6 @@ fn skip_value(cursor: &mut Cursor) {
             let _ = read_text_bytes(cursor);
         }
         _ => {
-            // 0x80..=0xFF：短整数 / 令牌
             cursor.pos += 1;
         }
     }
@@ -171,8 +138,6 @@ fn read_charset_parameter(cursor: &mut Cursor) -> Option<u32> {
 
 type ContentTypeInfo = (String, Option<u32>, Option<String>);
 
-/// 解析 Content-Type 值：裸 short-integer、`Value-length Media-type *(Parameter)`、
-/// 或裸文本串（部分老编码器）。
 fn read_content_type(cursor: &mut Cursor) -> Option<ContentTypeInfo> {
     let first = cursor.peek()?;
     if first >= 0x80 {
@@ -224,10 +189,6 @@ fn read_content_type(cursor: &mut Cursor) -> Option<ContentTypeInfo> {
     Some((decode_text(&bytes, None), None, None))
 }
 
-/// 判断 `length` 字节的块是否为紧跟 Content-Type 的参数块。
-///
-/// 只有整块都能按“已知参数 id + 值”解析时才认为它是参数块，避免把正文里的
-/// `part count / headers_len` 误判成参数。
 fn looks_like_parameter_block(cursor: &Cursor, length: u8) -> bool {
     if length == 0 || length > 30 {
         return false;
@@ -267,7 +228,6 @@ fn looks_like_parameter_block(cursor: &Cursor, length: u8) -> bool {
     scan == end
 }
 
-/// 解码 M-Retrieve.conf（子集）。
 pub fn decode(bytes: &[u8]) -> Option<DecodedMms> {
     if bytes.is_empty() || bytes.len() > MAX_PDU_BYTES {
         return None;
@@ -288,19 +248,15 @@ pub fn decode(bytes: &[u8]) -> Option<DecodedMms> {
             None => break,
         };
         if header < 0x80 {
-            // 部分编码器把 multipart.related 的 start/type 参数写成紧跟在裸短整数
-            // Content-Type 之后的一个独立 value-length 块，这里识别并跳过。
             if !content_type.is_empty() && looks_like_parameter_block(&cursor, header) {
                 cursor.skip(header as usize);
                 continue;
             }
-            // 这个字节是正文的第一个字节，回退后交给多部分解析
             cursor.pos = header_pos;
             break;
         }
         let start = cursor.pos;
         match header {
-            // X-Mms-Message-Type：裸 octet
             0x8C => message.message_type = cursor.take()? as i32,
             // Content-Type
             0x84 => {
@@ -318,10 +274,7 @@ pub fn decode(bytes: &[u8]) -> Option<DecodedMms> {
                     cursor.pos = cursor.data.len();
                     break;
                 }
-                // multipart：继续循环；剩余头字段与 Content-Type 参数块会在
-                // 上面的 `header < 0x80` 分支里被跳过，正文起点则跳出循环。
             }
-            // Date：Long-integer（秒）
             0x85 => {
                 let seconds = cursor.long_integer()?;
                 message.date_ms = (seconds as i64).saturating_mul(1000);
@@ -341,7 +294,6 @@ pub fn decode(bytes: &[u8]) -> Option<DecodedMms> {
             }
             // Subject
             0x96 => message.subject = read_encoded_string(&mut cursor).unwrap_or_default(),
-            // Message-Class：短令牌
             0x8A => {
                 let _ = cursor.take();
             }
@@ -349,8 +301,6 @@ pub fn decode(bytes: &[u8]) -> Option<DecodedMms> {
             0x8D => {
                 let _ = cursor.short_integer();
             }
-            // 文本型头：Transaction-Id / Message-Id / Response-Text / Retrieve-Text /
-            // X-Mms-Content-Location
             0x98 | 0x8B | 0x93 | 0x9A | 0x83 => {
                 let _ = read_text_bytes(&mut cursor);
             }
@@ -362,11 +312,9 @@ pub fn decode(bytes: &[u8]) -> Option<DecodedMms> {
                 let _ = cursor.long_integer();
                 cursor.pos = end;
             }
-            // 其余未知头：尽量跳过
             _ => skip_value(&mut cursor),
         }
         if cursor.pos <= start {
-            // 没有推进，避免死循环
             cursor.pos = start + 1;
         }
     }
@@ -406,7 +354,6 @@ fn parse_multipart(cursor: &mut Cursor, message: &mut DecodedMms) -> bool {
         if cursor.pos > headers_end {
             return false;
         }
-        // 剩余 part 头部（Content-Location / Content-ID / Content-Disposition 等）
         while cursor.pos < headers_end {
             let parameter = match cursor.take() {
                 Some(parameter) => parameter,
@@ -450,7 +397,6 @@ fn classify_part(
     message: &mut DecodedMms,
 ) {
     let lower = mime.to_ascii_lowercase();
-    // SMIL 只是排版描述，不参与正文/附件
     if lower == "application/smil" || lower == "application/smil+xml" {
         return;
     }
@@ -508,7 +454,6 @@ fn write_parameter_text(out: &mut Vec<u8>, parameter: u8, value: &str) {
     write_text_string(out, value.as_bytes());
 }
 
-/// 号码补 `/TYPE=PLMN`；邮箱/已带类型后缀的地址原样保留。
 fn address_with_type(address: &str) -> String {
     let trimmed = address.trim();
     if trimmed.is_empty() {
@@ -553,7 +498,6 @@ fn write_part(out: &mut Vec<u8>, content_type: &[u8], location: Option<&str>, da
     out.extend_from_slice(data);
 }
 
-/// 编码 M-Retrieve.conf（`multipart.mixed`：文本 + 附件）。
 pub fn encode(
     recipients: &[String],
     text: &str,
@@ -570,7 +514,6 @@ pub fn encode(
     out.push(0x85);
     write_long_integer(&mut out, now_seconds());
 
-    // From：insert-address-token（本机发送，不回填号码）
     out.push(0x89);
     out.push(0x01);
     out.push(0x81);
@@ -695,7 +638,6 @@ mod tests {
 
     #[test]
     fn decodes_address_present_token_from() {
-        // 手工构造规范形式：From = Value-length(0x80 + Value-length(charset + text))
         let mut pdu: Vec<u8> = vec![0x8C, 0x84];
         let mut inner: Vec<u8> = vec![0x80 | CHARSET_UTF8 as u8];
         write_text_string(&mut inner, b"10086/TYPE=PLMN");
@@ -705,7 +647,6 @@ mod tests {
         pdu.push(0x89);
         pdu.push(value.len() as u8);
         pdu.extend_from_slice(&value);
-        // Content-Type 为裸 short-integer（与常见编码器一致）
         pdu.push(0x84);
         pdu.push(0x80 | MULTIPART_MIXED_INDEX);
         let mut content_type: Vec<u8> = vec![0x80 | TEXT_PLAIN_INDEX];
@@ -721,7 +662,6 @@ mod tests {
     #[test]
     fn skips_unknown_headers() {
         let pdu = encode(&["10086".into()], "未知头测试", "", &[]);
-        // 在第一个头之前插入一个未知头（0xA5 + value-length 3 + 文本）
         let mut injected: Vec<u8> = vec![0xA5, 0x03, b'x', b'y', b'z'];
         injected.extend_from_slice(&pdu);
         let decoded = decode(&injected).expect("decode");
@@ -737,12 +677,10 @@ mod tests {
         assert!(decode(&pdu[..pdu.len() / 2]).is_none(), "正文被截断");
         assert!(decode(&[]).is_none());
 
-        // 多部分头长度非法（超出剩余字节）
         let mut broken: Vec<u8> = vec![0x8C, 0x84, 0x84, 0x80 | MULTIPART_MIXED_INDEX];
         broken.extend_from_slice(&[0x01, 0x7F, 0x00]);
         assert!(decode(&broken).is_none());
 
-        // 部分数据长度非法
         let mut broken: Vec<u8> = vec![0x8C, 0x84, 0x84, 0x80 | MULTIPART_MIXED_INDEX];
         broken.extend_from_slice(&[0x01, 0x04, 0x7F, 0x83, 0x00, 0x00]);
         assert!(decode(&broken).is_none());
@@ -754,7 +692,6 @@ mod tests {
         assert!(decode(&oversized).is_none());
         assert!(decode(&[0x00, 0x01, 0x02, 0x03]).is_none());
         assert!(decode(&[0xFF; 64]).is_none());
-        // 全是未知头也不会 panic
         let _ = decode(&[0xA5; 200]);
     }
 
@@ -785,8 +722,6 @@ mod tests {
 
     #[test]
     fn tolerates_content_type_parameter_block() {
-        // 部分编码器把 multipart.related 的 start/type 参数写成紧跟 Content-Type
-        // 之后的独立 value-length 块
         let mut pdu: Vec<u8> = vec![0x8C, 0x84, 0x84, 0x80 | MULTIPART_MIXED_INDEX];
         let mut parameters: Vec<u8> = Vec::new();
         parameters.push(0x8A);

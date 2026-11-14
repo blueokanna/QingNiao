@@ -5,7 +5,6 @@ import 'aurora_motion.dart';
 import '../design/android_palette.dart';
 import '../design/bundled_fonts.dart';
 
-/// 品牌色板。极光主题以一束青碧为骨，紫与天水为翼。
 abstract final class AuroraPalettes {
   static const jade = Color(0xFF0E7C6B);
   static const aurora = Color(0xFF5B6CFF);
@@ -24,7 +23,6 @@ abstract final class AuroraPalettes {
   };
 }
 
-/// 主题扩展：极光渐变、气泡、验证码与玻璃质感。
 @immutable
 class AuroraColors extends ThemeExtension<AuroraColors> {
   const AuroraColors({
@@ -150,7 +148,6 @@ class AuroraColors extends ThemeExtension<AuroraColors> {
   }
 }
 
-/// 应用级外观配置，注入主题构建。
 @immutable
 class AuroraAppearance {
   const AuroraAppearance({
@@ -593,7 +590,6 @@ Color _deepen(Color color, double amount) {
   return hsl.withLightness((hsl.lightness - amount).clamp(0.0, 1.0)).toColor();
 }
 
-/// 便捷读取主题扩展。
 extension AuroraThemeContext on BuildContext {
   AuroraColors get aurora =>
       Theme.of(this).extension<AuroraColors>() ?? _fallbackAurora;

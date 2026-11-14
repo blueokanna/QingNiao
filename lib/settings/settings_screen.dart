@@ -13,8 +13,6 @@ import 'device_compatibility_screen.dart';
 import 'blocked_screen.dart';
 import 'sync_screen.dart';
 
-/// 设置主页面。分组遵循「权限 → 外观 → 消息 → 隐私 → 同步 → 关于」，
-/// 所有改动即时生效并持久化。
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.repository, required this.hub});
 

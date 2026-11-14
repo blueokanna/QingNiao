@@ -14,7 +14,6 @@ import 'compose_screen.dart';
 import 'conversation_screen.dart';
 import 'trash_screen.dart';
 
-/// 收件箱：持续流动的极光之下，会话是唯一的视觉主角。
 class InboxScreen extends StatefulWidget {
   const InboxScreen({super.key, required this.repository, required this.hub});
 
@@ -315,7 +314,7 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
                 style: context.texts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
               Text(
-                'AURORA ENGINE',
+                '短信与彩信',
                 style: context.texts.labelSmall?.copyWith(
                   fontSize: 8.5,
                   letterSpacing: 1.6,

@@ -10,7 +10,6 @@ import '../messaging/message_widgets.dart';
 import '../messaging/models.dart';
 import 'conversation_screen.dart';
 
-/// 验证码中心：把散落在短信里的短期凭证收拢成可一触复制的时间线。
 class OtpScreen extends StatelessWidget {
   const OtpScreen({super.key, required this.repository, required this.hub});
 

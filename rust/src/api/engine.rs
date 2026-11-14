@@ -1,9 +1,3 @@
-//! flutter_rust_bridge 2.13 的唯一门面。
-//!
-//! 约定：本模块的 `pub` 函数与结构体字段只使用 FRB 友好类型
-//! （`String` / `bool` / `i64` / `u32` / `f64` / `Option<T>` / `Vec<T>` /
-//! 仅含 pub 字段的结构体），不使用泛型、生命周期、`HashMap`、trait 对象或
-//! `Result` 错误类型；失败一律用 `bool` 或 `Option` 表达。
 
 use crate::core::analysis;
 use crate::core::crypto;
@@ -12,11 +6,7 @@ use crate::core::search;
 use crate::core::segment;
 use crate::core::store;
 
-// ---------------------------------------------------------------------------
-// 正文分析
-// ---------------------------------------------------------------------------
 
-/// 单条正文的分析结果。`otp_start` / `otp_end` 为 UTF-16 码元下标。
 pub struct MessageAnalysis {
     pub category: String,
     pub otp: Option<String>,
@@ -29,7 +19,6 @@ pub struct MessageAnalysis {
     pub remaining: u32,
 }
 
-/// 批量分析正文，顺序与输入一致。
 pub fn analyze_messages(bodies: Vec<String>) -> Vec<MessageAnalysis> {
     bodies
         .iter()
@@ -50,9 +39,6 @@ pub fn analyze_messages(bodies: Vec<String>) -> Vec<MessageAnalysis> {
         .collect()
 }
 
-// ---------------------------------------------------------------------------
-// 检索
-// ---------------------------------------------------------------------------
 
 pub struct SearchDoc {
     pub id: i64,
@@ -63,7 +49,6 @@ pub struct SearchDoc {
     pub read: bool,
 }
 
-/// snippet 内的 UTF-16 范围。
 pub struct TextRange {
     pub start: u32,
     pub end: u32,
@@ -77,7 +62,6 @@ pub struct SearchHit {
     pub highlights: Vec<TextRange>,
 }
 
-/// 初始化数据目录（幂等）。同时设置 store / crypto / search 的根目录。
 pub fn engine_init(data_dir: String) -> bool {
     let initialized = store::init(&data_dir);
     if initialized {
@@ -86,7 +70,6 @@ pub fn engine_init(data_dir: String) -> bool {
     initialized
 }
 
-/// 全量重建索引，返回索引的文档数。
 pub fn index_messages(docs: Vec<SearchDoc>) -> u32 {
     let documents: Vec<search::Document> = docs
         .into_iter()
@@ -102,7 +85,6 @@ pub fn index_messages(docs: Vec<SearchDoc>) -> u32 {
     search::index_messages(documents)
 }
 
-/// 检索。空查询返回空列表，`limit` 上限 100。
 pub fn search_messages(query: String, limit: u32) -> Vec<SearchHit> {
     search::search_messages(&query, limit)
         .into_iter()
@@ -120,14 +102,10 @@ pub fn search_messages(query: String, limit: u32) -> Vec<SearchHit> {
         .collect()
 }
 
-/// 当前索引文档数。
 pub fn indexed_count() -> u32 {
     search::indexed_count()
 }
 
-// ---------------------------------------------------------------------------
-// 分段
-// ---------------------------------------------------------------------------
 
 pub struct Segmentation {
     pub encoding: String,
@@ -137,7 +115,6 @@ pub struct Segmentation {
     pub max_chars: u32,
 }
 
-/// 计算 GSM-7 / UCS-2 分段。
 pub fn segment_message(body: String) -> Segmentation {
     let result = segment::segmentation(&body);
     Segmentation {
@@ -149,9 +126,6 @@ pub fn segment_message(body: String) -> Segmentation {
     }
 }
 
-// ---------------------------------------------------------------------------
-// 回收站与设置
-// ---------------------------------------------------------------------------
 
 pub struct TrashEntry {
     pub id: i64,
@@ -163,7 +137,6 @@ pub struct TrashEntry {
     pub deleted_at: i64,
 }
 
-/// 把消息放入回收站。`engine_init` 之后可用。
 pub fn trash_add(
     id: i64,
     thread_id: i64,
@@ -183,7 +156,6 @@ pub fn trash_add(
     })
 }
 
-/// 回收站条目（最近删除的在前）。
 pub fn trash_entries() -> Vec<TrashEntry> {
     store::trash_entries()
         .into_iter()
@@ -199,17 +171,14 @@ pub fn trash_entries() -> Vec<TrashEntry> {
         .collect()
 }
 
-/// 从回收站恢复（移出回收站）。返回该条目是否存在。
 pub fn trash_restore(id: i64) -> bool {
     store::trash_restore(id)
 }
 
-/// 从回收站永久删除。返回该条目是否存在。
 pub fn trash_remove(id: i64) -> bool {
     store::trash_remove(id)
 }
 
-/// 按保留天数清理回收站，`0` 表示永久保留。返回清理数量。
 pub fn trash_purge(retention_days: i32) -> u32 {
     store::trash_purge(retention_days)
 }
@@ -222,9 +191,6 @@ pub fn settings_set(key: String, value: String) -> bool {
     store::settings_set(&key, &value)
 }
 
-// ---------------------------------------------------------------------------
-// 彩信 PDU
-// ---------------------------------------------------------------------------
 
 pub struct MmsAttachmentData {
     pub mime: String,
@@ -242,7 +208,6 @@ pub struct DecodedMms {
     pub message_type: i32,
 }
 
-/// 解码 M-Retrieve.conf。非法输入返回 `None`。
 pub fn decode_mms_pdu(pdu: Vec<u8>) -> Option<DecodedMms> {
     mms_pdu::decode(&pdu).map(|decoded| DecodedMms {
         sender: decoded.sender,
@@ -263,7 +228,6 @@ pub fn decode_mms_pdu(pdu: Vec<u8>) -> Option<DecodedMms> {
     })
 }
 
-/// 编码 M-Retrieve.conf（`multipart.mixed`：文本 + 附件）。
 pub fn encode_mms_pdu(
     recipients: Vec<String>,
     text: String,
@@ -281,9 +245,6 @@ pub fn encode_mms_pdu(
     mms_pdu::encode(&recipients, &text, &subject, &converted)
 }
 
-// ---------------------------------------------------------------------------
-// 端到端同步加密
-// ---------------------------------------------------------------------------
 
 pub struct DeviceIdentity {
     pub device_id: String,
@@ -297,7 +258,6 @@ pub struct EncryptedEnvelope {
     pub ciphertext: String,
 }
 
-/// 初始化（或加载）本机同步身份。必须先调用 `engine_init`。
 pub fn sync_init() -> Option<DeviceIdentity> {
     crypto::sync_init().map(|identity| DeviceIdentity {
         device_id: identity.device_id,
@@ -306,12 +266,10 @@ pub fn sync_init() -> Option<DeviceIdentity> {
     })
 }
 
-/// 计算公钥指纹（8 组 4 位大写 hex）。输入非法返回空串。
 pub fn sync_fingerprint(public_key_base64: String) -> String {
     crypto::sync_fingerprint(&public_key_base64)
 }
 
-/// 加密给目标设备公钥。失败返回 `None`。
 pub fn sync_encrypt(target_public_key_base64: String, plaintext: String) -> Option<EncryptedEnvelope> {
     crypto::sync_encrypt(&target_public_key_base64, &plaintext).map(|envelope| EncryptedEnvelope {
         ephemeral_public_key: envelope.ephemeral_public_key,
@@ -320,7 +278,6 @@ pub fn sync_encrypt(target_public_key_base64: String, plaintext: String) -> Opti
     })
 }
 
-/// 使用本机静态私钥解密。失败返回 `None`。
 pub fn sync_decrypt(
     ephemeral_public_key_base64: String,
     nonce_base64: String,
@@ -333,7 +290,6 @@ pub fn sync_decrypt(
     )
 }
 
-/// 删除密钥文件并清空缓存。
 pub fn sync_reset() -> bool {
     crypto::sync_reset()
 }
@@ -347,7 +303,6 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    /// 全局状态（store / search / crypto 单例）在测试间串行使用。
     static TEST_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
     fn guard() -> MutexGuard<'static, ()> {
@@ -489,7 +444,6 @@ mod tests {
         assert_eq!(trash_entries().len(), 1);
         assert!(trash_remove(2));
         assert!(trash_entries().is_empty());
-        // 0 = 永久保留
         assert_eq!(trash_purge(0), 0);
         let _ = fs::remove_dir_all(&dir);
     }
@@ -548,7 +502,6 @@ mod tests {
             identity.fingerprint
         );
 
-        // 自己加密给自己：验证完整链路
         let envelope = sync_encrypt(identity.public_key.clone(), "同步载荷 🌿".into()).expect("seal");
         let opened = sync_decrypt(
             envelope.ephemeral_public_key,
@@ -558,11 +511,9 @@ mod tests {
         .expect("open");
         assert_eq!(opened, "同步载荷 🌿");
 
-        // 错误输入不会 panic
         assert!(sync_encrypt("bad-key".into(), "x".into()).is_none());
         assert!(sync_decrypt("bad".into(), "bad".into(), "bad".into()).is_none());
 
-        // reset 后重新生成身份
         assert!(sync_reset());
         let regenerated = sync_init().expect("identity after reset");
         assert!(!regenerated.device_id.is_empty());

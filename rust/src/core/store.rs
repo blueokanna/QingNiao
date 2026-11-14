@@ -1,9 +1,3 @@
-//! 本地持久化：数据目录、回收站、设置。
-//!
-//! - `engine_init` 创建数据目录并把路径写入全局状态；
-//! - `trash.json` / `settings.json` 使用“临时文件 + rename”原子写入；
-//! - 文件损坏时自动备份为 `.bak` 并回退为空，不影响启动；
-//! - 回收站按 `id` 去重，`retention_days == 0` 表示永久保留。
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -17,7 +11,6 @@ use serde::{Deserialize, Serialize};
 pub const TRASH_FILE: &str = "trash.json";
 pub const SETTINGS_FILE: &str = "settings.json";
 
-/// 回收站条目。
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TrashEntry {
     pub id: i64,
@@ -29,7 +22,6 @@ pub struct TrashEntry {
     pub deleted_at: i64,
 }
 
-/// 存储状态（不含全局锁，便于单测并发）。
 #[derive(Default)]
 pub struct Store {
     dir: Option<PathBuf>,
@@ -46,7 +38,6 @@ impl Store {
         self.dir.as_deref()
     }
 
-    /// 初始化数据目录。幂等：同一目录重复调用直接返回 `true`。
     pub fn init(&mut self, data_dir: &str) -> bool {
         let trimmed = data_dir.trim();
         if trimmed.is_empty() {
@@ -84,7 +75,6 @@ impl Store {
         false
     }
 
-    /// 加入回收站（同 id 覆盖）。
     pub fn trash_add(&mut self, entry: TrashEntry) -> bool {
         if self.dir.is_none() {
             return false;
@@ -110,12 +100,10 @@ impl Store {
         self.trash.clone()
     }
 
-    /// 从回收站移除（恢复）。返回是否存在于回收站。
     pub fn trash_restore(&mut self, id: i64) -> bool {
         self.remove_entry(id)
     }
 
-    /// 从回收站移除（永久删除）。返回是否存在于回收站。
     pub fn trash_remove(&mut self, id: i64) -> bool {
         self.remove_entry(id)
     }
@@ -137,12 +125,10 @@ impl Store {
         }
     }
 
-    /// 按保留天数清理，`retention_days <= 0` 表示永久保留。
     pub fn trash_purge(&mut self, retention_days: i32) -> u32 {
         self.trash_purge_at(now_ms(), retention_days)
     }
 
-    /// 以指定时间清理，便于测试。
     pub fn trash_purge_at(&mut self, now: i64, retention_days: i32) -> u32 {
         if retention_days <= 0 || self.dir.is_none() {
             return 0;
@@ -180,12 +166,10 @@ impl Store {
 
 static STORE: Lazy<Mutex<Store>> = Lazy::new(|| Mutex::new(Store::new()));
 
-/// 全局初始化（由 `engine_init` 调用）。
 pub fn init(data_dir: &str) -> bool {
     STORE.lock().init(data_dir)
 }
 
-/// 当前数据目录。
 pub fn data_dir() -> Option<PathBuf> {
     STORE.lock().dir().map(|path| path.to_path_buf())
 }
@@ -218,7 +202,6 @@ pub fn trash_purge(retention_days: i32) -> u32 {
     STORE.lock().trash_purge(retention_days)
 }
 
-/// 清空全局状态（测试用）。
 pub fn reset() {
     *STORE.lock() = Store::new();
 }
@@ -276,7 +259,6 @@ fn backup(path: &Path) {
     let _ = fs::copy(path, target);
 }
 
-/// 原子写入：先写同目录临时文件再 rename，避免进程被杀导致半截 JSON。
 fn write_json_atomic<T: Serialize>(path: &Path, value: &T) -> bool {
     let data = match serde_json::to_vec(value) {
         Ok(data) => data,
@@ -289,7 +271,6 @@ fn write_json_atomic<T: Serialize>(path: &Path, value: &T) -> bool {
     if fs::rename(&tmp, path).is_ok() {
         return true;
     }
-    // 某些平台 rename 覆盖已存在文件可能失败，退化为直接写。
     let _ = fs::remove_file(&tmp);
     fs::write(path, &data).is_ok()
 }
@@ -335,7 +316,6 @@ mod tests {
         assert!(store.dir().is_some());
         assert!(!store.init("   "));
 
-        // 目录不可用时返回 false（用文件路径占位）
         let file = dir.join("blocked");
         fs::write(&file, b"x").unwrap();
         let mut other = Store::new();
@@ -360,12 +340,10 @@ mod tests {
         );
         assert!(entries[1].deleted_at > 0);
 
-        // 重新加载
         let mut reloaded = Store::new();
         assert!(reloaded.init(dir.to_str().unwrap()));
         assert_eq!(reloaded.trash_entries(), entries);
 
-        // 临时文件不应残留
         assert!(!dir.join("trash.json.tmp").exists());
         let _ = fs::remove_dir_all(&dir);
     }
@@ -397,13 +375,11 @@ mod tests {
         store.trash_add(entry(1, "旧"));
         store.trash_add(entry(2, "新"));
 
-        // 0 / 负数表示永久保留
         let now = now_ms();
         assert_eq!(store.trash_purge_at(now + 10 * 86_400_000, 0), 0);
         assert_eq!(store.trash_purge_at(now + 10 * 86_400_000, -1), 0);
         assert_eq!(store.trash_entries().len(), 2);
 
-        // 两天后再按 1 天保留清理 -> 全部过期
         assert_eq!(store.trash_purge_at(now + 2 * 86_400_000, 1), 2);
         assert!(store.trash_entries().is_empty());
 
@@ -438,7 +414,6 @@ mod tests {
         assert!(dir.join("trash.json.bak").exists());
         assert!(dir.join("settings.json.bak").exists());
 
-        // 备份后仍可正常写入
         assert!(store.settings_set("theme", "dark"));
         let mut reloaded = Store::new();
         reloaded.init(dir.to_str().unwrap());

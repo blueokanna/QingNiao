@@ -5,8 +5,6 @@ import 'models.dart';
 
 typedef MessageRecord = Map<String, dynamic>;
 
-/// 平台通道的统一封装。所有短信读写都经过 Kotlin 平台层；
-/// 验证码/分类由 Rust 引擎批量计算。
 class MessageRepository {
   const MessageRepository();
 
@@ -65,8 +63,6 @@ class MessageRepository {
 
   static bool _engineReady = false;
 
-  /// 初始化 Rust 引擎的数据目录（回收站/搜索/同步密钥）。
-  /// 平台层尚未提供目录时静默失败，短信收发不依赖它。
   Future<bool> initEngine() async {
     if (_engineReady) return true;
     try {
@@ -287,7 +283,26 @@ class MessageRepository {
 
   Future<void> syncReset() => _channel.invokeMethod<void>('syncReset');
 
-  /// 批量补充验证码与分类。Rust 不可用时保持原值，不阻塞列表。
+  Future<String?> syncStateRaw() => _invoke<String>('syncState');
+
+  Future<void> syncStateSet(String json) =>
+      _channel.invokeMethod<void>('syncStateSet', {'json': json});
+
+  Future<List<Map<String, dynamic>>> remoteMessagesSince(int since) =>
+      _list('remoteMessagesSince', {'since': since});
+
+  Future<int?> insertRemoteMessage({
+    required String address,
+    required String body,
+    required int date,
+    int subscriptionId = -1,
+  }) => _invoke<int>('insertRemoteMessage', {
+    'address': address,
+    'body': body,
+    'date': date,
+    'subscriptionId': subscriptionId,
+  });
+
   Future<List<SmsMessage>> analyzeMessages(List<SmsMessage> messages) async {
     if (messages.isEmpty) return messages;
     try {
@@ -345,7 +360,6 @@ class MessageRepository {
   }
 }
 
-/// 与 Rust 桥接的薄封装，便于未来替换为带位置信息的分析结果。
 Future<List<MessageAnalysis>> analyzeMessagesRust({
   required List<String> bodies,
 }) => analyzeMessages(bodies: bodies);

@@ -4,8 +4,6 @@ import 'dart:typed_data';
 import 'message_repository.dart';
 import 'models.dart';
 
-/// 用于桌面调试、Widget 测试与黄金截图的演示数据源。
-/// 不触碰任何平台通道，行为与真实仓库一致。
 class DemoMessageRepository extends MessageRepository {
   DemoMessageRepository() {
     _seed();

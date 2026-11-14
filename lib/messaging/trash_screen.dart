@@ -8,7 +8,6 @@ import 'format.dart';
 import 'message_repository.dart';
 import 'models.dart';
 
-/// 可恢复回收站。保留时长由用户设置，永久删除前二次确认。
 class TrashScreen extends StatefulWidget {
   const TrashScreen({super.key, required this.repository});
 

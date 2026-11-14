@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// 统一的运动语言：时间、曲线与弹簧参数都从这里取，避免页面各写一套。
 abstract final class AuroraMotion {
   static const fast = Duration(milliseconds: 160);
   static const base = Duration(milliseconds: 280);
@@ -28,7 +27,6 @@ abstract final class AuroraMotion {
   }
 }
 
-/// Android 使用系统预测性返回（Material 3 FadeForwards），其他平台使用极光共享轴。
 class AuroraPageTransitionsTheme extends PageTransitionsTheme {
   AuroraPageTransitionsTheme()
     : super(
@@ -38,8 +36,6 @@ class AuroraPageTransitionsTheme extends PageTransitionsTheme {
       );
 }
 
-/// 共享轴转场：新页面从右侧轻推进入，旧页面轻微后退并淡出，
-/// 两页之间保留背景的连续性，避免"切屏"的断裂感。
 class AuroraPageTransitionsBuilder extends PageTransitionsBuilder {
   const AuroraPageTransitionsBuilder();
 
@@ -87,7 +83,6 @@ class AuroraPageTransitionsBuilder extends PageTransitionsBuilder {
   }
 }
 
-/// 标签切换：淡出旧内容、淡入新内容，同时做极轻微的纵向位移。
 class AuroraSwitcher extends StatelessWidget {
   const AuroraSwitcher({
     super.key,
@@ -126,8 +121,6 @@ class AuroraSwitcher extends StatelessWidget {
   }
 }
 
-/// 列表逐项浮现。使用隐式动画而非每项一个 controller，
-/// 动画结束即释放，滚动时不会积累 ticker。
 class AuroraReveal extends StatelessWidget {
   const AuroraReveal({
     super.key,
@@ -164,7 +157,6 @@ class AuroraReveal extends StatelessWidget {
   }
 }
 
-/// 数字滚动。仅重建数字本身，避免整行重排。
 class AuroraCounter extends StatelessWidget {
   const AuroraCounter({
     super.key,
@@ -194,7 +186,6 @@ class AuroraCounter extends StatelessWidget {
   }
 }
 
-/// 视差滚动：为头图或背景提供被限幅的位移，尊重"减少动态"设置。
 class AuroraParallax extends StatelessWidget {
   const AuroraParallax({
     super.key,

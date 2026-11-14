@@ -13,8 +13,6 @@ import '../aurora/aurora_widgets.dart';
 import 'format.dart';
 import 'models.dart';
 
-/// 收件箱会话行。固定信息层级：标题 / 摘要 / 元信息，
-/// 未读时头像形变、卡片出现渐变底色。
 class ConversationTile extends StatelessWidget {
   const ConversationTile({
     super.key,
@@ -238,7 +236,6 @@ class CategoryTag extends StatelessWidget {
   }
 }
 
-/// 验证码胶囊：点按复制，复制后图标形变为对勾。
 class OtpChip extends StatefulWidget {
   const OtpChip({
     super.key,
@@ -324,7 +321,6 @@ class _OtpChipState extends State<OtpChip> {
   }
 }
 
-/// 消息气泡。相邻同向消息会收拢对应圆角，形成连续对话流。
 class MessageBubble extends StatelessWidget {
   const MessageBubble({
     super.key,
@@ -745,8 +741,6 @@ class AttachmentPreview extends StatelessWidget {
   }
 }
 
-/// 撰写栏。发送键为 M3 形状按钮，输入为空时收缩为圆形，
-/// 有内容时舒展为饼干形并点亮渐变。
 class MessageComposer extends StatelessWidget {
   const MessageComposer({
     super.key,

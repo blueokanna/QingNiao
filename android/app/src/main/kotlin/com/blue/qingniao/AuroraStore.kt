@@ -5,13 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-/**
- * 青鸟自己的轻量状态库：置顶/归档/黑名单/回收站/草稿/定时短信。
- *
- * 与系统短信库分离：系统库只存短信本体，所有“应用状态”在这里。
- * 这样升级应用不会影响系统短信，也避免与其他短信应用互相覆盖。
- */
-class AuroraStore(context: Context) : SQLiteOpenHelper(context, "aurora.db", null, 1) {
+class AuroraStore(context: Context) : SQLiteOpenHelper(context, "aurora.db", null, 2) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             "CREATE TABLE thread_state (" +
@@ -49,9 +43,14 @@ class AuroraStore(context: Context) : SQLiteOpenHelper(context, "aurora.db", nul
                 "at INTEGER NOT NULL," +
                 "sub_id INTEGER NOT NULL DEFAULT -1)"
         )
+        db.execSQL("CREATE TABLE remote (id INTEGER PRIMARY KEY)")
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS remote (id INTEGER PRIMARY KEY)")
+        }
+    }
 
     data class ThreadState(val pinned: Boolean, val archived: Boolean, val muted: Boolean)
 
@@ -204,5 +203,13 @@ class AuroraStore(context: Context) : SQLiteOpenHelper(context, "aurora.db", nul
 
     fun cancelScheduled(id: Long) {
         writableDatabase.delete("scheduled", "id=?", arrayOf(id.toString()))
+    }
+
+    fun remoteIds(): Set<Long> = readableDatabase.rawQuery("SELECT id FROM remote", null).use { cursor ->
+        buildSet { while (cursor.moveToNext()) add(cursor.getLong(0)) }
+    }
+
+    fun markRemote(id: Long) {
+        writableDatabase.execSQL("INSERT OR IGNORE INTO remote VALUES(?)", arrayOf<Any?>(id))
     }
 }

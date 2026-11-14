@@ -11,10 +11,6 @@ import 'aurora_motion.dart';
 import 'aurora_shapes.dart';
 import 'aurora_theme.dart';
 
-/// 所有页面的共同外壳：持续流动的极光背景 + 透明 Scaffold。
-///
-/// 背景位于最底层并由 [RepaintBoundary] 隔离；滚动会通知极光引擎降低
-/// 氛围动效频率，把渲染预算留给消息列表。
 class AuroraScaffold extends StatefulWidget {
   const AuroraScaffold({
     super.key,
@@ -81,7 +77,6 @@ class _AuroraScaffoldState extends State<AuroraScaffold> {
   }
 }
 
-/// 玻璃质感表面：半透明、极细描边、顶部高光，不依赖 BackdropFilter。
 class AuroraGlass extends StatelessWidget {
   const AuroraGlass({
     super.key,
@@ -150,7 +145,6 @@ class AuroraGlass extends StatelessWidget {
   }
 }
 
-/// 带弹簧按压反馈的点击层。弹簧由极光引擎统一 tick，不额外创建 controller。
 class AuroraPressable extends StatefulWidget {
   const AuroraPressable({
     super.key,
@@ -221,7 +215,6 @@ class _AuroraPressableState extends State<AuroraPressable> {
   }
 }
 
-/// 玻璃图标按钮，可带未读徽章。
 class AuroraIconButton extends StatelessWidget {
   const AuroraIconButton({
     super.key,
@@ -274,7 +267,6 @@ class AuroraIconButton extends StatelessWidget {
   }
 }
 
-/// 逐项形变的筛选条。选中项使用渐变与超椭圆，切换时连续过渡。
 class AuroraFilterBar extends StatelessWidget {
   const AuroraFilterBar({
     super.key,
@@ -393,7 +385,6 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-/// 搜索胶囊。聚焦时描边与阴影连续增强，不改变布局尺寸。
 class AuroraSearchField extends StatefulWidget {
   const AuroraSearchField({
     super.key,
@@ -508,7 +499,6 @@ class _AuroraSearchFieldState extends State<AuroraSearchField> {
   }
 }
 
-/// 页面顶部：返回、标题、副标题与操作。
 class AuroraTopBar extends StatelessWidget {
   const AuroraTopBar({
     super.key,
@@ -575,7 +565,6 @@ class AuroraTopBar extends StatelessWidget {
   }
 }
 
-/// 大标题区域：eyebrow + 标题 + 描述。
 class AuroraLargeHeader extends StatelessWidget {
   const AuroraLargeHeader({
     super.key,
@@ -636,7 +625,6 @@ class AuroraLargeHeader extends StatelessWidget {
   }
 }
 
-/// 底部弹出的极光面板。
 Future<T?> showAuroraSheet<T>({
   required BuildContext context,
   required WidgetBuilder builder,
@@ -719,7 +707,6 @@ class AuroraSheetSurface extends StatelessWidget {
   }
 }
 
-/// 极光对话框。
 Future<T?> showAuroraDialog<T>({
   required BuildContext context,
   required Widget title,
@@ -759,7 +746,6 @@ Future<T?> showAuroraDialog<T>({
   );
 }
 
-/// 轻提示，带图标与可选操作。
 void showAuroraSnack(
   BuildContext context,
   String message, {
@@ -786,7 +772,6 @@ void showAuroraSnack(
   );
 }
 
-/// 空状态：发光花朵 + 标题 + 行动。
 class AuroraEmpty extends StatelessWidget {
   const AuroraEmpty({
     super.key,
@@ -835,7 +820,6 @@ class AuroraEmpty extends StatelessWidget {
   }
 }
 
-/// 分组标题与设置卡片。
 class AuroraSection extends StatelessWidget {
   const AuroraSection({
     super.key,
@@ -962,7 +946,6 @@ class AuroraSettingTile extends StatelessWidget {
   }
 }
 
-/// 未读徽章数字，滚动增长。
 class AuroraBadge extends StatelessWidget {
   const AuroraBadge({super.key, required this.count, this.small = false});
 
@@ -997,7 +980,6 @@ class AuroraBadge extends StatelessWidget {
   }
 }
 
-/// 极光加载指示器：三颗 Material 形状交替形变。
 class AuroraLoading extends StatelessWidget {
   const AuroraLoading({super.key, this.size = 26});
 
@@ -1047,7 +1029,6 @@ class _LoadingPainter extends CustomPainter {
   bool shouldRepaint(covariant _LoadingPainter old) => old.time != time || old.color != color;
 }
 
-/// 错误提示条。
 class AuroraErrorBanner extends StatelessWidget {
   const AuroraErrorBanner({super.key, required this.message, this.onRetry});
 
@@ -1085,7 +1066,6 @@ class AuroraErrorBanner extends StatelessWidget {
   }
 }
 
-/// 底部导航：选中项的形状胶囊连续形变。
 class AuroraNavBar extends StatelessWidget {
   const AuroraNavBar({
     super.key,
@@ -1149,7 +1129,6 @@ class AuroraNavDestination {
   final int badge;
 }
 
-/// 极光主操作按钮：阳光形 M3 形状 + 渐变 + 柔光。
 class AuroraFab extends StatelessWidget {
   const AuroraFab({
     super.key,

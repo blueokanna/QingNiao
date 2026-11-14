@@ -21,12 +21,16 @@ class IncomingSmsReceiver : BroadcastReceiver() {
             try {
                 val address = parts.first().originatingAddress ?: "未知号码"
                 val body = parts.joinToString("") { it.messageBody ?: "" }
+                val subscription = intent.getIntExtra(SubscriptionManager.EXTRA_SUBSCRIPTION_INDEX, intent.getIntExtra("subscription", -1))
                 val saved = context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, ContentValues().apply {
                     put("address", address); put("body", body); put("date", System.currentTimeMillis())
                     put("date_sent", parts.first().timestampMillis); put("read", 0); put("seen", 0)
-                    put("sub_id", intent.getIntExtra(SubscriptionManager.EXTRA_SUBSCRIPTION_INDEX, intent.getIntExtra("subscription", -1)))
+                    put("sub_id", subscription)
                 })
-                if (saved != null) MessageNotifications.show(context, address, "收到新短信", address.hashCode())
+                if (saved != null) {
+                    val threadId = Telephony.Threads.getOrCreateThreadId(context, address)
+                    Notifications.showSms(context, address, body, subscription, threadId)
+                }
             } catch (_: Exception) {
                 MessageNotifications.show(context, "", "短信保存失败，请检查权限与存储空间", 9023)
             } finally { pending.finish() }

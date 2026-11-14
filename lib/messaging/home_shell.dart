@@ -8,7 +8,6 @@ import '../messaging/otp_screen.dart';
 import '../settings/settings_screen.dart';
 import 'compose_screen.dart';
 
-/// 应用主壳：极光背景与底部导航常驻，三个标签共享同一个 [MessageHub]。
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, required this.repository, required this.hub});
 

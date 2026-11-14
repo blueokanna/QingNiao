@@ -5,8 +5,6 @@ import '../aurora/aurora_theme.dart';
 import '../aurora/aurora_widgets.dart';
 import '../messaging/message_repository.dart';
 
-/// 首次启动引导：默认短信角色、权限与本地优先承诺。
-/// 只展示必要步骤，任何一步失败都允许先浏览界面。
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({
     super.key,

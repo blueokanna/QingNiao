@@ -6,14 +6,6 @@ import 'aurora_engine.dart';
 import 'aurora_theme.dart';
 import '../app/app_settings.dart';
 
-/// 全局极光背景。
-///
-/// 设计要点：
-/// * 唯一实例由各个页面的 [AuroraScaffold] 复用同一全局时钟，页面切换不会
-///   重启时间线，视觉上是一条持续流动的极光；
-/// * 所有光团使用径向渐变直接绘制，避免逐帧 `blur`；
-/// * 质量档位决定光团数量、星点与帧率，滚动时进一步退避；
-/// * 整层包在 `RepaintBoundary` 中，列表滚动不会触发背景重绘。
 class AuroraBackdrop extends StatelessWidget {
   const AuroraBackdrop({super.key, this.veil = true});
 

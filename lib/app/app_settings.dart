@@ -7,8 +7,6 @@ import '../design/android_palette.dart';
 
 enum AuroraThemePreference { system, light, dark }
 
-/// 全局外观与行为设置。持久化在 Kotlin 侧（SharedPreferences），
-/// 加载失败时回退到安全默认值，保证首屏可用。
 class AppSettings extends ChangeNotifier {
   AppSettings({MessageRepository? repository}) : _repository = repository;
 
@@ -63,7 +61,6 @@ class AppSettings extends ChangeNotifier {
         await repository.invoke<Map>('systemPalette'),
       );
     } catch (_) {
-      // 桌面调试或测试环境没有平台通道，保持默认值。
     }
     return settings;
   }
@@ -223,7 +220,6 @@ class AppSettings extends ChangeNotifier {
   }
 }
 
-/// 通过 InheritedNotifier 暴露设置，避免引入第三方状态库。
 class AppScope extends InheritedNotifier<AppSettings> {
   const AppScope({
     super.key,

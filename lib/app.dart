@@ -13,7 +13,6 @@ import 'messaging/message_repository.dart';
 import 'messaging/models.dart';
 import 'onboarding/onboarding_screen.dart';
 
-/// 应用根：主题、全局时钟与引导流程。
 class QingniaoApp extends StatefulWidget {
   const QingniaoApp({
     super.key,
@@ -152,7 +151,6 @@ class _AdjustedTextScaler extends TextScaler {
   double get textScaleFactor => system.textScaleFactor * factor;
 }
 
-/// 启动闸门：读取权限状态，决定进入引导还是主界面。
 class RootGate extends StatefulWidget {
   const RootGate({super.key, required this.repository});
 

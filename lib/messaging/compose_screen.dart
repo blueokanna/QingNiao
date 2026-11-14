@@ -9,7 +9,6 @@ import 'message_repository.dart';
 import 'message_widgets.dart';
 import 'models.dart';
 
-/// 新短信 / 新彩信撰写页。收件人使用可编辑胶囊，支持联系人多选。
 class ComposeScreen extends StatefulWidget {
   const ComposeScreen({
     super.key,

@@ -1,13 +1,3 @@
-//! 内存倒排索引与检索。
-//!
-//! 设计要点：
-//! - `index_messages` 全量重建（O(n)），可被增量调用，线程安全（`RwLock`）。
-//! - 分词：小写化 + 全角转半角 + 按非字母数字切分；CJK 同时产生单字与相邻二字
-//!   bigram；纯数字保留，并对 4-12 位数字串额外索引 4 位以上子串，便于号码片段命中。
-//! - 排序：BM25-lite（tf 饱和 + 文档长度归一，正文权重 1、号码权重 3）+ 精确短语
-//!   加分 + 近 7 天时间加成 + 未读微加成。
-//! - snippet 取首个命中附近最多 120 个 UTF-16 单元，highlight 为 snippet 内的
-//!   UTF-16 范围（已合并、升序）。
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -18,16 +8,11 @@ use parking_lot::RwLock;
 
 use crate::core::utf16;
 
-/// 索引文档数上限。
 pub const MAX_DOCS: usize = 50_000;
-/// 单文档正文最大字符数（超出部分不索引）。
 pub const MAX_BODY_CHARS: usize = 4_000;
-/// 单文档号码最大字符数。
 pub const MAX_ADDRESS_CHARS: usize = 256;
-/// 单次查询返回上限。
 pub const MAX_RESULTS: usize = 100;
 
-/// 单文档不同词条上限：约束倒排索引的内存上界（超长 CJK 正文只索引前若干个词）。
 const MAX_TERMS_PER_DOC: usize = 1024;
 const MAX_QUERY_TERMS: usize = 32;
 const MAX_NUMERIC_FRAGMENT: usize = 12;
@@ -40,7 +25,6 @@ const BODY_WEIGHT: f64 = 1.0;
 const ADDRESS_WEIGHT: f64 = 3.0;
 const WEEK_MS: i64 = 7 * 24 * 60 * 60 * 1000;
 
-/// 参与索引的消息。
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Document {
     pub id: i64,
@@ -51,18 +35,15 @@ pub struct Document {
     pub read: bool,
 }
 
-/// 检索命中。
 #[derive(Clone, Debug, PartialEq)]
 pub struct Hit {
     pub id: i64,
     pub thread_id: i64,
     pub score: f64,
     pub snippet: String,
-    /// snippet 内的 UTF-16 范围，升序且已合并。
     pub highlights: Vec<(u32, u32)>,
 }
 
-/// 倒排索引。
 #[derive(Default)]
 pub struct Index {
     docs: Vec<Document>,
@@ -77,32 +58,26 @@ pub struct Index {
 static INDEX: Lazy<RwLock<Index>> = Lazy::new(|| RwLock::new(Index::default()));
 static ROOT: Lazy<RwLock<Option<PathBuf>>> = Lazy::new(|| RwLock::new(None));
 
-/// 记录数据目录（由 `engine_init` 调用），为将来持久化索引预留。
 pub fn set_root(dir: &str) {
     *ROOT.write() = Some(PathBuf::from(dir));
 }
 
-/// 当前数据目录。
 pub fn root() -> Option<PathBuf> {
     ROOT.read().clone()
 }
 
-/// 全量重建索引，返回实际索引的文档数（<= 50000）。
 pub fn index_messages(docs: Vec<Document>) -> u32 {
     INDEX.write().rebuild(docs)
 }
 
-/// 查询。空查询返回空列表，`limit` 上限 100。
 pub fn search_messages(query: &str, limit: u32) -> Vec<Hit> {
     INDEX.read().search(query, limit)
 }
 
-/// 当前已索引文档数。
 pub fn indexed_count() -> u32 {
     INDEX.read().len()
 }
 
-/// 清空索引（测试与登出场景使用）。
 pub fn clear() {
     INDEX.write().clear();
 }
@@ -120,7 +95,6 @@ impl Index {
         *self = Index::default();
     }
 
-    /// 全量重建。
     pub fn rebuild(&mut self, docs: Vec<Document>) -> u32 {
         *self = Index::default();
         self.docs.reserve(docs.len().min(MAX_DOCS));
@@ -157,7 +131,6 @@ impl Index {
         self.len()
     }
 
-    /// 查询。
     pub fn search(&self, query: &str, limit: u32) -> Vec<Hit> {
         let limit = (limit as usize).min(MAX_RESULTS);
         if limit == 0 || self.docs.is_empty() {
@@ -203,7 +176,6 @@ impl Index {
             return Vec::new();
         }
 
-        // 时间衰减 + 未读微加成
         let now = now_ms();
         for (doc, score) in scores.iter_mut() {
             let document = &self.docs[*doc as usize];
@@ -221,7 +193,6 @@ impl Index {
         let mut ranked: Vec<(u32, f64)> = scores.into_iter().collect();
         self.sort_ranked(&mut ranked);
 
-        // 精确短语加分只对有望进入结果的候选计算，控制开销
         let phrase = normalize_phrase(query);
         if !phrase.is_empty() {
             let candidates = ranked.len().min((limit * 3).min(300));
@@ -319,7 +290,6 @@ fn is_cjk(ch: char) -> bool {
         || (0x20000..=0x2FA1F).contains(&cp)
 }
 
-/// 全角转半角 + 1:1 小写化（不改变字符数量，保证下标可映射回原文）。
 pub fn normalize_char(ch: char) -> char {
     let mapped = match ch {
         '\u{FF01}'..='\u{FF5E}' => char::from_u32(ch as u32 - 0xFEE0).unwrap_or(ch),
@@ -356,7 +326,6 @@ fn normalize_phrase(query: &str) -> String {
     parts.join(" ")
 }
 
-/// 分词：小写化、全角转半角、按非字母数字切分。
 pub fn tokenize(text: &str) -> Vec<String> {
     let mut terms: Vec<String> = Vec::new();
     let mut current: Vec<char> = Vec::new();
@@ -380,7 +349,6 @@ fn emit_token(chars: &[char], terms: &mut Vec<String>) {
     if all_digits {
         let token: String = chars.iter().collect();
         terms.push(token);
-        // 号码片段：对 5-12 位数字串索引全部 4 位以上子串
         if chars.len() > 4 && chars.len() <= MAX_NUMERIC_FRAGMENT {
             for length in 4..chars.len() {
                 for start in 0..=chars.len() - length {
@@ -434,7 +402,6 @@ fn build_snippet(document: &Document, terms: &[String]) -> (String, Vec<(u32, u3
     let folded: Vec<char> = chars.iter().map(|&ch| normalize_char(ch)).collect();
     let offsets = utf16::offsets(&chars);
 
-    // 首个命中位置（只取前几个词，避免病态查询）
     let mut hit: Option<usize> = None;
     for term in terms.iter().take(6) {
         let needle: Vec<char> = term.chars().collect();
@@ -546,7 +513,6 @@ mod tests {
         assert_eq!(index.rebuild(sample()), 3);
         let hits = index.search("验证码", 10);
         assert_eq!(hits.len(), 2);
-        // 更近、未读的那条排前面
         assert_eq!(hits[0].id, 1);
         assert!(hits[0].snippet.contains("验证码"));
         assert!(!hits[0].highlights.is_empty());
@@ -715,7 +681,6 @@ mod tests {
             date: 0,
             read: true,
         }]);
-        // 超出 4k 字符的部分不参与索引
         assert!(index.search("tailmark", 10).is_empty());
         assert_eq!(index.search("字", 10).len(), 1);
     }

@@ -16,6 +16,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() async {
+    final icons = FontLoader('MaterialIcons')
+      ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+    await icons.load();
     final fontPath = Platform.environment['QINGNIAO_PREVIEW_FONT'];
     if (fontPath != null && File(fontPath).existsSync()) {
       final loader = FontLoader('PreviewFont')
