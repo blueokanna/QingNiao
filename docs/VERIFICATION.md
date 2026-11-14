@@ -76,7 +76,9 @@ adb shell dumpsys notification --noredact | findstr /i "PROMOTED_ONGOING qingnia
 
 期望：出现 `flags=ONGOING_EVENT|PROMOTED_ONGOING`。
 
-- 流体云提醒最多保留 **15 分钟**（`NotificationExpiryReceiver`），避免胶囊常驻。
+- 流体云提醒最多保留 **15 分钟**（`NotificationExpiryReceiver`），避免胶囊常驻；
+  因为是 `AlarmManager.set()` 的非精确闹钟，ColorOS 省电策略可能让实际撤下延后。
+  可用 `adb shell dumpsys alarm | findstr NotificationExpiryReceiver` 看到已排队的闹钟。
 - 系统或 ROM 拒绝提升时，青鸟自动退回普通高优先级通知；设置页的
   「流体云实时胶囊」会显示当前设备是否真的可用。
 - **已知取舍**：被提升的大卡片由系统渲染，不展示 RemoteInput「回复」动作；
