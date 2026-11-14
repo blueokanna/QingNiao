@@ -1,5 +1,8 @@
 # 本轮短信实现验证快照
 
+> 历史快照，记录早期实现阶段的检查。当前代码已包含流体云、端到端同步、
+> 发送看门狗等功能，最新验收请见 [VERIFICATION.md](VERIFICATION.md)。
+
 日期：2026-11-14，Asia/Shanghai。
 
 本轮业务源码使用 Kotlin、Dart 和 Rust。没有迁入 CapsuleSMS 的 Java 业务源码。Flutter 自动生成的插件注册及第三方 JVM 库仍属于构建依赖。

@@ -1,5 +1,10 @@
 # Android 快照验证：2026-11-14
 
+> 本页记录的是当天早些时候在隔离快照上的构建验证；当时 ADB 没有设备。
+> 当天晚些时候已在一加 PLK110（ColorOS 17）完成安装、默认短信角色、通知、
+> 流体云与进程被杀唤醒的实机验证，以及发送失败/看门狗的行为验证。
+> 最新结果与复测步骤以 [VERIFICATION.md](VERIFICATION.md) 为准。
+
 本次构建来自 `build/verification/android-snapshot` 的隔离源码副本。共享工作目录有另一会话持续开发；本记录不覆盖快照之后的改动。每个源文件的 SHA-256 位于 `build/verification/verified-source-sha256.txt`。
 
 ## 产物
