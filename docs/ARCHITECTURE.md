@@ -138,13 +138,20 @@ flutter test --no-pub
 flutter build apk --debug --no-pub
 ```
 
-本仓库在离线环境下使用以下验证：
+本仓库在离线环境下的验证入口：
 
-- `flutter test`：收件箱/会话/回收站/窄屏大字体 5 项 Widget 测试；
-- `cargo test --offline`：Rust 核心 76 个测试（分析、分段、搜索、存储、MMS PDU、密码学）；
+- `flutter test`：收件箱/会话/回收站/窄屏大字体等 Widget 与渲染测试；
+- `cargo test --offline`：Rust 核心（分析、分段、搜索、存储、MMS PDU、密码学）；
 - 渲染截图：`test/inbox_rendering_test.dart` 在 `QINGNIAO_RENDER_PREVIEW=1` 时输出
   `build/verification/inbox_{light,dark}.png`；
-- `server-rs`：`cargo test --offline` 覆盖配对、信封校验、持久化损坏恢复与健康检查。
+- `server-rs`：`cargo test --offline` 覆盖配对、信封校验、持久化损坏恢复与健康检查；
+- 端到端冒烟：`server-rs/scripts/smoke.ps1`；
+- 真机自检：`tool/verify-device.ps1`；
+- 签名构建：`tool/build-release.ps1`。
+
+逐项步骤、预期结果与实测记录见 [VERIFICATION.md](VERIFICATION.md)，
+发布签名见 [RELEASE.md](RELEASE.md)。具体测试数量以当前提交的
+`flutter test` / `cargo test` 输出为准，本文不再写死数字。
 
 ## 8. 已知限制
 
