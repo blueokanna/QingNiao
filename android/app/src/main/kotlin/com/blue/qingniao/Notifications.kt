@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -133,7 +134,8 @@ object Notifications {
 
         // Android 16 Live Updates：ColorOS 16/17 会把它呈现在流体云胶囊。
         // 系统与 OEM 仍可拒绝；失败时自动退回普通高优先级通知。
-        if (canPromote(context) && AppPrefs.bool(prefs, "fluidCloud", true)) {
+        val promoted = canPromote(context) && AppPrefs.bool(prefs, "fluidCloud", true)
+        if (promoted) {
             try {
                 builder
                     .setOngoing(true)
@@ -156,8 +158,25 @@ object Notifications {
         try {
             manager.notify(id, builder.build())
             manager.notify(SUMMARY_ID, summary)
+            if (promoted) scheduleExpiry(context, id)
         } catch (_: SecurityException) {
             // 用户关闭通知权限时静默失败。
+        }
+    }
+
+    /** ongoing 的流体云提醒 15 分钟后自动撤下，避免胶囊长期占位。 */
+    private fun scheduleExpiry(context: Context, id: Int) {
+        try {
+            val alarm = context.getSystemService(AlarmManager::class.java)
+            val pending = PendingIntent.getBroadcast(
+                context,
+                id,
+                Intent(context, NotificationExpiryReceiver::class.java).putExtra("id", id),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            alarm.set(AlarmManager.RTC, System.currentTimeMillis() + 15 * 60 * 1000L, pending)
+        } catch (_: Exception) {
+            // 闹钟不可用时仅损失自动收起，不影响通知本身。
         }
     }
 

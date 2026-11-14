@@ -66,9 +66,16 @@ class DebugNotifyReceiver : BroadcastReceiver() {
                     "sendSms" to SmsAccess.granted(context, android.Manifest.permission.SEND_SMS),
                     "receiveSms" to SmsAccess.granted(context, android.Manifest.permission.RECEIVE_SMS),
                     "promoted" to Notifications.canPromote(context),
+                    "promotionActive" to Notifications.promotionActive(context),
                     "fluidCloud" to Notifications.fluidCloudEnabled(context),
                 )
                 Log.d(TAG, "access=$state")
+            }
+            ACTION_CLEAR -> {
+                val manager = context.getSystemService(android.app.NotificationManager::class.java)
+                val active = runCatching { manager.activeNotifications.toList() }.getOrDefault(emptyList())
+                active.forEach { manager.cancel(it.id) }
+                Log.d(TAG, "cleared ${active.size} notifications")
             }
         }
     }
@@ -78,5 +85,6 @@ class DebugNotifyReceiver : BroadcastReceiver() {
         private const val ACTION_NOTIFY = "com.blue.qingniao.DEBUG_NOTIFY"
         private const val ACTION_SEND = "com.blue.qingniao.DEBUG_SEND"
         private const val ACTION_ACCESS = "com.blue.qingniao.DEBUG_ACCESS"
+        private const val ACTION_CLEAR = "com.blue.qingniao.DEBUG_CLEAR"
     }
 }

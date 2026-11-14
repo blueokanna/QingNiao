@@ -53,6 +53,8 @@ if (canPromote(context) && prefs.getBoolean("fluidCloud", true)) {
 - 通知仍是标准高优先级渠道；系统拒绝提升时，用户看到的是普通横幅通知。
 - 设置中提供「流体云实时胶囊」开关；关闭后完全退回普通通知。
 - 只对**未读短信**保持 ongoing，标记已读/回复后取消，不伪造“进行中任务”。
+- ongoing 通知最多保留 15 分钟（`NotificationExpiryReceiver` 自动撤下），
+  避免状态栏胶囊长期占位；点开通知或会话即提前取消。
 
 > Google 的 Live Updates 指南把聊天消息列为不推荐场景，OEM 可追加更严格条件。
 > 因此青鸟不承诺“必定上岛”；这是一条**尽力而为**的标准路径，而不是私有后门。

@@ -36,6 +36,7 @@
         <receiver android:name=".ReplyReceiver" android:exported="false" />
         <receiver android:name=".MarkReadReceiver" android:exported="false" />
         <receiver android:name=".CopyOtpReceiver" android:exported="false" />
+        <receiver android:name=".NotificationExpiryReceiver" android:exported="false" />
         <service android:name=".RespondViaMessageService" android:exported="true" android:permission="android.permission.SEND_RESPOND_VIA_MESSAGE"><intent-filter><action android:name="android.intent.action.RESPOND_VIA_MESSAGE" /><category android:name="android.intent.category.DEFAULT" /><data android:scheme="sms" /><data android:scheme="smsto" /><data android:scheme="mms" /><data android:scheme="mmsto" /></intent-filter></service>
         <provider android:name=".MmsTransferProvider" android:authorities="${applicationId}.transfers" android:exported="false" android:grantUriPermissions="true" />
         <provider android:name="com.klinker.android.send_message.MmsFileProvider" android:authorities="${applicationId}.MmsFileProvider" tools:node="remove" />
