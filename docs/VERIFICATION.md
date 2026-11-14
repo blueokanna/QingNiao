@@ -174,6 +174,7 @@ adb shell am broadcast -n com.blue.qingniao/.DebugNotifyReceiver -a com.blue.qin
 | 流体云大卡片 | 通过（复制验证码 / 标为已读） | `device_fluid_cloud_card.png` |
 | 进程被杀后发通知 | 通过（force-stop 后广播拉起） | `PROMOTED_ONGOING` 日志 |
 | 通知点击进会话 | 通过，胶囊同步撤下 | `device_notification_open.png` |
+| 流体云 15 分钟自动撤下 | 通过：15:35:17 发布的提醒由 `NotificationExpiryReceiver` 在 15:50:17 取消，`dumpsys notification` 中不再有青鸟记录 | `device_expiry_after.png` |
 | 验证码页布局 | 通过（修复状态栏遮挡与 2.2px 溢出） | `device_otp2.png` |
 | 撰写页 | 通过（修复重复输入框） | `device_compose_final.png` |
 | 短信发送 | **受运营商/ROM 限制**：本机两张卡均返回 generic failure，疑似 SMSC/IMS 未就绪；应用正确显示失败与重发 | `device_thread_status3.png` |
