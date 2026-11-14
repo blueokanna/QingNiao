@@ -1,0 +1,22 @@
+[package]
+name = "qingniao-sync"
+version = "0.4.0"
+edition = "2021"
+description = "青鸟短信的最小端到端加密同步服务：只保存密文信封。"
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "signal"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+rand = "0.8"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+
+[profile.release]
+lto = true
+strip = true
+opt-level = "s"

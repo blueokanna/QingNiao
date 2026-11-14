@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'aurora_engine.dart';
 import 'aurora_theme.dart';
+import '../app/app_settings.dart';
 
 /// 全局极光背景。
 ///
@@ -20,6 +21,10 @@ class AuroraBackdrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (Theme.of(context).brightness == Brightness.dark &&
+        AppScope.maybeOf(context)?.amoled == true) {
+      return const ColoredBox(color: Colors.black);
+    }
     final engine = AuroraEngine.instance;
     final colors = context.aurora;
     final scheme = context.colors;
@@ -78,7 +83,11 @@ class _AuroraPainter extends CustomPainter {
   static List<_Star> _seedStars() {
     final random = math.Random(9031);
     return List.generate(46, (_) {
-      return _Star(random.nextDouble(), random.nextDouble() * .72, random.nextDouble());
+      return _Star(
+        random.nextDouble(),
+        random.nextDouble() * .72,
+        random.nextDouble(),
+      );
     });
   }
 
@@ -92,8 +101,20 @@ class _AuroraPainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: dark
-              ? [Color.alphaBlend(colors.auroraA.withValues(alpha: .07), surface), surface]
-              : [surface, Color.alphaBlend(colors.auroraC.withValues(alpha: .03), surface)],
+              ? [
+                  Color.alphaBlend(
+                    colors.auroraA.withValues(alpha: .07),
+                    surface,
+                  ),
+                  surface,
+                ]
+              : [
+                  surface,
+                  Color.alphaBlend(
+                    colors.auroraC.withValues(alpha: .03),
+                    surface,
+                  ),
+                ],
         ).createShader(rect),
     );
 
@@ -107,8 +128,12 @@ class _AuroraPainter extends CustomPainter {
     for (var index = 0; index < count; index++) {
       final blob = _blobs[index];
       final drift = time * blob.speed;
-      final cx = size.width * (blob.x + math.sin(drift + blob.phase) * .045 * amplitude);
-      final cy = size.height * (blob.y + math.cos(drift * .8 + blob.phase) * .03 * amplitude);
+      final cx =
+          size.width *
+          (blob.x + math.sin(drift + blob.phase) * .045 * amplitude);
+      final cy =
+          size.height *
+          (blob.y + math.cos(drift * .8 + blob.phase) * .03 * amplitude);
       final radius = size.shortestSide * blob.radius;
       final color = switch (blob.color) {
         0 => colors.auroraA,
@@ -137,7 +162,8 @@ class _AuroraPainter extends CustomPainter {
     if (dark && quality == AuroraQuality.full) {
       final starPaint = Paint()..color = colors.star;
       for (final star in _stars) {
-        final twinkle = (math.sin(time * (.5 + star.phase) + star.phase * 6) + 1) / 2;
+        final twinkle =
+            (math.sin(time * (.5 + star.phase) + star.phase * 6) + 1) / 2;
         final position = Offset(star.x * size.width, star.y * size.height);
         canvas.drawCircle(
           position,
@@ -177,7 +203,15 @@ class _AuroraPainter extends CustomPainter {
 }
 
 class _Blob {
-  const _Blob(this.x, this.y, this.radius, this.color, this.speed, this.phase, this.layer);
+  const _Blob(
+    this.x,
+    this.y,
+    this.radius,
+    this.color,
+    this.speed,
+    this.phase,
+    this.layer,
+  );
   final double x;
   final double y;
   final double radius;

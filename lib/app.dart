@@ -15,7 +15,11 @@ import 'onboarding/onboarding_screen.dart';
 
 /// 应用根：主题、全局时钟与引导流程。
 class QingniaoApp extends StatefulWidget {
-  const QingniaoApp({super.key, required this.repository, required this.settings});
+  const QingniaoApp({
+    super.key,
+    required this.repository,
+    required this.settings,
+  });
 
   final MessageRepository repository;
   final AppSettings settings;
@@ -24,10 +28,13 @@ class QingniaoApp extends StatefulWidget {
   State<QingniaoApp> createState() => _QingniaoAppState();
 }
 
-class _QingniaoAppState extends State<QingniaoApp> with SingleTickerProviderStateMixin {
+class _QingniaoAppState extends State<QingniaoApp>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  bool _systemReduceMotion = false;
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     AuroraEngine.instance.attach(this);
     _applyMotion();
     widget.settings.addListener(_onSettings);
@@ -38,14 +45,30 @@ class _QingniaoAppState extends State<QingniaoApp> with SingleTickerProviderStat
   void _applyMotion() {
     final settings = widget.settings;
     AuroraEngine.instance.configure(
-      motion: settings.lowPowerAurora ? AuroraMotionLevel.reduced : settings.motionLevel,
-      reduce: settings.motionLevel == AuroraMotionLevel.reduced,
+      motion: settings.lowPowerAurora
+          ? AuroraMotionLevel.reduced
+          : settings.motionLevel,
+      reduce:
+          _systemReduceMotion ||
+          settings.motionLevel == AuroraMotionLevel.reduced,
+      backdrop: !settings.amoled,
     );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      AuroraEngine.instance.resume();
+      widget.settings.refreshSystemSeed();
+    } else {
+      AuroraEngine.instance.pause();
+    }
   }
 
   @override
   void dispose() {
     widget.settings.removeListener(_onSettings);
+    WidgetsBinding.instance.removeObserver(this);
     AuroraEngine.instance.detach();
     super.dispose();
   }
@@ -79,12 +102,10 @@ class _QingniaoAppState extends State<QingniaoApp> with SingleTickerProviderStat
             themeMode: settings.themeMode,
             builder: (context, child) {
               final reduce = MediaQuery.disableAnimationsOf(context);
-              if (reduce != AuroraEngine.instance.reduceMotion) {
+              if (reduce != _systemReduceMotion) {
+                _systemReduceMotion = reduce;
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  AuroraEngine.instance.configure(
-                    motion: settings.motionLevel,
-                    reduce: reduce,
-                  );
+                  if (mounted) _applyMotion();
                 });
               }
               final media = MediaQuery.of(context);
@@ -100,7 +121,12 @@ class _QingniaoAppState extends State<QingniaoApp> with SingleTickerProviderStat
                         systemNavigationBarColor: Colors.transparent,
                       ),
                 child: MediaQuery(
-                  data: media.copyWith(textScaler: TextScaler.linear(settings.fontScale)),
+                  data: media.copyWith(
+                    textScaler: _AdjustedTextScaler(
+                      media.textScaler,
+                      settings.fontScale,
+                    ),
+                  ),
                   child: child ?? const SizedBox.shrink(),
                 ),
               );
@@ -111,6 +137,19 @@ class _QingniaoAppState extends State<QingniaoApp> with SingleTickerProviderStat
       },
     );
   }
+}
+
+class _AdjustedTextScaler extends TextScaler {
+  const _AdjustedTextScaler(this.system, this.factor);
+  final TextScaler system;
+  final double factor;
+
+  @override
+  double scale(double fontSize) => system.scale(fontSize) * factor;
+
+  @override
+  // ignore: deprecated_member_use
+  double get textScaleFactor => system.textScaleFactor * factor;
 }
 
 /// 启动闸门：读取权限状态，决定进入引导还是主界面。

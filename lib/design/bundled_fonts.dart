@@ -10,8 +10,15 @@ abstract final class BundledFonts {
 
   static void registerLicenses() {
     LicenseRegistry.addLicense(() async* {
-      yield LicenseEntryWithLineBreaks(['Google Sans'], await rootBundle.loadString('assets/licenses/GoogleSans-OFL.txt'));
-      yield LicenseEntryWithLineBreaks(['HarmonyOS Sans'], await rootBundle.loadString('assets/licenses/HarmonyOS-Sans-LICENSE.txt'));
+      yield LicenseEntryWithLineBreaks([
+        'Google Sans',
+      ], await rootBundle.loadString('assets/licenses/GoogleSans-OFL.txt'));
+      yield LicenseEntryWithLineBreaks(
+        ['HarmonyOS Sans'],
+        await rootBundle.loadString(
+          'assets/licenses/HarmonyOS-Sans-LICENSE.txt',
+        ),
+      );
     });
   }
 }

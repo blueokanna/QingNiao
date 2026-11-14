@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:material_new_shapes/material_new_shapes.dart';
-import 'package:vector_math/vector_math_64.dart' show Matrix4;
 
 import 'aurora_engine.dart';
 import 'aurora_theme.dart';

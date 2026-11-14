@@ -39,6 +39,7 @@ class MessageHub extends ChangeNotifier {
   };
 
   void start() {
+    repository.initEngine();
     _subscription ??= repository.changes.listen(
       (event) {
         if (event == 'intent') intentTick++;

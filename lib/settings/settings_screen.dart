@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../app/app_settings.dart';
 import '../aurora/aurora_engine.dart';
 import '../aurora/aurora_shapes.dart';
 import '../aurora/aurora_theme.dart';
 import '../aurora/aurora_widgets.dart';
-import '../messaging/format.dart';
 import '../messaging/message_hub.dart';
 import '../messaging/message_repository.dart';
-import '../messaging/message_widgets.dart';
 import '../messaging/models.dart';
 import 'appearance_screen.dart';
+import 'device_compatibility_screen.dart';
 import 'blocked_screen.dart';
 import 'sync_screen.dart';
 
@@ -139,6 +137,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: access.readContacts ? '已允许显示联系人名称' : '未允许，仅显示号码',
                 icon: Icons.contacts_outlined,
                 onTap: () => widget.repository.openAppSettings(),
+                showDivider: true,
+              ),
+              AuroraSettingTile(
+                title: '设备与权限诊断',
+                subtitle: '短信角色、后台限制与厂商设置',
+                icon: Icons.phonelink_setup_rounded,
+                onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => DeviceCompatibilityScreen(repository: widget.repository),
+                )),
               ),
             ],
           ),
@@ -271,7 +278,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: Icons.file_upload_outlined,
                 onTap: () async {
                   final ok = await widget.repository.exportBackup();
-                  if (mounted) showAuroraSnack(context, ok ? '备份已导出' : '已取消导出');
+                  if (context.mounted) showAuroraSnack(context, ok ? '备份已导出' : '已取消导出');
                 },
                 showDivider: true,
               ),
@@ -297,7 +304,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                   if (confirmed != true) return;
                   final ok = await widget.repository.importBackup();
-                  if (mounted) {
+                  if (context.mounted) {
                     showAuroraSnack(context, ok ? '恢复完成' : '已取消恢复');
                   }
                 },

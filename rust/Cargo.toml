@@ -8,6 +8,7 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 flutter_rust_bridge = "=2.13.0"
+snow = { version = "=0.10.0", default-features = false, features = ["std", "default-resolver", "use-getrandom", "use-curve25519", "use-chacha20poly1305", "use-sha2"] }
 base64 = "0.22"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

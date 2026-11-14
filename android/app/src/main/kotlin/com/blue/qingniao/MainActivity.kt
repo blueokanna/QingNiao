@@ -18,6 +18,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val appearance by lazy { AppearanceBridge(this) }
+    private val aurora by lazy { AuroraBridge(this) }
     private val handler = Handler(Looper.getMainLooper())
     private var events: EventChannel.EventSink? = null
     private var pendingAccess: MethodChannel.Result? = null
@@ -56,6 +57,7 @@ class MainActivity : FlutterActivity() {
             result.error("appearance_unavailable", "无法读取系统外观设置", null)
             return
         }
+        if (aurora.handle(call, result)) return
         when (call.method) {
             "pickContact", "pickAttachment" -> {
                 if (pendingSelection != null) { result.error("busy", "选择器已打开", null); return }
@@ -118,7 +120,7 @@ class MainActivity : FlutterActivity() {
         }
     }
     private fun requestMessagePermissions() {
-        val permissions = mutableListOf(Manifest.permission.READ_SMS, Manifest.permission.SEND_SMS, Manifest.permission.RECEIVE_SMS, Manifest.permission.RECEIVE_MMS, Manifest.permission.RECEIVE_WAP_PUSH, Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_PHONE_NUMBERS)
+        val permissions = mutableListOf(Manifest.permission.READ_SMS, Manifest.permission.SEND_SMS, Manifest.permission.RECEIVE_SMS, Manifest.permission.RECEIVE_MMS, Manifest.permission.RECEIVE_WAP_PUSH, Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_PHONE_NUMBERS, Manifest.permission.READ_CONTACTS)
         if (android.os.Build.VERSION.SDK_INT >= 33) permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         val missing = permissions.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }.toTypedArray()
         if (missing.isEmpty()) { pendingAccess?.success(access()); pendingAccess = null }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../aurora/aurora_engine.dart';
 import '../aurora/aurora_theme.dart';
 import '../messaging/message_repository.dart';
+import '../design/android_palette.dart';
 
 enum AuroraThemePreference { system, light, dark }
 
@@ -12,6 +13,7 @@ class AppSettings extends ChangeNotifier {
   AppSettings({MessageRepository? repository}) : _repository = repository;
 
   final MessageRepository? _repository;
+  bool _disposed = false;
 
   AuroraThemePreference themePreference = AuroraThemePreference.system;
   Color seed = AuroraPalettes.jade;
@@ -28,6 +30,10 @@ class AppSettings extends ChangeNotifier {
   int trashRetentionDays = 30;
   bool sendDelay = false;
   bool lowPowerAurora = false;
+  bool amoled = false;
+  String fontFamily = 'system';
+  String launcherIcon = 'bird';
+  AndroidPalette? systemPalette;
 
   ThemeMode get themeMode => switch (themePreference) {
     AuroraThemePreference.system => ThemeMode.system,
@@ -41,6 +47,9 @@ class AppSettings extends ChangeNotifier {
     useDynamic: useDynamic,
     bubbleStyle: bubbleStyle,
     morphShapes: morphShapes,
+    amoled: amoled,
+    fontFamily: fontFamily,
+    systemPalette: systemPalette,
   );
 
   static Future<AppSettings> load(MessageRepository repository) async {
@@ -50,6 +59,9 @@ class AppSettings extends ChangeNotifier {
       settings._apply(values);
       final seedHex = await repository.systemSeed();
       settings.systemSeed = _colorFromHex(seedHex);
+      settings.systemPalette = AndroidPalette.fromMap(
+        await repository.invoke<Map>('systemPalette'),
+      );
     } catch (_) {
       // 桌面调试或测试环境没有平台通道，保持默认值。
     }
@@ -76,7 +88,8 @@ class AppSettings extends ChangeNotifier {
       'reduced' => AuroraMotionLevel.reduced,
       _ => AuroraMotionLevel.full,
     };
-    fontScale = double.tryParse(values['fontScale'] ?? '')?.clamp(.85, 1.25) ?? 1;
+    fontScale =
+        double.tryParse(values['fontScale'] ?? '')?.clamp(.85, 1.25) ?? 1;
     deliveryReports = values['delivery'] != 'false';
     notifications = values['notifications'] != 'false';
     showPreview = values['preview'] != 'false';
@@ -84,13 +97,35 @@ class AppSettings extends ChangeNotifier {
     trashRetentionDays = int.tryParse(values['trashDays'] ?? '') ?? 30;
     sendDelay = values['sendDelay'] == 'true';
     lowPowerAurora = values['lowPowerAurora'] == 'true';
+    amoled = values['amoled'] == 'true';
+    launcherIcon =
+        const ['bird', 'leaf', 'chat'].contains(values['launcherIcon'])
+        ? values['launcherIcon']!
+        : 'bird';
+    fontFamily = switch (values['fontFamily']) {
+      'harmony' => 'harmony',
+      'google' => 'google',
+      _ => 'system',
+    };
   }
 
   Future<void> refreshSystemSeed() async {
     try {
-      systemSeed = _colorFromHex(await _repository?.systemSeed());
+      final nextSeed = _colorFromHex(await _repository?.systemSeed());
+      final nextPalette = AndroidPalette.fromMap(
+        await _repository?.invoke<Map>('systemPalette'),
+      );
+      if (_disposed) return;
+      systemSeed = nextSeed;
+      systemPalette = nextPalette;
       notifyListeners();
     } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 
   void update(VoidCallback change) {
@@ -99,9 +134,11 @@ class AppSettings extends ChangeNotifier {
     _persist();
   }
 
-  void setTheme(AuroraThemePreference value) => update(() => themePreference = value);
+  void setTheme(AuroraThemePreference value) =>
+      update(() => themePreference = value);
 
-  void setSeed(String name) => update(() => seed = AuroraPalettes.seeds[name] ?? AuroraPalettes.jade);
+  void setSeed(String name) =>
+      update(() => seed = AuroraPalettes.seeds[name] ?? AuroraPalettes.jade);
 
   void setDynamic(bool value) => update(() => useDynamic = value);
 
@@ -111,7 +148,8 @@ class AppSettings extends ChangeNotifier {
 
   void setMotion(AuroraMotionLevel value) => update(() => motionLevel = value);
 
-  void setFontScale(double value) => update(() => fontScale = value.clamp(.85, 1.25));
+  void setFontScale(double value) =>
+      update(() => fontScale = value.clamp(.85, 1.25));
 
   void setDelivery(bool value) => update(() => deliveryReports = value);
 
@@ -126,6 +164,20 @@ class AppSettings extends ChangeNotifier {
   void setSendDelay(bool value) => update(() => sendDelay = value);
 
   void setLowPower(bool value) => update(() => lowPowerAurora = value);
+  void setAmoled(bool value) => update(() {
+    amoled = value;
+    if (value) themePreference = AuroraThemePreference.dark;
+  });
+  void setFontFamily(String value) => update(
+    () => fontFamily = const ['system', 'harmony', 'google'].contains(value)
+        ? value
+        : 'system',
+  );
+  Future<void> setLauncherIcon(String value) async {
+    await _repository?.invoke('setLauncherIcon', {'icon': value});
+    launcherIcon = value;
+    notifyListeners();
+  }
 
   void _persist() {
     final repository = _repository;
@@ -136,7 +188,12 @@ class AppSettings extends ChangeNotifier {
         AuroraThemePreference.light => 'light',
         AuroraThemePreference.dark => 'dark',
       },
-      'seed': AuroraPalettes.seeds.entries.firstWhere((entry) => entry.value == seed, orElse: () => const MapEntry('青碧', AuroraPalettes.jade)).key,
+      'seed': AuroraPalettes.seeds.entries
+          .firstWhere(
+            (entry) => entry.value == seed,
+            orElse: () => const MapEntry('青碧', AuroraPalettes.jade),
+          )
+          .key,
       'useDynamic': '$useDynamic',
       'bubble': switch (bubbleStyle) {
         AuroraBubbleStyle.soft => 'soft',
@@ -157,6 +214,8 @@ class AppSettings extends ChangeNotifier {
       'trashDays': '$trashRetentionDays',
       'sendDelay': '$sendDelay',
       'lowPowerAurora': '$lowPowerAurora',
+      'amoled': '$amoled',
+      'fontFamily': fontFamily,
     };
     for (final entry in values.entries) {
       repository.settingsSet(entry.key, entry.value).catchError((_) {});
@@ -166,8 +225,11 @@ class AppSettings extends ChangeNotifier {
 
 /// 通过 InheritedNotifier 暴露设置，避免引入第三方状态库。
 class AppScope extends InheritedNotifier<AppSettings> {
-  const AppScope({super.key, required AppSettings settings, required super.child})
-    : super(notifier: settings);
+  const AppScope({
+    super.key,
+    required AppSettings settings,
+    required super.child,
+  }) : super(notifier: settings);
 
   static AppSettings of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();

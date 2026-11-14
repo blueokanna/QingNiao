@@ -3,6 +3,7 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
+import 'api/engine.dart';
 import 'api/message_analysis.dart';
 
 import 'dart:async';
@@ -25,19 +26,103 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  bool dco_decode_bool(dynamic raw);
+
+  @protected
+  DecodedMms dco_decode_box_autoadd_decoded_mms(dynamic raw);
+
+  @protected
+  DeviceIdentity dco_decode_box_autoadd_device_identity(dynamic raw);
+
+  @protected
+  EncryptedEnvelope dco_decode_box_autoadd_encrypted_envelope(dynamic raw);
+
+  @protected
+  DecodedMms dco_decode_decoded_mms(dynamic raw);
+
+  @protected
+  DeviceIdentity dco_decode_device_identity(dynamic raw);
+
+  @protected
+  EncryptedEnvelope dco_decode_encrypted_envelope(dynamic raw);
+
+  @protected
+  double dco_decode_f_64(dynamic raw);
+
+  @protected
+  int dco_decode_i_32(dynamic raw);
+
+  @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw);
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<MessageAnalysis> dco_decode_list_message_analysis(dynamic raw);
 
   @protected
   List<MessageInsight> dco_decode_list_message_insight(dynamic raw);
 
   @protected
+  List<MmsAttachmentData> dco_decode_list_mms_attachment_data(dynamic raw);
+
+  @protected
+  List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  List<SearchDoc> dco_decode_list_search_doc(dynamic raw);
+
+  @protected
+  List<SearchHit> dco_decode_list_search_hit(dynamic raw);
+
+  @protected
+  List<TextRange> dco_decode_list_text_range(dynamic raw);
+
+  @protected
+  List<TrashEntry> dco_decode_list_trash_entry(dynamic raw);
+
+  @protected
+  MessageAnalysis dco_decode_message_analysis(dynamic raw);
 
   @protected
   MessageInsight dco_decode_message_insight(dynamic raw);
 
   @protected
+  MmsAttachmentData dco_decode_mms_attachment_data(dynamic raw);
+
+  @protected
   String? dco_decode_opt_String(dynamic raw);
+
+  @protected
+  DecodedMms? dco_decode_opt_box_autoadd_decoded_mms(dynamic raw);
+
+  @protected
+  DeviceIdentity? dco_decode_opt_box_autoadd_device_identity(dynamic raw);
+
+  @protected
+  EncryptedEnvelope? dco_decode_opt_box_autoadd_encrypted_envelope(dynamic raw);
+
+  @protected
+  SearchDoc dco_decode_search_doc(dynamic raw);
+
+  @protected
+  SearchHit dco_decode_search_hit(dynamic raw);
+
+  @protected
+  Segmentation dco_decode_segmentation(dynamic raw);
+
+  @protected
+  TextRange dco_decode_text_range(dynamic raw);
+
+  @protected
+  TrashEntry dco_decode_trash_entry(dynamic raw);
+
+  @protected
+  int dco_decode_u_32(dynamic raw);
 
   @protected
   int dco_decode_u_8(dynamic raw);
@@ -49,7 +134,46 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
+  bool sse_decode_bool(SseDeserializer deserializer);
+
+  @protected
+  DecodedMms sse_decode_box_autoadd_decoded_mms(SseDeserializer deserializer);
+
+  @protected
+  DeviceIdentity sse_decode_box_autoadd_device_identity(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  EncryptedEnvelope sse_decode_box_autoadd_encrypted_envelope(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  DecodedMms sse_decode_decoded_mms(SseDeserializer deserializer);
+
+  @protected
+  DeviceIdentity sse_decode_device_identity(SseDeserializer deserializer);
+
+  @protected
+  EncryptedEnvelope sse_decode_encrypted_envelope(SseDeserializer deserializer);
+
+  @protected
+  double sse_decode_f_64(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_i_32(SseDeserializer deserializer);
+
+  @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
+
+  @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<MessageAnalysis> sse_decode_list_message_analysis(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<MessageInsight> sse_decode_list_message_insight(
@@ -57,13 +181,74 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<MmsAttachmentData> sse_decode_list_mms_attachment_data(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  List<SearchDoc> sse_decode_list_search_doc(SseDeserializer deserializer);
+
+  @protected
+  List<SearchHit> sse_decode_list_search_hit(SseDeserializer deserializer);
+
+  @protected
+  List<TextRange> sse_decode_list_text_range(SseDeserializer deserializer);
+
+  @protected
+  List<TrashEntry> sse_decode_list_trash_entry(SseDeserializer deserializer);
+
+  @protected
+  MessageAnalysis sse_decode_message_analysis(SseDeserializer deserializer);
 
   @protected
   MessageInsight sse_decode_message_insight(SseDeserializer deserializer);
 
   @protected
+  MmsAttachmentData sse_decode_mms_attachment_data(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
+  DecodedMms? sse_decode_opt_box_autoadd_decoded_mms(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  DeviceIdentity? sse_decode_opt_box_autoadd_device_identity(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  EncryptedEnvelope? sse_decode_opt_box_autoadd_encrypted_envelope(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  SearchDoc sse_decode_search_doc(SseDeserializer deserializer);
+
+  @protected
+  SearchHit sse_decode_search_hit(SseDeserializer deserializer);
+
+  @protected
+  Segmentation sse_decode_segmentation(SseDeserializer deserializer);
+
+  @protected
+  TextRange sse_decode_text_range(SseDeserializer deserializer);
+
+  @protected
+  TrashEntry sse_decode_trash_entry(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_8(SseDeserializer deserializer);
@@ -72,16 +257,61 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_decode_unit(SseDeserializer deserializer);
 
   @protected
-  int sse_decode_i_32(SseDeserializer deserializer);
-
-  @protected
-  bool sse_decode_bool(SseDeserializer deserializer);
-
-  @protected
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
+  void sse_encode_bool(bool self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_decoded_mms(
+    DecodedMms self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_device_identity(
+    DeviceIdentity self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_encrypted_envelope(
+    EncryptedEnvelope self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_decoded_mms(DecodedMms self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_device_identity(
+    DeviceIdentity self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_encrypted_envelope(
+    EncryptedEnvelope self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_f_64(double self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_i_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_message_analysis(
+    List<MessageAnalysis> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_message_insight(
@@ -90,8 +320,47 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_mms_attachment_data(
+    List<MmsAttachmentData> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_search_doc(
+    List<SearchDoc> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_search_hit(
+    List<SearchHit> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_text_range(
+    List<TextRange> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_trash_entry(
+    List<TrashEntry> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_message_analysis(
+    MessageAnalysis self,
     SseSerializer serializer,
   );
 
@@ -102,19 +371,55 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_mms_attachment_data(
+    MmsAttachmentData self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_decoded_mms(
+    DecodedMms? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_device_identity(
+    DeviceIdentity? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_encrypted_envelope(
+    EncryptedEnvelope? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_search_doc(SearchDoc self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_search_hit(SearchHit self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_segmentation(Segmentation self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_text_range(TextRange self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_trash_entry(TrashEntry self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_8(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_i_32(int self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_bool(bool self, SseSerializer serializer);
 }
 
 // Section: wire_class

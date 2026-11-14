@@ -117,7 +117,7 @@ class _TrashScreenState extends State<TrashScreen> {
                         settings.trashRetentionDays,
                       );
                       await _load();
-                      if (mounted) {
+                      if (context.mounted) {
                         showAuroraSnack(
                           context,
                           removed == 0 ? '没有需要清理的项目' : '已清理 $removed 条过期消息',

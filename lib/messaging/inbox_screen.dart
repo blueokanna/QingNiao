@@ -61,6 +61,7 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
     }
   }
 
+  // ignore: unused_element
   Future<void> _compose() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(

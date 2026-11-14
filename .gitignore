@@ -48,3 +48,7 @@ app.*.map.json
 .widget_preview/
 
 android/.kotlin/
+*.jks
+*.keystore
+android/key.properties
+.toolchains/

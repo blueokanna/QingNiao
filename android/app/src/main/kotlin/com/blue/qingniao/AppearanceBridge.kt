@@ -23,6 +23,10 @@ class AppearanceBridge(private val activity: Activity) {
 
     fun handle(call: MethodCall, result: MethodChannel.Result): Boolean {
         when (call.method) {
+            "setLauncherIcon" -> {
+                LauncherIcons.select(activity, requireNotNull(call.argument<String>("icon")))
+                result.success(null)
+            }
             "systemSeed" -> result.success(String.format("#%08X", activity.getColor(android.R.color.system_accent1_500)))
             "systemPalette" -> result.success(palette())
             "settingsAll" -> result.success(preferences.all.mapValues { it.value.toString() })
@@ -48,7 +52,8 @@ class AppearanceBridge(private val activity: Activity) {
                     "model" to Build.MODEL,
                     "sdk" to Build.VERSION.SDK_INT,
                     "notificationsEnabled" to activity.getSystemService(NotificationManager::class.java).areNotificationsEnabled(),
-                    "batteryRestricted" to !power.isIgnoringBatteryOptimizations(activity.packageName),
+                    "batteryRestricted" to activity.getSystemService(android.app.ActivityManager::class.java).isBackgroundRestricted,
+                    "batteryOptimizationExcluded" to power.isIgnoringBatteryOptimizations(activity.packageName),
                     "powerSaveMode" to power.isPowerSaveMode
                 ))
             }

@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' show FontFeature;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -273,7 +272,6 @@ class _OtpChipState extends State<OtpChip> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = context.colors;
     final aurora = context.aurora;
     return AuroraPressable(
       onTap: _copy,
@@ -284,7 +282,7 @@ class _OtpChipState extends State<OtpChip> {
         padding: EdgeInsets.symmetric(horizontal: widget.compact ? 8 : 12, vertical: widget.compact ? 3 : 7),
         decoration: ShapeDecoration(
           color: widget.inverted
-              ? scheme.onPrimary.withValues(alpha: _copied ? .26 : .16)
+              ? aurora.outgoingText.withValues(alpha: _copied ? .26 : .16)
               : aurora.otpSoft,
           shape: RoundedSuperellipseBorder(
             borderRadius: BorderRadius.circular(widget.compact ? 10 : 14),
@@ -304,7 +302,7 @@ class _OtpChipState extends State<OtpChip> {
                 _copied ? Icons.check_rounded : Icons.content_copy_rounded,
                 key: ValueKey(_copied),
                 size: widget.compact ? 11 : 14,
-                color: widget.inverted ? scheme.onPrimary : aurora.otp,
+                color: widget.inverted ? aurora.outgoingText : aurora.otp,
               ),
             ),
             const SizedBox(width: 5),
@@ -315,7 +313,7 @@ class _OtpChipState extends State<OtpChip> {
                 height: 1.2,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.2,
-                color: widget.inverted ? scheme.onPrimary : aurora.otp,
+                color: widget.inverted ? aurora.outgoingText : aurora.otp,
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
@@ -371,7 +369,9 @@ class MessageBubble extends StatelessWidget {
         bottomLeft: Radius.circular(groupedBottom && !outgoing ? small : (outgoing ? radius : small)),
         bottomRight: Radius.circular(groupedBottom && outgoing ? small : (outgoing ? small : radius)),
       ),
-      side: selected ? BorderSide(color: scheme.primary, width: 1.6) : BorderSide.none,
+      side: selected
+          ? BorderSide(color: scheme.primary, width: 1.6)
+          : (outgoing ? BorderSide.none : BorderSide(color: aurora.hairline, width: 1)),
     );
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -381,7 +381,7 @@ class MessageBubble extends StatelessWidget {
           Text(
             message.sender,
             style: context.texts.labelSmall?.copyWith(
-              color: scheme.tertiary,
+              color: scheme.primary,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -413,14 +413,14 @@ class MessageBubble extends StatelessWidget {
               Icon(
                 Icons.image_outlined,
                 size: 11,
-                color: outgoing ? scheme.onPrimaryContainer.withValues(alpha: .7) : scheme.onSurfaceVariant,
+                color: outgoing ? context.aurora.outgoingText.withValues(alpha: .7) : scheme.onSurfaceVariant,
               ),
             Text(
               MessageFormat.time(message.date),
               style: context.texts.labelSmall?.copyWith(
                 fontSize: 10,
                 color: outgoing
-                    ? scheme.onPrimaryContainer.withValues(alpha: .6)
+                    ? context.aurora.outgoingText.withValues(alpha: .6)
                     : scheme.onSurfaceVariant.withValues(alpha: .7),
               ),
             ),
@@ -430,7 +430,7 @@ class MessageBubble extends StatelessWidget {
                 'SIM ${message.subscriptionId == 0 ? 1 : message.subscriptionId}',
                 style: TextStyle(
                   fontSize: 9.5,
-                  color: scheme.onPrimaryContainer.withValues(alpha: .55),
+                  color: context.aurora.outgoingText.withValues(alpha: .55),
                 ),
               ),
           ],
@@ -443,7 +443,7 @@ class MessageBubble extends StatelessWidget {
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 minimumSize: const Size(0, 30),
-                foregroundColor: outgoing ? scheme.onPrimaryContainer : scheme.error,
+                foregroundColor: outgoing ? context.aurora.outgoingText : scheme.error,
                 textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
               ),
               icon: const Icon(Icons.refresh_rounded, size: 13),
@@ -462,7 +462,13 @@ class MessageBubble extends StatelessWidget {
         gradient: outgoing ? aurora.outgoingGradient : null,
         shadows: outgoing
             ? [BoxShadow(color: scheme.primary.withValues(alpha: .08), blurRadius: 18, offset: const Offset(0, 6))]
-            : null,
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? .18 : .045),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
+                ),
+              ],
       ),
       child: DefaultTextStyle.merge(
         style: context.texts.bodyLarge?.copyWith(
@@ -521,9 +527,9 @@ class _MessageText extends StatelessWidget {
         TextSpan(
           text: url,
           style: TextStyle(
-            color: outgoing ? scheme.onPrimaryContainer : scheme.primary,
+            color: outgoing ? context.aurora.outgoingText : scheme.primary,
             decoration: TextDecoration.underline,
-            decorationColor: (outgoing ? scheme.onPrimaryContainer : scheme.primary).withValues(alpha: .5),
+            decorationColor: (outgoing ? context.aurora.outgoingText : scheme.primary).withValues(alpha: .5),
           ),
           recognizer: TapGestureRecognizer()..onTap = () => onOpenLink?.call(url),
         ),
@@ -547,9 +553,9 @@ class _MessageText extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.4,
-                  color: outgoing ? scheme.onPrimaryContainer : context.aurora.otp,
+                  color: outgoing ? context.aurora.outgoingText : context.aurora.otp,
                   backgroundColor: outgoing
-                      ? scheme.onPrimaryContainer.withValues(alpha: .14)
+                      ? context.aurora.outgoingText.withValues(alpha: .14)
                       : context.aurora.otpSoft,
                 ),
               ),
@@ -969,7 +975,7 @@ class _SendButton extends StatelessWidget {
             shape: BoxShape.circle,
             gradient: enabled
                 ? LinearGradient(
-                    colors: [scheme.primary, Color.lerp(scheme.primary, scheme.tertiary, .65)!],
+                    colors: [scheme.primary, Color.lerp(scheme.primary, scheme.secondary, .65)!],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   )

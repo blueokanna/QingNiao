@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
-
 import 'message_repository.dart';
 import 'models.dart';
 
@@ -418,6 +416,7 @@ class DemoMessageRepository extends MessageRepository {
       message(11, 5, '+86 137 0000 9012', '看起来像呼吸一样。可以再把回弹压一点点。', 110, sender: '周岸', sim: 2, mms: true),
       message(12, 5, '+86 139 0000 5678', '收到，今晚调一版发群里。', 100, sender: '林雾', sim: 2, mms: true),
       message(13, 5, '+86 137 0000 9012', '别忘了明早十点的评审 🌿', 12, sender: '周岸', sim: 2, mms: true),
+      message(15, 5, '+86 139 0000 5678', '收到，我把回弹曲线压到 0.72 了，明早一起看。', 6, type: 2, read: true, sim: 2, mms: true),
     ];
     _messages[6] = [
       message(14, 6, '106900', '【美团】您有一张满 30 减 8 的优惠券将于今日 24:00 过期，退订回 T。', 500, read: true, category: MessageCategory.promotion, otp: null),
@@ -454,6 +453,7 @@ class _Seed {
     this.category,
     this.sim, {
     this.pinned = false,
+    // ignore: unused_element_parameter
     this.archived = false,
   });
 

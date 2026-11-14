@@ -10,3 +10,9 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
+
+linter:
+  rules:
+    use_null_aware_elements: false
+    prefer_initializing_formals: false
+    prefer_const_constructors_in_immutables: false

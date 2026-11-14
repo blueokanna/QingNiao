@@ -1,0 +1,119 @@
+name: Android delivery
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing v-prefixed tag for a draft GitHub Release; leave empty for validation only
+        required: false
+        type: string
+      production:
+        description: Build with the production signing key
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARGOKIT_RUST_TOOLCHAIN: 1.99.1
+      RUSTUP_TOOLCHAIN: 1.99.1
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: flutter/flutter
+          ref: c197ca5199e9ee5661e865596c9c07294dfab51c
+          path: .toolchains/flutter
+          persist-credentials: false
+      - name: Install pinned Android toolchain
+        shell: bash
+        run: |
+          echo "$GITHUB_WORKSPACE/.toolchains/flutter/bin" >> "$GITHUB_PATH"
+          rustup toolchain install 1.99.1 --profile minimal
+          rustup target add --toolchain 1.99.1 aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358'
+      - name: Validate source
+        shell: bash
+        run: |
+          flutter config --no-analytics
+          flutter pub get --enforce-lockfile
+          flutter analyze --no-fatal-infos --no-fatal-warnings
+          flutter test
+          cargo test --locked --manifest-path rust/Cargo.toml
+      - name: Prepare production key
+        if: ${{ inputs.production == true }}
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64"
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/qingniao-release.jks"
+      - name: Build and inspect APK
+        shell: bash
+        env:
+          PRODUCTION: ${{ inputs.production || false }}
+          QINGNIAO_KEYSTORE_PATH: ${{ runner.temp }}/qingniao-release.jks
+          QINGNIAO_STORE_PASSWORD: ${{ inputs.production && secrets.ANDROID_STORE_PASSWORD || '' }}
+          QINGNIAO_KEY_ALIAS: ${{ inputs.production && secrets.ANDROID_KEY_ALIAS || '' }}
+          QINGNIAO_KEY_PASSWORD: ${{ inputs.production && secrets.ANDROID_KEY_PASSWORD || '' }}
+        run: |
+          if [[ "$PRODUCTION" == 'true' ]]; then mode=release; else mode=debug; fi
+          flutter build apk --"$mode"
+          (cd android && chmod +x gradlew && ./gradlew lintDebug --no-daemon)
+          mkdir -p build/delivery
+          cp "build/app/outputs/flutter-apk/app-$mode.apk" "build/delivery/qingniao-$mode.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "build/delivery/qingniao-$mode.apk" > build/delivery/signature.txt
+          git rev-parse HEAD > build/delivery/source-commit.txt
+          flutter --version --machine > build/delivery/flutter-version.json
+          rustc --version > build/delivery/rust-version.txt
+          (cd build/delivery && sha256sum *.apk > SHA256SUMS)
+      - name: Remove signing material
+        if: always()
+        shell: bash
+        run: rm -f -- "$RUNNER_TEMP/qingniao-release.jks"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qingniao-android
+          path: build/delivery/
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' }}
+    needs: android
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Create draft release from verified artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          PRODUCTION: ${{ inputs.production }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$ ]]
+          gh run download "$RUN_ID" --name qingniao-android --dir delivery
+          flags=(--draft --verify-tag)
+          if [[ "$PRODUCTION" != 'true' ]]; then flags+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" delivery/* "${flags[@]}" --title "青鸟短信 $RELEASE_TAG" --notes 'Android APK, source commit, toolchain versions, certificate fingerprint and SHA-256 checksums are attached. See the device compatibility matrix before deployment.'

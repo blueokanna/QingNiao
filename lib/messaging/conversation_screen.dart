@@ -256,6 +256,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     if (selected != null) setState(() => _simId = selected);
   }
 
+  // ignore: unused_element
   Future<void> _messageActions(SmsMessage message) async {
     if (_selected.isNotEmpty) {
       setState(() {
@@ -750,7 +751,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       final sameDay = previous != null && _sameDay(previous.date, message.date);
       if (!sameDay) entries.add(_Entry.day(message.date));
       final groupedTop = sameDay &&
-          previous!.outgoing == message.outgoing &&
+          previous.outgoing == message.outgoing &&
           message.date - previous.date < 4 * 60 * 1000;
       final groupedBottom = next != null &&
           _sameDay(next.date, message.date) &&

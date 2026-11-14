@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../app/app_settings.dart';
 import '../aurora/aurora_engine.dart';
-import '../aurora/aurora_shapes.dart';
 import '../aurora/aurora_theme.dart';
 import '../aurora/aurora_widgets.dart';
 import '../messaging/models.dart';
@@ -23,10 +22,7 @@ class AppearanceScreen extends StatelessWidget {
           physics: const BouncingScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
-              child: AuroraTopBar(
-                title: '外观',
-                subtitle: '改动即时生效',
-              ),
+              child: AuroraTopBar(title: '外观', subtitle: '改动即时生效'),
             ),
             SliverToBoxAdapter(
               child: Padding(
@@ -45,7 +41,10 @@ class AppearanceScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      _PreviewBubble(outgoing: false, text: '今晚的极光，像一条慢慢展开的短信。'),
+                      _PreviewBubble(
+                        outgoing: false,
+                        text: '今晚的极光，像一条慢慢展开的短信。',
+                      ),
                       _PreviewBubble(outgoing: true, text: '那就把这条留在青鸟里。'),
                     ],
                   ),
@@ -56,6 +55,77 @@ class AppearanceScreen extends StatelessWidget {
               child: AuroraSection(
                 title: '主题',
                 children: [
+                  AuroraSettingTile(
+                    title: 'AMOLED 纯黑',
+                    subtitle: '启用深色与纯黑背景，关闭背景光效',
+                    icon: Icons.nightlight_outlined,
+                    trailing: Switch(
+                      value: settings.amoled,
+                      onChanged: settings.setAmoled,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: DropdownButtonFormField<String>(
+                      initialValue: settings.fontFamily,
+                      decoration: const InputDecoration(labelText: '界面字体'),
+                      items: const [
+                        DropdownMenuItem(value: 'system', child: Text('系统字体')),
+                        DropdownMenuItem(
+                          value: 'harmony',
+                          child: Text('HarmonyOS Sans · 鸿蒙'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'google',
+                          child: Text('Google Sans'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) settings.setFontFamily(value);
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      '内置 HarmonyOS Sans 与 Google Sans；Google Sans 的中文使用鸿蒙字体回退。',
+                      style: context.texts.bodySmall,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => showLicensePage(
+                      context: context,
+                      applicationName: '青鸟短信',
+                    ),
+                    child: const Text('字体许可与开源声明'),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: DropdownButtonFormField<String>(
+                      initialValue: settings.launcherIcon,
+                      decoration: const InputDecoration(labelText: '桌面图标'),
+                      items: const [
+                        DropdownMenuItem(value: 'bird', child: Text('青鸟')),
+                        DropdownMenuItem(value: 'leaf', child: Text('新叶')),
+                        DropdownMenuItem(value: 'chat', child: Text('对话')),
+                      ],
+                      onChanged: (value) async {
+                        if (value == null) return;
+                        try {
+                          await settings.setLauncherIcon(value);
+                        } catch (_) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('桌面图标切换失败，请重试')),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                  ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
                     child: AuroraFilterBar(
@@ -64,13 +134,11 @@ class AppearanceScreen extends StatelessWidget {
                         AuroraThemePreference.light => 'light',
                         AuroraThemePreference.dark => 'dark',
                       },
-                      onSelected: (value) => settings.setTheme(
-                        switch (value) {
-                          'light' => AuroraThemePreference.light,
-                          'dark' => AuroraThemePreference.dark,
-                          _ => AuroraThemePreference.system,
-                        },
-                      ),
+                      onSelected: (value) => settings.setTheme(switch (value) {
+                        'light' => AuroraThemePreference.light,
+                        'dark' => AuroraThemePreference.dark,
+                        _ => AuroraThemePreference.system,
+                      }),
                       items: const [
                         AuroraFilterItem('system', '跟随系统'),
                         AuroraFilterItem('light', '浅色'),
@@ -88,7 +156,9 @@ class AppearanceScreen extends StatelessWidget {
                     icon: Icons.colorize_outlined,
                     trailing: Switch(
                       value: settings.useDynamic,
-                      onChanged: settings.systemSeed == null ? null : settings.setDynamic,
+                      onChanged: settings.systemSeed == null
+                          ? null
+                          : settings.setDynamic,
                     ),
                   ),
                 ],
@@ -108,7 +178,9 @@ class AppearanceScreen extends StatelessWidget {
                           _SeedSwatch(
                             name: entry.key,
                             color: entry.value,
-                            selected: !settings.useDynamic && settings.seed == entry.value,
+                            selected:
+                                !settings.useDynamic &&
+                                settings.seed == entry.value,
                             onTap: () {
                               settings.setDynamic(false);
                               settings.setSeed(entry.key);
@@ -132,13 +204,11 @@ class AppearanceScreen extends StatelessWidget {
                         AuroraBubbleStyle.capsule => 'capsule',
                         AuroraBubbleStyle.cookie => 'cookie',
                       },
-                      onSelected: (value) => settings.setBubble(
-                        switch (value) {
-                          'capsule' => AuroraBubbleStyle.capsule,
-                          'cookie' => AuroraBubbleStyle.cookie,
-                          _ => AuroraBubbleStyle.soft,
-                        },
-                      ),
+                      onSelected: (value) => settings.setBubble(switch (value) {
+                        'capsule' => AuroraBubbleStyle.capsule,
+                        'cookie' => AuroraBubbleStyle.cookie,
+                        _ => AuroraBubbleStyle.soft,
+                      }),
                       items: const [
                         AuroraFilterItem('soft', '柔和'),
                         AuroraFilterItem('capsule', '胶囊'),
@@ -170,13 +240,11 @@ class AppearanceScreen extends StatelessWidget {
                         AuroraMotionLevel.balanced => 'balanced',
                         AuroraMotionLevel.reduced => 'reduced',
                       },
-                      onSelected: (value) => settings.setMotion(
-                        switch (value) {
-                          'balanced' => AuroraMotionLevel.balanced,
-                          'reduced' => AuroraMotionLevel.reduced,
-                          _ => AuroraMotionLevel.full,
-                        },
-                      ),
+                      onSelected: (value) => settings.setMotion(switch (value) {
+                        'balanced' => AuroraMotionLevel.balanced,
+                        'reduced' => AuroraMotionLevel.reduced,
+                        _ => AuroraMotionLevel.full,
+                      }),
                       items: const [
                         AuroraFilterItem('full', '全速'),
                         AuroraFilterItem('balanced', '平衡'),
@@ -208,7 +276,9 @@ class AppearanceScreen extends StatelessWidget {
                       onChanged: (value) {
                         settings.setLowPower(value);
                         AuroraEngine.instance.configure(
-                          motion: value ? AuroraMotionLevel.reduced : AuroraMotionLevel.full,
+                          motion: value
+                              ? AuroraMotionLevel.reduced
+                              : AuroraMotionLevel.full,
                           reduce: false,
                         );
                       },
@@ -288,7 +358,12 @@ class _SeedSwatch extends StatelessWidget {
                 width: 2,
               ),
               boxShadow: selected
-                  ? [BoxShadow(color: color.withValues(alpha: .4), blurRadius: 18)]
+                  ? [
+                      BoxShadow(
+                        color: color.withValues(alpha: .4),
+                        blurRadius: 18,
+                      ),
+                    ]
                   : null,
             ),
             child: selected
@@ -308,8 +383,3 @@ class _SeedSwatch extends StatelessWidget {
     );
   }
 }
-
-extension on Icons {
-  static const colorize = Icons.colorize_outlined;
-}
-

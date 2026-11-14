@@ -3,12 +3,13 @@ import 'package:flutter/services.dart';
 
 import 'app.dart';
 import 'app/app_settings.dart';
-import 'messaging/demo_repository.dart';
+import 'design/bundled_fonts.dart';
 import 'messaging/message_repository.dart';
 import 'src/rust/frb_generated.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  BundledFonts.registerLicenses();
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -18,8 +19,7 @@ Future<void> main() async {
     ),
   );
 
-  const demo = bool.fromEnvironment('QINGNIAO_DEMO');
-  final MessageRepository repository = demo ? DemoMessageRepository() : MessageRepository();
+  const repository = MessageRepository();
   final settings = await AppSettings.load(repository);
 
   try {

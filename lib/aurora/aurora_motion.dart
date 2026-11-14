@@ -1,8 +1,6 @@
 import 'dart:math' as math;
-import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/physics.dart';
 
 /// 统一的运动语言：时间、曲线与弹簧参数都从这里取，避免页面各写一套。
 abstract final class AuroraMotion {
@@ -36,11 +34,6 @@ class AuroraPageTransitionsTheme extends PageTransitionsTheme {
     : super(
         builders: const <TargetPlatform, PageTransitionsBuilder>{
           TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
-          TargetPlatform.iOS: AuroraPageTransitionsBuilder(),
-          TargetPlatform.macOS: AuroraPageTransitionsBuilder(),
-          TargetPlatform.windows: AuroraPageTransitionsBuilder(),
-          TargetPlatform.linux: AuroraPageTransitionsBuilder(),
-          TargetPlatform.fuchsia: AuroraPageTransitionsBuilder(),
         },
       );
 }

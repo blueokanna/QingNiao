@@ -1,8 +1,6 @@
-import 'dart:typed_data';
-
 import 'package:flutter/services.dart';
 
-import '../src/rust/api/message_analysis.dart';
+import '../src/rust/api/engine.dart';
 import 'models.dart';
 
 typedef MessageRecord = Map<String, dynamic>;
@@ -64,6 +62,41 @@ class MessageRepository {
       _channel.invokeMethod<void>('notificationSettings');
 
   Future<void> openUrl(String url) => _channel.invokeMethod<void>('openUrl', {'url': url});
+
+  static bool _engineReady = false;
+
+  /// 初始化 Rust 引擎的数据目录（回收站/搜索/同步密钥）。
+  /// 平台层尚未提供目录时静默失败，短信收发不依赖它。
+  Future<bool> initEngine() async {
+    if (_engineReady) return true;
+    try {
+      final dir = await _invoke<String>('dataDir');
+      if (dir == null || dir.isEmpty) return false;
+      _engineReady = await engineInit(dataDir: dir);
+    } catch (_) {
+      _engineReady = false;
+    }
+    return _engineReady;
+  }
+
+  bool get engineReady => _engineReady;
+
+  Future<Segmentation?> segmentBody(String body) async {
+    try {
+      return await segmentMessage(body: body);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<SearchHit>> searchMessagesRust(String query, {int limit = 40}) async {
+    try {
+      if (!await initEngine()) return const [];
+      return await searchMessages(query: query, limit: limit);
+    } catch (_) {
+      return const [];
+    }
+  }
 
   Future<List<ThreadSummary>> conversations({
     String query = '',
@@ -143,17 +176,27 @@ class MessageRepository {
       .invokeMethod<void>('saveDraft', {'address': address, 'body': body});
 
   Future<ContactChoice?> pickContact() async {
-    final map = await _channel.invokeMapMethod<String, dynamic>('pickContact');
-    if (map == null || (map['number'] as String? ?? '').isEmpty) return null;
-    return ContactChoice.fromMap(map);
+    final raw = await _channel.invokeMethod<dynamic>('pickContact');
+    if (raw is String && raw.trim().isNotEmpty) {
+      return ContactChoice(number: raw.trim(), name: '');
+    }
+    if (raw is Map) {
+      final number = '${raw['number'] ?? ''}';
+      if (number.isEmpty) return null;
+      return ContactChoice(number: number, name: '${raw['name'] ?? ''}');
+    }
+    return null;
   }
 
   Future<AttachmentChoice?> pickAttachment() async {
-    final map = await _channel.invokeMapMethod<String, dynamic>(
-      'pickAttachment',
-    );
-    if (map == null || (map['uri'] as String? ?? '').isEmpty) return null;
-    return AttachmentChoice.fromMap(map);
+    final map = await _channel.invokeMapMethod<String, dynamic>('pickAttachment');
+    if (map == null) return null;
+    final uri = '${map['uri'] ?? ''}';
+    if (uri.isEmpty) return null;
+    final mime = '${map['mime'] ?? map['type'] ?? 'application/octet-stream'}';
+    final segments = Uri.tryParse(uri)?.pathSegments;
+    final name = '${map['name'] ?? (segments != null && segments.isNotEmpty ? segments.last : '附件')}';
+    return AttachmentChoice(uri: uri, mime: mime, name: name);
   }
 
   Future<Uint8List?> attachmentData(String uri) =>
@@ -256,7 +299,7 @@ class MessageRepository {
         for (var index = 0; index < messages.length; index++)
           messages[index].copyWith(
             category: categoryFrom(insights[index].category),
-            otp: insights[index].verificationCode,
+            otp: insights[index].otp,
           ),
       ];
     } catch (_) {
@@ -288,7 +331,7 @@ class MessageRepository {
             archived: threads[index].archived,
             blocked: threads[index].blocked,
             category: categoryFrom(insights[index].category),
-            otp: insights[index].verificationCode,
+            otp: insights[index].otp,
             recipients: threads[index].recipients,
             count: threads[index].count,
             hasMms: threads[index].hasMms,
@@ -303,7 +346,7 @@ class MessageRepository {
 }
 
 /// 与 Rust 桥接的薄封装，便于未来替换为带位置信息的分析结果。
-Future<List<MessageInsight>> analyzeMessagesRust({
+Future<List<MessageAnalysis>> analyzeMessagesRust({
   required List<String> bodies,
 }) => analyzeMessages(bodies: bodies);
 

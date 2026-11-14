@@ -27,6 +27,7 @@ pub const MAX_ADDRESS_CHARS: usize = 256;
 /// 单次查询返回上限。
 pub const MAX_RESULTS: usize = 100;
 
+/// 单文档不同词条上限：约束倒排索引的内存上界（超长 CJK 正文只索引前若干个词）。
 const MAX_TERMS_PER_DOC: usize = 1024;
 const MAX_QUERY_TERMS: usize = 32;
 const MAX_NUMERIC_FRAGMENT: usize = 12;
