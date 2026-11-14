@@ -18,7 +18,23 @@ Qingniao combines a Flutter Material 3 Expressive interface, Kotlin integration 
 | Design | Material 3 components, Expressive shapes and Aurora motion |
 | License | [PolyForm Small Business License 1.0.0](LICENSE) |
 
-**Navigation:** [Features](#features) · [Design and rendering](#design-and-rendering) · [Getting started](#getting-started) · [Development and builds](#development-and-builds) · [Optional networking](#optional-networking) · [Security and compatibility](#security-and-compatibility)
+**Navigation:** [Screenshots](#screenshots) · [Features](#features) · [Design and rendering](#design-and-rendering) · [Getting started](#getting-started) · [Development and builds](#development-and-builds) · [Optional networking](#optional-networking) · [Security and compatibility](#security-and-compatibility)
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/images/preview-light.png" alt="Qingniao light theme: inbox, conversation and verification codes">
+</p>
+
+<p align="center">
+  <img src="docs/images/preview-dark.png" alt="Qingniao dark and AMOLED theme: inbox, conversation and settings">
+</p>
+
+<p align="center">
+  <img src="docs/images/preview-navigation.png" alt="Navigation appearance: blur strength and surface opacity">
+</p>
+
+<p align="center"><sub>Rendered off-screen from the real widget tree by <code>test/preview_screens_test.dart</code>; conversation content comes from test fixtures.</sub></p>
 
 ## Features
 

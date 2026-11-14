@@ -131,7 +131,7 @@ class _QingniaoAppState extends State<QingniaoApp>
                       ),
                 child: MediaQuery(
                   data: media.copyWith(
-                    textScaler: _AdjustedTextScaler(
+                    textScaler: _effectiveTextScaler(
                       media.textScaler,
                       settings.fontScale,
                     ),
@@ -156,16 +156,47 @@ class _QingniaoAppState extends State<QingniaoApp>
   }
 }
 
+/// Applies the user's font-scale setting on top of the platform scaler.
+///
+/// The platform scaler is left untouched when the factor is neutral, so the
+/// default path keeps the exact system behaviour and rebuilds triggered by this
+/// builder do not invalidate every text widget.
+TextScaler _effectiveTextScaler(TextScaler system, double factor) {
+  if (!factor.isFinite || factor == 1) return system;
+  return _AdjustedTextScaler(system, factor);
+}
+
+/// Multiplies the platform scaler by the user's factor.
+///
+/// The platform scaler can be nonlinear (Android 14+), so the factor is applied
+/// per font size instead of collapsing everything into one ratio.
 class _AdjustedTextScaler extends TextScaler {
   const _AdjustedTextScaler(this.system, this.factor);
+
   final TextScaler system;
   final double factor;
 
   @override
   double scale(double fontSize) => system.scale(fontSize) * factor;
 
+  // TextScaler declares this as an abstract member, so a concrete subclass must
+  // implement it even though the API itself is deprecated. Reporting the product
+  // keeps callers that still read it on the same ratio as [scale].
   @override
+  // ignore: deprecated_member_use
   double get textScaleFactor => system.textScaleFactor * factor;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _AdjustedTextScaler &&
+      other.system == system &&
+      other.factor == factor;
+
+  @override
+  int get hashCode => Object.hash(system, factor);
+
+  @override
+  String toString() => '_AdjustedTextScaler($system, ${factor}x)';
 }
 
 class RootGate extends StatefulWidget {

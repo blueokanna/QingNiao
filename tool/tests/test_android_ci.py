@@ -11,6 +11,11 @@ import unittest
 SCRIPT = Path(__file__).resolve().parents[1] / "setup_android_sdk.sh"
 
 
+@unittest.skipIf(
+    os.name != "posix",
+    "tool/setup_android_sdk.sh targets the Linux CI runner; Windows has no "
+    "POSIX bash that can execute it",
+)
 class AndroidSdkBootstrapTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory(prefix="qingniao-ci-")

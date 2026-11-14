@@ -18,7 +18,23 @@
 | 设计 | Material 3 组件、Expressive 形状与 Aurora 动效 |
 | 许可证 | [PolyForm Small Business License 1.0.0](LICENSE) |
 
-**导航：** [功能](#功能) · [设计与渲染](#设计与渲染) · [开始使用](#开始使用) · [开发与构建](#开发与构建) · [可选联网功能](#可选联网功能) · [安全与兼容性](#安全与兼容性)
+**导航：** [界面预览](#界面预览) · [功能](#功能) · [设计与渲染](#设计与渲染) · [开始使用](#开始使用) · [开发与构建](#开发与构建) · [可选联网功能](#可选联网功能) · [安全与兼容性](#安全与兼容性)
+
+## 界面预览
+
+<p align="center">
+  <img src="docs/images/preview-light.png" alt="青鸟短信浅色界面：收件箱、会话与验证码">
+</p>
+
+<p align="center">
+  <img src="docs/images/preview-dark.png" alt="青鸟短信深色与 AMOLED 界面：收件箱、会话与设置">
+</p>
+
+<p align="center">
+  <img src="docs/images/preview-navigation.png" alt="导航栏外观：模糊强度与表面不透明度调节">
+</p>
+
+<p align="center"><sub>截图由 <code>test/preview_screens_test.dart</code> 用真实 widget 树离屏渲染生成，会话内容为测试夹具数据。</sub></p>
 
 ## 功能
 
