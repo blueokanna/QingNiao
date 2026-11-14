@@ -61,6 +61,15 @@ access={defaultApp=true, readSms=true, sendSms=true, receiveSms=true, promoted=t
 `type` 含义：1 收件箱、2 已发送、4 发件箱（发送中）、5 发送失败。
 `status`：32 = `STATUS_PENDING`。
 
+也可以直接跑脚本（自动完成设备、角色、权限、通知、流体云与 debug 自检）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tool\verify-device.ps1
+```
+
+脚本在飞行模式、无 SIM 注册、release 包等情况下给出 WARN 而不是误报 PASS；
+真实入站短信仍需人工按第 4 节执行。成功时退出码为 0。
+
 ## 3. 通知与流体云
 
 1. 执行上面的 `DEBUG_NOTIFY`，收起通知栏。
