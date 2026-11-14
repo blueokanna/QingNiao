@@ -28,6 +28,19 @@ curl http://127.0.0.1:8787/v1/health
 # {"ok":true,"spaces":0,"devices":0,"envelopes":0,"serverTime":...,"protocol":1}
 ```
 
+## 自动冒烟测试
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File server-rs\scripts\smoke.ps1
+```
+
+脚本会构建服务端、在本地随机端口启动、然后依次验证：健康检查 → 创建空间 →
+用配对码加入第二台设备 → 轮换配对码 → 投递密文信封 → 以第二台设备拉取 →
+确认发送方拉不到自己的信封。数据文件写在 `build/verification/`，退出时清理，
+成功输出 `ALL PASS`。
+
+可选参数：`-Port 8899`、`-SkipBuild`。
+
 ## API
 
 | 方法 | 路径 | 说明 |

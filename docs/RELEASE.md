@@ -32,14 +32,16 @@ $env:QINGNIAO_KEY_PASSWORD   = "你的key密码"
 
 ```powershell
 # 单个通用 APK（含全部 ABI）
-pwsh -File tool/build-release.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tool\build-release.ps1
 
 # 按 ABI 拆分，体积更小，适合分发
-pwsh -File tool/build-release.ps1 -SplitAbi
+powershell -NoProfile -ExecutionPolicy Bypass -File tool\build-release.ps1 -SplitAbi
 
 # 上架 Google Play 用 AAB
-pwsh -File tool/build-release.ps1 -Bundle
+powershell -NoProfile -ExecutionPolicy Bypass -File tool\build-release.ps1 -Bundle
 ```
+
+> 若终端里有 PowerShell 7（`pwsh`），把上面的 `powershell` 换成 `pwsh` 即可。
 
 产物：
 
