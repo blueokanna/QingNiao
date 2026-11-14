@@ -103,6 +103,25 @@ class MessageRepository {
     }
   }
 
+  /// 全量重建 Rust 搜索索引。语料来自系统短信库（短信正文 + 彩信主题）。
+  Future<int> indexSearchCorpus() async {
+    if (!await initEngine()) return 0;
+    final rows = await _list('searchCorpus');
+    return indexMessages(
+      docs: [
+        for (final row in rows)
+          SearchDoc(
+            id: (row['id'] as num?)?.toInt() ?? 0,
+            threadId: (row['threadId'] as num?)?.toInt() ?? 0,
+            address: '${row['address'] ?? ''}',
+            body: '${row['body'] ?? ''}',
+            date: (row['date'] as num?)?.toInt() ?? 0,
+            read: row['read'] == true,
+          ),
+      ],
+    );
+  }
+
   Future<List<ThreadSummary>> conversations({
     String query = '',
     String filter = 'all',

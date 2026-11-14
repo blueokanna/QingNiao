@@ -110,7 +110,7 @@ flutter build apk --debug
 - MMS PDU 仅实现 M-Retrieve.conf 子集；GB2312 文本离线解码为尽力而为。
 - 同步在应用前台启动或回到前台时自动执行，并每 2 分钟重试；后台长轮询 / JobScheduler 兜底仍在路线图中。
 - 备份导入已支持把短信、草稿、置顶/归档与黑名单合并回本机（需默认短信应用）。
-- 搜索索引在内存中重建；超大短信库只索引前 4k 字符/条。
+- 搜索已接入 Rust 倒排索引并按得分排序线程；索引在内存中重建，超大短信库只索引前 4k 字符/条，引擎不可用时回退 LIKE。
 - 流体云：ColorOS 16.1 可走标准 Live Updates；ColorOS 15 及更早需要 OPPO
   Seedling SDK 审核与 `serviceId`，无法应用侧自助接入。详见
   [docs/FLUID-CLOUD.md](docs/FLUID-CLOUD.md)。

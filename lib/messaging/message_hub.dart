@@ -24,6 +24,7 @@ class MessageHub extends ChangeNotifier {
   Timer? _debounce;
   bool _refreshing = false;
   bool _again = false;
+  bool _indexDirty = true;
 
   int get unread => threads.fold(0, (sum, thread) => sum + thread.unread);
   int get otpCount => threads.where((thread) => thread.hasOtp).length;
@@ -41,6 +42,7 @@ class MessageHub extends ChangeNotifier {
     _subscription ??= repository.changes.listen(
       (event) {
         if (event == 'intent') intentTick++;
+        _indexDirty = true;
         refresh(silent: true);
       },
       onError: (Object value) {
@@ -86,7 +88,9 @@ class MessageHub extends ChangeNotifier {
         notifyListeners();
         return;
       }
-      final loaded = await repository.conversations(query: query, filter: filter);
+      final loaded = query.trim().isEmpty
+          ? await repository.conversations(query: '', filter: filter)
+          : await _searchThreads();
       threads = await repository.analyzeThreads(loaded);
       sims = await repository.subscriptions();
       error = null;
@@ -101,6 +105,48 @@ class MessageHub extends ChangeNotifier {
         unawaited(refresh(silent: true));
       }
       notifyListeners();
+    }
+  }
+
+  Future<List<ThreadSummary>> _searchThreads() async {
+    final direct = await repository.conversations(query: query, filter: filter);
+    try {
+      if (!await repository.initEngine()) return direct;
+      if (_indexDirty) {
+        final indexed = await repository.indexSearchCorpus();
+        _indexDirty = false;
+        if (indexed == 0) return direct;
+      }
+      final hits = await repository.searchMessagesRust(query, limit: 200);
+      if (hits.isEmpty) return direct;
+      final rank = <int, int>{};
+      for (var index = 0; index < hits.length; index++) {
+        rank.putIfAbsent(hits[index].threadId.toInt(), () => index);
+      }
+      final all = await repository.conversations(query: '', filter: filter);
+      final merged = <ThreadSummary>[];
+      final seen = <int>{};
+      for (final thread in all) {
+        if (rank.containsKey(thread.threadId)) {
+          merged.add(thread);
+          seen.add(thread.threadId);
+        }
+      }
+      // Rust 语料不含彩信正文；把 provider 直接命中的彩信线程补在后面。
+      for (final thread in direct) {
+        if (seen.add(thread.threadId)) merged.add(thread);
+      }
+      merged.sort((a, b) {
+        final left = rank[a.threadId];
+        final right = rank[b.threadId];
+        if (left != null && right != null) return left.compareTo(right);
+        if (left != null) return -1;
+        if (right != null) return 1;
+        return b.date.compareTo(a.date);
+      });
+      return merged;
+    } catch (_) {
+      return direct;
     }
   }
 

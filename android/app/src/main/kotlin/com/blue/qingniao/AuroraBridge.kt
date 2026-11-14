@@ -171,6 +171,7 @@ class AuroraBridge(private val activity: Activity) {
                     call.argument<Number>("before")?.toLong() ?: Long.MAX_VALUE,
                     (call.argument<Number>("limit")?.toInt() ?: 80).coerceIn(1, 300),
                 )
+                "searchCorpus" -> searchCorpus(store)
                 "markRead" -> {
                     markRead(requireNotNull(call.argument<Number>("threadId")).toLong())
                     null
@@ -274,7 +275,7 @@ class AuroraBridge(private val activity: Activity) {
 
     private val methods = setOf(
         "conversations", "messages", "markRead", "hide", "restore", "delete",
-        "trash", "trashRetention", "purgeTrash", "subscriptions", "draft", "saveDraft",
+        "searchCorpus", "trash", "trashRetention", "purgeTrash", "subscriptions", "draft", "saveDraft",
         "pin", "archive", "block", "unblock", "blocked", "attachmentData",
         "schedule", "scheduled", "cancelScheduled", "dataDir", "openUrl",
         "stats", "exportBackup", "importBackup", "syncStatus", "syncConfigure",
@@ -1011,6 +1012,64 @@ class AuroraBridge(private val activity: Activity) {
         values.put(MediaStore.MediaColumns.IS_PENDING, 0)
         context.contentResolver.update(uri, values, null, null)
         return true
+    }
+
+    /** 供 Rust 建索引的全量短信/彩信文本；限制 50k + 5k，避免大库一次性占满内存。 */
+    private fun searchCorpus(store: AuroraStore): List<Map<String, Any?>> {
+        val hidden = store.hiddenIds()
+        val rows = mutableListOf<Map<String, Any?>>()
+        context.contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf("_id", "thread_id", "address", "body", "date", "read"),
+            null,
+            null,
+            "date DESC",
+        )?.use { cursor ->
+            while (cursor.moveToNext() && rows.size < 50_000) {
+                val id = cursor.getLong(0)
+                if (id in hidden) continue
+                val body = cursor.getString(3) ?: ""
+                if (body.isEmpty()) continue
+                rows.add(
+                    mapOf(
+                        "id" to id,
+                        "threadId" to cursor.getLong(1),
+                        "address" to (cursor.getString(2) ?: ""),
+                        "body" to body,
+                        "date" to cursor.getLong(4),
+                        "read" to (cursor.getInt(5) != 0),
+                    ),
+                )
+            }
+        }
+        var mms = 0
+        context.contentResolver.query(
+            Telephony.Mms.CONTENT_URI,
+            arrayOf("_id", "thread_id", "date", "subject", "read"),
+            null,
+            null,
+            "date DESC",
+        )?.use { cursor ->
+            while (cursor.moveToNext() && mms < 5_000) {
+                val id = cursor.getLong(0)
+                if (id in hidden) continue
+                val subject = cursor.getString(3) ?: ""
+                if (subject.isEmpty()) continue
+                val address = "彩信"
+                rows.add(
+                    mapOf(
+                        "id" to -id,
+                        "threadId" to cursor.getLong(1),
+                        "address" to address,
+                        "body" to subject,
+                        "date" to cursor.getLong(2) * 1000,
+                        "read" to (cursor.getInt(4) != 0),
+                    ),
+                )
+                mms += 1
+            }
+        }
+        return rows
     }
 
     private fun remoteMessagesSince(store: AuroraStore, since: Long): List<Map<String, Any?>> {
