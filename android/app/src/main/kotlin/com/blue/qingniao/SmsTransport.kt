@@ -32,6 +32,7 @@ object SmsTransport {
         android.util.Log.d("QingniaoSms", "outbox id=$id parts=${parts.size} sub=$subscription address=$address")
         try {
             store.registerOutgoing(id, parts.size)
+            SmsSendWatchdog.schedule(context, id)
             fun callbacks(phase: String) = ArrayList(parts.indices.map { index ->
                 val intent = Intent(context, SmsReceiptReceiver::class.java).setAction(phase)
                     .setData(Uri.parse("qingniao://receipt/$id/$phase/$index"))
@@ -63,6 +64,7 @@ class SmsReceiptReceiver : BroadcastReceiver() {
                 MessageStore(context).use { store ->
                     val state = store.receipt(id, part, phase, success) ?: return@use
                     android.util.Log.d("QingniaoSms", "receipt id=$id part=$part phase=$phase success=$success type=$state")
+                    if (phase == "sent") SmsSendWatchdog.cancel(context, id)
                     val values = ContentValues()
                     if (phase == "sent") values.put("type", state)
                     if (phase == "delivered") values.put("status", if (state == 2) Telephony.Sms.STATUS_COMPLETE else Telephony.Sms.STATUS_FAILED)

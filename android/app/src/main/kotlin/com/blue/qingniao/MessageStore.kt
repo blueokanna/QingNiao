@@ -23,6 +23,10 @@ class MessageStore(context: Context) : SQLiteOpenHelper(context, "message_state.
         else writableDatabase.execSQL("INSERT OR REPLACE INTO drafts VALUES (?,?)", arrayOf(address, body))
     }
     fun registerOutgoing(id: Long, parts: Int) { writableDatabase.execSQL("INSERT INTO outgoing VALUES (?,?)", arrayOf<Any>(id, parts)) }
+    fun outgoingIds(): List<Long> = readableDatabase.rawQuery("SELECT message_id FROM outgoing", null).use { cursor ->
+        buildList { while (cursor.moveToNext()) add(cursor.getLong(0)) }
+    }
+    fun forgetOutgoing(id: Long) { writableDatabase.delete("outgoing", "message_id=?", arrayOf(id.toString())) }
     fun receipt(id: Long, part: Int, phase: String, success: Boolean): Int? {
         val db = writableDatabase
         val count = db.rawQuery("SELECT parts FROM outgoing WHERE message_id=?", arrayOf(id.toString())).use { if (it.moveToFirst()) it.getInt(0) else return null }

@@ -29,6 +29,8 @@ class MainActivity : FlutterActivity() {
     }
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // 设备重启会丢失发送看门狗闹钟；启动时把长时间停在发件箱的消息标为失败。
+        MessageIo.executor.execute { SmsSendWatchdog.sweep(this) }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.blue.qingniao/messages").setMethodCallHandler(::handle)
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, "com.blue.qingniao/changes").setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, sink: EventChannel.EventSink) { events = sink }

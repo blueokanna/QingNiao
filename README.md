@@ -101,7 +101,8 @@ flutter build apk --debug
 | 一加真机（ColorOS 17 / Android 17） | 默认短信角色、系统短信库读取（162 会话）、通知三动作通过；**流体云/promoted 通知实测上岛** |
 
 渲染截图可通过 `QINGNIAO_RENDER_PREVIEW=1 flutter test` 输出到
-`build/verification/`（浅色/深色收件箱与会话）。
+`build/verification/`（浅色/深色收件箱与会话）。逐项验收步骤、adb 命令、故障排查
+与本次实测记录见 [docs/VERIFICATION.md](docs/VERIFICATION.md)。
 
 ## 已知边界
 
@@ -111,6 +112,9 @@ flutter build apk --debug
 - 真机上修正了两个只有设备才暴露的问题：ColorOS 只写 `RoleManager` 不写
   `sms_default_application`（改以 RoleManager 判定默认角色）；清单缺少
   `READ_CELL_BROADCASTS` 会触发系统重复报错。
+- ColorOS 会在第三方短信应用发送时插入系统确认弹窗；未确认或 ROM 丢弃请求时，
+  `SmsManager` 不会回调 sent/delivered。`SmsSendWatchdog` 会在 90 秒后把仍停在发件箱
+  的消息标为失败并给出「重新发送」，启动时还会补扫一次。
 - 通知回复、定时发送、MMS 下载已实现但需要设备验证。
 - MMS PDU 仅实现 M-Retrieve.conf 子集；GB2312 文本离线解码为尽力而为。
 - 同步在应用前台启动或回到前台时自动执行，并每 2 分钟重试；后台长轮询 / JobScheduler 兜底仍在路线图中。
@@ -135,5 +139,4 @@ test/            Widget / 渲染测试
 
 ## 许可
 
-业务源码用于本项目的替换与验证。`CapsuleSMS`、`OPPO`、`ColorOS` 与 Android
-相关标识归各自权利人所有。
+[]

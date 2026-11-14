@@ -14,6 +14,7 @@
                 <action android:name="com.blue.qingniao.DEBUG_SEND" />
                 <action android:name="com.blue.qingniao.DEBUG_ACCESS" />
                 <action android:name="com.blue.qingniao.DEBUG_CLEAR" />
+                <action android:name="com.blue.qingniao.DEBUG_DUMP" />
             </intent-filter>
         </receiver>
     </application>

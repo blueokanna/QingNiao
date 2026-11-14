@@ -77,6 +77,26 @@ class DebugNotifyReceiver : BroadcastReceiver() {
                 active.forEach { manager.cancel(it.id) }
                 Log.d(TAG, "cleared ${active.size} notifications")
             }
+            ACTION_DUMP -> {
+                val address = intent.getStringExtra("address") ?: ""
+                val rows = StringBuilder()
+                context.contentResolver.query(
+                    android.provider.Telephony.Sms.CONTENT_URI,
+                    arrayOf("_id", "address", "body", "type", "status", "date"),
+                    "address=?",
+                    arrayOf(address),
+                    "_id DESC",
+                )?.use { cursor ->
+                    while (cursor.moveToNext() && rows.length < 900) {
+                        rows.append("id=").append(cursor.getLong(0))
+                            .append(" type=").append(cursor.getInt(3))
+                            .append(" status=").append(cursor.getInt(4))
+                            .append(" body=").append(cursor.getString(2)?.take(24))
+                            .append("; ")
+                    }
+                }
+                Log.d(TAG, "dump[$address] $rows")
+            }
         }
     }
 
@@ -86,5 +106,6 @@ class DebugNotifyReceiver : BroadcastReceiver() {
         private const val ACTION_SEND = "com.blue.qingniao.DEBUG_SEND"
         private const val ACTION_ACCESS = "com.blue.qingniao.DEBUG_ACCESS"
         private const val ACTION_CLEAR = "com.blue.qingniao.DEBUG_CLEAR"
+        private const val ACTION_DUMP = "com.blue.qingniao.DEBUG_DUMP"
     }
 }
