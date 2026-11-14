@@ -5,6 +5,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -94,6 +96,24 @@ object Notifications {
         ).build()
 
         val text = if (preview) body else "新短信"
+        val otp = if (preview) extractOtp(body) else null
+        val copyPending = otp?.let { code ->
+            PendingIntent.getBroadcast(
+                context,
+                id + 2,
+                Intent(context, CopyOtpReceiver::class.java)
+                    .putExtra("code", code)
+                    .putExtra("notif", id),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
+        val copyAction = copyPending?.let {
+            Notification.Action.Builder(
+                Icon.createWithResource(context, android.R.drawable.ic_menu_edit),
+                "复制验证码",
+                it,
+            ).build()
+        }
         val builder = Notification.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setContentTitle(address)
@@ -106,7 +126,8 @@ object Notifications {
             .setVisibility(Notification.VISIBILITY_PRIVATE)
             .setOnlyAlertOnce(false)
             .addAction(replyAction)
-            .addAction(readAction)
+        if (copyAction != null) builder.addAction(copyAction)
+        builder.addAction(readAction)
 
         // Android 16 Live Updates：ColorOS 16 / OxygenOS 16 会把它呈现在流体云。
         // 系统与 OEM 仍可拒绝；失败时自动退回普通高优先级通知。
@@ -248,6 +269,33 @@ private object RemoteInputBuilder {
         .setLabel("直接回复")
         .setAllowFreeFormInput(true)
         .build()
+}
+
+/** 通知栏“复制验证码”。保守识别，仅在唯一候选时出现。 */
+private fun extractOtp(body: String): String? {
+    val lower = body.lowercase()
+    val keywords = listOf(
+        "验证码", "校验码", "动态码", "激活码", "verification code",
+        "security code", "one-time", "otp", "passcode", "code",
+    )
+    if (keywords.none { lower.contains(it) }) return null
+    val candidates = Regex("(?<!\\d)(\\d{4,8})(?!\\d)").findAll(body).toList()
+    if (candidates.size != 1) return null
+    val code = candidates.first().groupValues[1]
+    if (code.length == 4 && (code.startsWith("19") || code.startsWith("20"))) return null
+    return code
+}
+
+class CopyOtpReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val code = intent.getStringExtra("code") ?: return
+        val clipboard = context.getSystemService(ClipboardManager::class.java)
+        clipboard.setPrimaryClip(ClipData.newPlainText("验证码", code))
+        Notifications.cancel(context, intent.getIntExtra("notif", code.hashCode()))
+        Handler(Looper.getMainLooper()).post {
+            Toast.makeText(context, "验证码已复制", Toast.LENGTH_SHORT).show()
+        }
+    }
 }
 
 class ReplyReceiver : BroadcastReceiver() {
