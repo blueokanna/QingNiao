@@ -171,3 +171,34 @@ adb shell am broadcast -n com.blue.qingniao/.DebugNotifyReceiver -a com.blue.qin
 > 发送失败与短信中心/运营商开通状态有关，与青鸟的发送代码无关：同一路径在
 > `SmsPermissions` 日志里被系统判定为默认短信应用之外的调用时也会失败，修复
 > 默认短信设置后可复测。
+
+## 10. Release 构建验证
+
+在提交 `021a166` 的独立 worktree 中，用一次性测试 keystore 走通了完整 release 链路：
+
+```powershell
+git worktree add build\verification\release-worktree 021a166
+cd build\verification\release-worktree
+$env:QINGNIAO_KEYSTORE_PATH  = "...\release-test.jks"
+$env:QINGNIAO_STORE_PASSWORD = "***"
+$env:QINGNIAO_KEY_ALIAS      = "qingniao"
+$env:QINGNIAO_KEY_PASSWORD   = "***"
+powershell -File tool\build-release.ps1
+```
+
+结果：
+
+| 项目 | 值 |
+|---|---|
+| 产物 | `build/app/outputs/flutter-apk/app-release.apk` |
+| 大小 | 76.9 MiB（80,648,910 字节） |
+| SHA-256 | `BC3D3013C466FB3BB6DA9A29B3B3E4B9AA2779C4E838C94828EBC856C596F520` |
+| 签名 | APK Signature Scheme v2，测试证书 `CN=Qingniao Test` |
+| 原生库 | `lib/arm64-v8a/librust_lib_qingniao.so`、`lib/armeabi-v7a/...` 均在包内 |
+
+二次构建得到相同 SHA-256，说明构建可复现。正式发布请用自己的 keystore，步骤见
+[RELEASE.md](RELEASE.md)。
+
+> 注意：debug 构建会把 `integration_test` 开发插件写进
+> `android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java`，
+> 该文件会让 release 的 javac 失败；`tool/build-release.ps1` 会在构建前删除它。
