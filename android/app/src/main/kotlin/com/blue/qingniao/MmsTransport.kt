@@ -3,6 +3,7 @@ package com.blue.qingniao
 import android.app.Activity
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -64,13 +65,82 @@ object MmsTransport {
         val source = file(context, token)
         check(source.length() in 1..MAX_BYTES.toLong()) { "Invalid MMS size" }
         val pdu = PduParser(source.readBytes()).parse() as? MultimediaMessagePdu ?: error("Invalid MMS PDU")
-        val saved = PduPersister.getPduPersister(context).persist(pdu, Telephony.Mms.Inbox.CONTENT_URI, true, true, null, prefs.getInt("$token.subscription", -1))
+        val subscription = prefs.getInt("$token.subscription", -1)
+        val saved = PduPersister.getPduPersister(context).persist(pdu, Telephony.Mms.Inbox.CONTENT_URI, true, true, null, subscription)
         checkNotNull(saved)
         context.contentResolver.update(saved, ContentValues().apply { put("read", 0); put("seen", 0) }, null, null)
         prefs.getString("$token.notification", null)?.let { context.contentResolver.delete(Uri.parse(it), null, null) }
         prefs.edit().remove("$token.location").remove("$token.notification").remove("$token.subscription").commit()
         source.delete()
-        MessageNotifications.show(context, "", "收到新彩信", token.hashCode())
+        // 用与短信一致的富通知：发件人、会话、直接回复与流体云。
+        val savedId = ContentUris.parseId(saved)
+        val row = context.contentResolver.query(
+            Telephony.Mms.CONTENT_URI,
+            arrayOf("thread_id", "sub_id", "subject"),
+            "_id=?",
+            arrayOf(savedId.toString()),
+            null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                Triple(cursor.getLong(0), cursor.getInt(1), cursor.getString(2) ?: "")
+            } else {
+                null
+            }
+        }
+        val address = mmsAddress(context, savedId) ?: "彩信"
+        val threadId = row?.first ?: -1L
+        val subscriptionId = row?.second?.takeIf { it >= 0 } ?: subscription
+        val subject = row?.third.orEmpty()
+        val text = mmsText(context, savedId)
+        val preview = when {
+            text.isNotEmpty() && subject.isNotEmpty() -> "彩信 · $subject\n$text"
+            text.isNotEmpty() -> "彩信 · $text"
+            subject.isNotEmpty() -> "彩信 · $subject"
+            else -> "收到新彩信"
+        }
+        Notifications.showSms(context, address, preview, subscriptionId, threadId)
+    }
+
+    private fun mmsAddress(context: Context, id: Long): String? = try {
+        context.contentResolver.query(
+            Uri.parse("content://mms/$id/addr"),
+            arrayOf("address"),
+            "type=137",
+            null,
+            null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0)?.takeIf { it.isNotBlank() } else null
+        } ?: context.contentResolver.query(
+            Uri.parse("content://mms/$id/addr"),
+            arrayOf("address"),
+            null,
+            null,
+            null,
+        )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+    } catch (_: Exception) {
+        null
+    }
+
+    private fun mmsText(context: Context, id: Long): String = try {
+        val builder = StringBuilder()
+        context.contentResolver.query(
+            Uri.parse("content://mms/$id/part"),
+            arrayOf("ct", "text"),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            while (cursor.moveToNext() && builder.length < 500) {
+                if (cursor.getString(0) == "text/plain") {
+                    val value = cursor.getString(1) ?: continue
+                    if (builder.isNotEmpty()) builder.append(' ')
+                    builder.append(value)
+                }
+            }
+        }
+        builder.toString()
+    } catch (_: Exception) {
+        ""
     }
     fun retry(context: Context) {
         val prefs = context.getSharedPreferences("mms_pending", Context.MODE_PRIVATE)
