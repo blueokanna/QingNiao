@@ -10,6 +10,7 @@ import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
@@ -27,6 +28,7 @@ object Notifications {
     const val KEY_REPLY = "qingniao_reply"
     const val GROUP = "com.blue.qingniao.MESSAGES"
     const val SUMMARY_ID = 4100
+    private const val POST_PROMOTED = "android.permission.POST_PROMOTED_NOTIFICATIONS"
 
     fun showSms(
         context: Context,
@@ -36,8 +38,8 @@ object Notifications {
         threadId: Long,
     ) {
         val prefs = context.getSharedPreferences("appearance", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("notifications", true)) return
-        val preview = prefs.getBoolean("preview", true)
+        if (!AppPrefs.bool(prefs, "notifications", true)) return
+        val preview = AppPrefs.bool(prefs, "preview", true)
         val manager = context.getSystemService(NotificationManager::class.java)
         val channelId = "messages_${subscriptionId.coerceAtLeast(0)}"
         val channel = NotificationChannel(
@@ -115,7 +117,7 @@ object Notifications {
             ).build()
         }
         val builder = Notification.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setSmallIcon(R.drawable.ic_stat_message)
             .setContentTitle(address)
             .setContentText(text)
             .setStyle(Notification.BigTextStyle().bigText(text))
@@ -129,22 +131,22 @@ object Notifications {
         if (copyAction != null) builder.addAction(copyAction)
         builder.addAction(readAction)
 
-        // Android 16 Live Updates：ColorOS 16 / OxygenOS 16 会把它呈现在流体云。
+        // Android 16 Live Updates：ColorOS 16/17 会把它呈现在流体云胶囊。
         // 系统与 OEM 仍可拒绝；失败时自动退回普通高优先级通知。
-        if (canPromote(context) && prefs.getBoolean("fluidCloud", true)) {
+        if (canPromote(context) && AppPrefs.bool(prefs, "fluidCloud", true)) {
             try {
                 builder
                     .setOngoing(true)
                     .setAutoCancel(false)
-                    .setShortCriticalText(if (preview) "新短信" else "消息")
+                    .setShortCriticalText(if (otp != null) "验证码" else "新短信")
                 requestPromotedOngoing(builder)
-            } catch (_: Exception) {
+            } catch (_: Throwable) {
                 // 某些 ROM 在运行时移除了该能力。
             }
         }
 
         val summary = Notification.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setSmallIcon(R.drawable.ic_stat_message)
             .setContentTitle("青鸟短信")
             .setContentText("有新短信")
             .setGroup(GROUP)
@@ -168,7 +170,7 @@ object Notifications {
         notificationId: Int,
     ) {
         val prefs = context.getSharedPreferences("appearance", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("notifications", true)) return
+        if (!AppPrefs.bool(prefs, "notifications", true)) return
         val manager = context.getSystemService(NotificationManager::class.java)
         val channelId = "messages_${subscriptionId.coerceAtLeast(0)}"
         manager.createNotificationChannel(
@@ -192,7 +194,7 @@ object Notifications {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val builder = Notification.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setSmallIcon(R.drawable.ic_stat_message)
             .setContentTitle(address.ifBlank { "彩信" })
             .setContentText(text)
             .setStyle(Notification.BigTextStyle().bigText(text))
@@ -210,17 +212,38 @@ object Notifications {
         }
     }
 
-    /** Android 16 起可用的 Live Updates 能力；ColorOS 16 会桥接到流体云。 */
+    /**
+     * 是否尝试 Live Updates 提升。
+     *
+     * `canPostPromotedNotifications()` 在真机上会随调用时机短暂返回 false
+     * （例如进程刚被广播拉起时），若以它作为唯一开关，第一条短信就会错过流体云。
+     * 这里只要系统提供该 API 且权限已授予就尝试提升，最终由系统决定是否接受；
+     * 需要展示状态时用 [promotionActive]。
+     */
     fun canPromote(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < 36) return false
+        if (context.checkSelfPermission(POST_PROMOTED) != PackageManager.PERMISSION_GRANTED) return false
+        return promotionApiAvailable()
+    }
+
+    /** 系统当前是否真的允许提升（用于设置页/诊断页展示）。 */
+    fun promotionActive(context: Context): Boolean {
+        if (!canPromote(context)) return false
         return try {
             val manager = context.getSystemService(NotificationManager::class.java)
             val method = NotificationManager::class.java.getMethod("canPostPromotedNotifications")
             method.invoke(manager) as? Boolean ?: false
         } catch (_: Throwable) {
-            // API 36.1 才提供该能力；36.0 会抛异常。
             false
         }
+    }
+
+    private fun promotionApiAvailable(): Boolean = try {
+        NotificationManager::class.java.getMethod("canPostPromotedNotifications")
+        true
+    } catch (_: Throwable) {
+        // Android 16.0（API 36）没有 promoted 通知接口。
+        false
     }
 
     /**
@@ -237,9 +260,10 @@ object Notifications {
         }
     }
 
-    fun fluidCloudEnabled(context: Context): Boolean =
-        context.getSharedPreferences("appearance", Context.MODE_PRIVATE)
-            .getBoolean("fluidCloud", true) && canPromote(context)
+    fun fluidCloudEnabled(context: Context): Boolean {
+        val prefs = context.getSharedPreferences("appearance", Context.MODE_PRIVATE)
+        return AppPrefs.bool(prefs, "fluidCloud", true) && canPromote(context)
+    }
 
     fun markReplied(context: Context, address: String, notificationId: Int) {
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -309,7 +333,7 @@ class ReplyReceiver : BroadcastReceiver() {
         val pending = goAsync()
         MessageIo.receiverExecutor.execute {
             try {
-                check(Telephony.Sms.getDefaultSmsPackage(context) == context.packageName)
+                check(SmsAccess.isDefaultSmsApp(context))
                 MessageStore(context).use { store ->
                     val subscription = if (subscriptionId >= 0) {
                         subscriptionId

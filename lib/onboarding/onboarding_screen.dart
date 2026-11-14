@@ -4,6 +4,7 @@ import '../aurora/aurora_shapes.dart';
 import '../aurora/aurora_theme.dart';
 import '../aurora/aurora_widgets.dart';
 import '../messaging/message_repository.dart';
+import '../messaging/models.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({
@@ -21,9 +22,51 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _OnboardingScreenState extends State<OnboardingScreen> with WidgetsBindingObserver {
   bool _busy = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 从系统设置或授权弹窗返回时自动复检，避免用户再点一次。
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final access = await widget.repository.access();
+      if (!mounted) return;
+      if (access.ready) {
+        widget.onReady();
+      } else if (_error != null) {
+        setState(() => _error = _missingText(access));
+      }
+    } catch (_) {
+      // 保持当前提示，等待用户主动重试。
+    }
+  }
+
+  static String _missingText(AccessState access) {
+    final missing = <String>[
+      if (!access.defaultApp) '默认短信应用',
+      if (!access.readSms) '读取短信',
+      if (!access.sendSms) '发送短信',
+      if (!access.receiveSms) '接收短信',
+    ];
+    return '还差：${missing.join('、')}。授权后会自动进入收件箱。';
+  }
 
   Future<void> _request() async {
     setState(() {
@@ -37,7 +80,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       if (access.ready) {
         widget.onReady();
       } else {
-        setState(() => _error = '还没有获得默认短信角色，可以稍后在设置里再试。');
+        setState(() => _error = _missingText(access));
       }
     } catch (error) {
       if (mounted) setState(() => _error = messageError(error));

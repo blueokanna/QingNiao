@@ -21,7 +21,7 @@ object SmsTransport {
     fun send(context: Context, store: MessageStore, address: String, body: String, subscription: Int): Long {
         require(address.matches(Regex("\\+?[0-9*#][0-9*# .()-]{0,39}"))) { "请输入有效的收件号码" }
         require(body.isNotBlank() && body.length <= 10000) { "短信正文应为 1–10000 个字符" }
-        check(Telephony.Sms.getDefaultSmsPackage(context) == context.packageName) { "请先设置为默认短信应用" }
+        check(SmsAccess.isDefaultSmsApp(context)) { "请先设置为默认短信应用" }
         val manager = context.getSystemService(SmsManager::class.java).createForSubscriptionId(subscription)
         val parts = manager.divideMessage(body)
         require(parts.size <= 100) { "短信分段过多" }
@@ -29,6 +29,7 @@ object SmsTransport {
             put("address", address); put("body", body); put("date", System.currentTimeMillis()); put("read", 1); put("sub_id", subscription); put("status", Telephony.Sms.STATUS_PENDING)
         })) { "无法写入发件箱" }
         val id = ContentUris.parseId(uri)
+        android.util.Log.d("QingniaoSms", "outbox id=$id parts=${parts.size} sub=$subscription address=$address")
         try {
             store.registerOutgoing(id, parts.size)
             fun callbacks(phase: String) = ArrayList(parts.indices.map { index ->
@@ -61,6 +62,7 @@ class SmsReceiptReceiver : BroadcastReceiver() {
             try {
                 MessageStore(context).use { store ->
                     val state = store.receipt(id, part, phase, success) ?: return@use
+                    android.util.Log.d("QingniaoSms", "receipt id=$id part=$part phase=$phase success=$success type=$state")
                     val values = ContentValues()
                     if (phase == "sent") values.put("type", state)
                     if (phase == "delivered") values.put("status", if (state == 2) Telephony.Sms.STATUS_COMPLETE else Telephony.Sms.STATUS_FAILED)

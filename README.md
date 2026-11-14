@@ -16,7 +16,7 @@ Flutter 负责界面与流体动效，Kotlin 对接系统短信服务，Rust 承
 | 🔐 | **验证码中心** | Rust 保守解析（UTF-16 高亮），独立标签页一键复制；正文不上传 |
 | 🖼️ | **彩信** | 系统 `SmsManager` + `android-smsmms` 收发、附件预览；Rust MMS PDU 编解码 |
 | 🔔 | **通知直回** | 通知栏直接回复、标记已读、验证码一键复制、按 SIM 分渠道、会话分组 |
-| 🌊 | **流体云 / Live Updates** | ColorOS 16 走 Android 16 Live Updates；旧版 ColorOS 回退高优先级通知 |
+| 🌊 | **流体云 / Live Updates** | 一加 ColorOS 17 实测上岛：状态栏胶囊 + 大卡片；不支持时回退高优先级通知 |
 | ⚡ | **短信原生唤醒** | `SMS_DELIVER` / `SMS_RECEIVED` 系统广播唤醒，通知先行，不依赖 FCM |
 | 🗑️ | **可恢复回收站** | 7 / 30 / 90 天或永久；恢复与永久删除均二次确认 |
 | 🕒 | **定时发送** | `AlarmManager` 精确闹钟，权限不足时自动降级 |
@@ -97,22 +97,29 @@ flutter build apk --debug
 | Flutter Widget / 渲染测试 | 14 项通过（收件箱/会话/回收站/窄屏大字体/截图） |
 | Rust 核心 | `core::` 68 项、`api::engine` 8 项通过 |
 | 同步服务端 | 健康检查、创建空间、配对、投递/拉取信封端到端实测通过 |
-| APK | debug 构建成功（armv7 / arm64 / x86 / x86_64） |
+| APK | debug 构建成功（armv7 / arm64 / x86 / x86_64），一加 PLK110 安装并冷启动通过 |
+| 一加真机（ColorOS 17 / Android 17） | 默认短信角色、系统短信库读取（162 会话）、通知三动作通过；**流体云/promoted 通知实测上岛** |
 
 渲染截图可通过 `QINGNIAO_RENDER_PREVIEW=1 flutter test` 输出到
 `build/verification/`（浅色/深色收件箱与会话）。
 
 ## 已知边界
 
-- 本环境没有可用的 Android 模拟器硬件加速与真机，**尚未完成真机收发验证**；
-  运营商 MMS APN、进程被杀后的回执、双卡切换需要在设备上复核。
+- 已在 OnePlus PLK110（ColorOS V17.0.0 / Android 17 / API 37，电信 + 联通双卡）完成安装、
+  默认短信角色、短信库读取与通知动作验收；**运营商 MMS、进程被杀后的入站唤醒与回执
+  仍需真实收发复核**（自动化发送会被 ColorOS 的二次确认弹窗拦截）。
+- 真机上修正了两个只有设备才暴露的问题：ColorOS 只写 `RoleManager` 不写
+  `sms_default_application`（改以 RoleManager 判定默认角色）；清单缺少
+  `READ_CELL_BROADCASTS` 会触发系统重复报错。
 - 通知回复、定时发送、MMS 下载已实现但需要设备验证。
 - MMS PDU 仅实现 M-Retrieve.conf 子集；GB2312 文本离线解码为尽力而为。
 - 同步在应用前台启动或回到前台时自动执行，并每 2 分钟重试；后台长轮询 / JobScheduler 兜底仍在路线图中。
 - 备份导入已支持把短信、草稿、置顶/归档与黑名单合并回本机（需默认短信应用）。
 - 搜索已接入 Rust 倒排索引并按得分排序线程；索引在内存中重建，超大短信库只索引前 4k 字符/条，引擎不可用时回退 LIKE。
-- 流体云：ColorOS 16.1 可走标准 Live Updates；ColorOS 15 及更早需要 OPPO
-  Seedling SDK 审核与 `serviceId`，无法应用侧自助接入。详见
+- 流体云：一加 ColorOS 17 实测 `POST_PROMOTED_NOTIFICATIONS` + `setRequestPromotedOngoing`
+  可上岛（状态栏「验证码 · 95566」胶囊、下拉大卡片、复制验证码/标为已读），进程被
+  杀掉后由广播拉起同样生效；ColorOS 16.0 无该 API 时回退普通通知；ColorOS 15 及更早
+  需要 OPPO Seedling SDK 审核与 `serviceId`。详见
   [docs/FLUID-CLOUD.md](docs/FLUID-CLOUD.md)。
 
 ## 目录

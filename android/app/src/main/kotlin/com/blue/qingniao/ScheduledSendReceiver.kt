@@ -15,7 +15,7 @@ class ScheduledSendReceiver : BroadcastReceiver() {
             try {
                 AuroraStore(context).use { store ->
                     val row = store.scheduled(id) ?: return@use
-                    if (Telephony.Sms.getDefaultSmsPackage(context) != context.packageName) {
+                    if (!SmsAccess.isDefaultSmsApp(context)) {
                         MessageNotifications.show(context, row.address, "定时短信未发送：青鸟不是默认短信应用", 8100 + id.toInt())
                         return@use
                     }

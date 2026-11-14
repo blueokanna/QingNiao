@@ -16,6 +16,8 @@ class _DeviceCompatibilityScreenState extends State<DeviceCompatibilityScreen>
     with WidgetsBindingObserver {
   Map<dynamic, dynamic>? _device;
   Map<dynamic, dynamic>? _access;
+  Map<dynamic, dynamic>? _capabilities;
+  bool _testing = false;
   bool _loading = true;
   String? _error;
   int _request = 0;
@@ -50,11 +52,13 @@ class _DeviceCompatibilityScreenState extends State<DeviceCompatibilityScreen>
       final data = await Future.wait([
         widget.repository.invoke<Map>('deviceDiagnostics'),
         widget.repository.invoke<Map>('access'),
+        widget.repository.invoke<Map>('notificationCapabilities'),
       ]);
       if (!mounted || request != _request) return;
       setState(() {
         _device = data[0];
         _access = data[1];
+        _capabilities = data[2];
       });
     } catch (_) {
       if (mounted && request == _request) {
@@ -70,6 +74,27 @@ class _DeviceCompatibilityScreenState extends State<DeviceCompatibilityScreen>
       await widget.repository.invoke<void>(method);
     } catch (_) {
       if (mounted) showAuroraSnack(context, '系统未提供此设置入口，请从系统设置打开应用信息');
+    }
+  }
+
+  Future<void> _testNotification() async {
+    setState(() => _testing = true);
+    try {
+      final promoted = await widget.repository.invoke<bool>('testNotification');
+      if (!mounted) return;
+      showAuroraSnack(
+        context,
+        promoted == true
+            ? '测试通知已发送，可在通知栏或流体云查看'
+            : '测试通知已发送；本机未开放流体云，通知会出现在通知栏',
+        icon: Icons.notifications_active_outlined,
+      );
+    } catch (error) {
+      if (mounted) {
+        showAuroraSnack(context, messageError(error), icon: Icons.error_outline_rounded);
+      }
+    } finally {
+      if (mounted) setState(() => _testing = false);
     }
   }
 
@@ -137,6 +162,15 @@ class _DeviceCompatibilityScreenState extends State<DeviceCompatibilityScreen>
               _status('发送短信', access['sendSms'] as bool?),
               _status('系统通知', device['notificationsEnabled'] as bool?),
               _status(
+                '流体云 / 实时胶囊',
+                _capabilities?['fluidCloud'] == true &&
+                        _capabilities?['fluidCloudActive'] == true
+                    ? true
+                    : false,
+                yes: '已上岛：新短信会出现在状态栏胶囊',
+                no: '系统未启用提升，新短信仍会即时通知',
+              ),
+              _status(
                 '后台运行限制',
                 device['batteryRestricted'] as bool?,
                 yes: '系统正在限制后台运行',
@@ -149,6 +183,12 @@ class _DeviceCompatibilityScreenState extends State<DeviceCompatibilityScreen>
               const Text('此页显示系统报告的状态，不代表已经通过该机型或运营商的收发测试。'),
             ],
             const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: _testing ? null : _testNotification,
+              icon: const Icon(Icons.notifications_active_outlined),
+              label: Text(_testing ? '正在发送…' : '发送一条测试通知'),
+            ),
+            const SizedBox(height: 8),
             FilledButton.tonal(
               onPressed: () => _open('appSettings'),
               child: const Text('应用权限与后台设置'),

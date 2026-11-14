@@ -38,13 +38,13 @@ class MainActivity : FlutterActivity() {
         contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, observer)
     }
     private fun access() = mapOf(
-        "defaultApp" to (Telephony.Sms.getDefaultSmsPackage(this) == packageName),
-        "readSms" to (checkSelfPermission(Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED),
-        "sendSms" to (checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED),
-        "receiveSms" to (checkSelfPermission(Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED),
-        "readContacts" to (checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED),
+        "defaultApp" to SmsAccess.isDefaultSmsApp(this),
+        "readSms" to SmsAccess.granted(this, Manifest.permission.READ_SMS),
+        "sendSms" to SmsAccess.granted(this, Manifest.permission.SEND_SMS),
+        "receiveSms" to SmsAccess.granted(this, Manifest.permission.RECEIVE_SMS),
+        "readContacts" to SmsAccess.granted(this, Manifest.permission.READ_CONTACTS),
         "notifications" to getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled(),
-        "roleAvailable" to getSystemService(RoleManager::class.java).isRoleAvailable(RoleManager.ROLE_SMS)
+        "roleAvailable" to SmsAccess.roleAvailable(this)
     )
     private fun requireAccess() {
         val state = access()
@@ -81,6 +81,8 @@ class MainActivity : FlutterActivity() {
             "launchIntent" -> {
                 val address = intent.getStringExtra("address") ?: intent.data?.takeIf { it.scheme in setOf("sms", "smsto", "mms", "mmsto") }?.schemeSpecificPart?.substringBefore('?')
                 result.success(mapOf("address" to address, "body" to intent.getStringExtra("sms_body")))
+                // 从通知进入即视为已查看，撤掉仍在进行中的流体云胶囊，避免常驻。
+                if (!address.isNullOrBlank()) Notifications.cancel(this, address.hashCode())
                 intent = Intent(this, MainActivity::class.java)
                 return
             }

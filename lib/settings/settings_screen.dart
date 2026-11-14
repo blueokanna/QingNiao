@@ -91,21 +91,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
       physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
       slivers: [
         SliverToBoxAdapter(
-          child: Row(
-            children: [
-              const SizedBox(width: 20),
-              AuroraShapeContainer(
-                shape: AuroraShapes.fab,
-                size: 40,
-                gradient: [scheme.primary, scheme.tertiary],
-                child: Icon(Icons.tune_rounded, size: 19, color: scheme.onPrimary),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                '设置',
-                style: context.texts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-              ),
-            ],
+          child: Padding(
+            padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 6),
+            child: Row(
+              children: [
+                const SizedBox(width: 20),
+                AuroraShapeContainer(
+                  shape: AuroraShapes.fab,
+                  size: 40,
+                  gradient: [scheme.primary, scheme.tertiary],
+                  child: Icon(Icons.tune_rounded, size: 19, color: scheme.onPrimary),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  '设置',
+                  style: context.texts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
           ),
         ),
         SliverToBoxAdapter(
@@ -240,9 +243,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: '流体云实时胶囊',
                 subtitle: _capabilities['fluidCloud'] == true
                     ? (settings.fluidCloud
-                          ? '已开启 · ColorOS 16 可将未读短信呈现在流体云'
+                          ? '已开启 · 未读短信会以实时胶囊呈现'
                           : '已关闭，仅使用普通高优先级通知')
-                    : '当前设备不支持 Android 16 Live Updates（ColorOS 16.1 起）',
+                    : '系统未开放实时胶囊 · ColorOS 需 OPPO 流体云白名单，短信仍会即时通知',
                 icon: Icons.bubble_chart_outlined,
                 trailing: Switch(
                   value: settings.fluidCloud && _capabilities['fluidCloud'] == true,
@@ -493,7 +496,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: '流体云胶囊',
               subtitle: _capabilities['fluidCloud'] == true
                   ? '设备支持 Android 16 Live Updates'
-                  : '需要 Android 16.1 / ColorOS 16.1；系统仍可拒绝',
+                  : '系统未开放：ColorOS 15/16 需 OPPO 流体云（幼苗）白名单，实测 ColorOS 17 未向三方应用开放',
               icon: Icons.bubble_chart_outlined,
               trailing: Switch(
                 value: settings.fluidCloud && _capabilities['fluidCloud'] == true,

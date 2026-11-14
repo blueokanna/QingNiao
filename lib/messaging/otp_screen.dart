@@ -26,21 +26,24 @@ class OtpScreen extends StatelessWidget {
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           slivers: [
             SliverToBoxAdapter(
-              child: Row(
-                children: [
-                  const SizedBox(width: 20),
-                  AuroraShapeContainer(
-                    shape: AuroraShapes.nav,
-                    size: 40,
-                    gradient: [context.colors.tertiary, context.colors.primary],
-                    child: Icon(Icons.shield_rounded, size: 19, color: context.colors.onPrimary),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    '验证码',
-                    style: context.texts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                ],
+              child: Padding(
+                padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 6),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 20),
+                    AuroraShapeContainer(
+                      shape: AuroraShapes.nav,
+                      size: 40,
+                      gradient: [context.colors.tertiary, context.colors.primary],
+                      child: Icon(Icons.shield_rounded, size: 19, color: context.colors.onPrimary),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '验证码',
+                      style: context.texts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
               ),
             ),
             SliverToBoxAdapter(
@@ -143,17 +146,23 @@ class _OtpCard extends StatelessWidget {
               const SizedBox(height: 14),
               Row(
                 children: [
-                  Text(
-                    thread.otp!,
-                    style: context.texts.displayMedium?.copyWith(
-                      fontSize: 40,
-                      letterSpacing: 6,
-                      fontWeight: FontWeight.w600,
-                      color: aurora.otp,
-                      fontFeatures: const [FontFeature.tabularFigures()],
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        thread.otp!,
+                        style: context.texts.displayMedium?.copyWith(
+                          fontSize: 40,
+                          letterSpacing: 6,
+                          fontWeight: FontWeight.w600,
+                          color: aurora.otp,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 10),
                   OtpChip(code: thread.otp!),
                 ],
               ),

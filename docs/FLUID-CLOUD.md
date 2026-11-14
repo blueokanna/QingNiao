@@ -8,6 +8,7 @@
 | 系统 | 可用路径 | 青鸟的实现 |
 |---|---|---|
 | ColorOS 16 / OxygenOS 16（Android 16+） | 流体云兼容 Android **Live Updates** 标准 API | 已接入；系统可拒绝，自动回退普通高优先级通知 |
+| ColorOS 17 / OxygenOS 17（Android 17，V17.0.0 实测） | 流体云兼容 Android **Live Updates** 标准 API | **已实测上岛**：状态栏出现「新短信」胶囊，下拉为大卡片（含「复制验证码 / 标为已读」） |
 | ColorOS 15 及更早 | OPPO `SeedlingSupportSDK` / `IntelligentIntent` 卡片体系 | 第三方无法自助接入：需要 OPPO 审核、服务 ID 与场景白名单；当前回退普通通知 |
 | 所有 Android 12+ | 短信 Telephony 广播唤醒 + 高优先级通知 | 已接入，默认短信应用与非默认应用都有入口 |
 
@@ -156,6 +157,12 @@ FCM 适合“另一端设备/服务器产生事件”的同步；青鸟已有自
 adb shell dumpsys notification --noredact | findstr qingniao
 ```
 
+应用内「设置 → 设备与权限诊断」新增两个自检入口：
+
+- **流体云 / 实时胶囊**：直接显示 `canPostPromotedNotifications()` 的结果；
+- **发送一条测试通知**：发出一条带验证码的示例短信通知，可在通知栏确认
+  标题、正文、「回复 / 复制验证码 / 标为已读」三个动作，以及是否被系统提升。
+
 模拟器可用：
 
 ```bash
@@ -166,13 +173,46 @@ adb emu sms send 10086 "验证码 123456"
 
 - 应用被划掉后仍能收到通知；
 - 通知可直回、可标为已读；
-- ColorOS 16.1 上 `dumpsys notification` 可见 `promoted` 标志；
+- 支持的系统上 `dumpsys notification` 可见 `promoted` 标志；
 - 关闭「流体云实时胶囊」后仍出现普通横幅。
 
-## 7. 已知限制
+## 7. 真机实测记录（OnePlus PLK110）
 
-- 当前构建环境没有真机/可用模拟器，以上 UI 行为需要设备复核。
+2026-11 在一加 PLK110（ColorOS V17.0.0 / Android 17 / API 37，双卡：电信 + 联通）上实测：
+
+| 项目 | 结果 |
+|---|---|
+| 安装与冷启动 | 通过，冷启动约 0.7–1.0 s |
+| 默认短信角色 | 通过。ColorOS 只写 `RoleManager`，不写 `Settings.Secure.sms_default_application`，旧接口 `Telephony.Sms.getDefaultSmsPackage()` 返回 null |
+| 短信库读取 | 通过，162 个会话、8 条未读、64 条验证码正常聚合 |
+| 通知与动作 | 通过。`dumpsys notification` 显示 `actions=3`（回复 / 复制验证码 / 标为已读），BigText 正文正确 |
+| 流体云 / Live Updates | **通过**。`POST_PROMOTED_NOTIFICATIONS` 已授予，通知带 `ONGOING_EVENT\|PROMOTED_ONGOING`；锁屏外的状态栏出现「验证码 · 95566」胶囊，下拉为大卡片与两个快捷动作。进程被 `force-stop` 后由广播拉起再发通知同样生效 |
+| 后台广播唤醒 | 自定义广播在后台可能被 ColorOS 延迟投递；系统 Telephony 广播属于豁免通道，仍需真实入站短信复核 |
+
+由此修正了三处真机才暴露的问题：
+
+1. 默认短信角色改以 `RoleManager.isRoleHeld(ROLE_SMS)` 为准，旧接口只作回退
+   （`SmsAccess.kt`）。否则 ColorOS 上会永远显示“还没有获得默认短信角色”。
+2. 清单补声明 `READ_CELL_BROADCASTS`（dangerous）。默认短信应用会被系统自动授予，
+   不声明时 ColorOS 的 `SmsApplication` 会重复打印
+   `lost android:read_cell_broadcasts: (no permission to fix)`。
+3. **通知设置读写类型冲突**：Dart 把 `notifications/preview/fluidCloud` 以字符串写入
+   `appearance` 偏好，Kotlin 用 `getBoolean` 读取会抛 `ClassCastException`，
+   接收器随之崩溃——真机现象是“短信到了却完全没有通知”。现在 Kotlin 统一走
+   `AppPrefs.bool()` 宽容解析，写入端也改为真正的 Boolean。
+4. `canPostPromotedNotifications()` 会在进程刚被广播拉起等时机短暂返回 false，
+   因此不再用它作为是否尝试提升的唯一开关：只要 API 存在且权限已授予就尝试，
+   由系统决定是否接受；设置页另用 `promotionActive()` 展示真实状态。
+
+## 8. 已知限制
+
+- 以上结论来自单台一加真机（ColorOS 17），其他 ColorOS/OxygenOS 版本仍需复核；
+  构建环境没有可用的 Android 模拟器。
 - ColorOS 16.0 若没有 API 36.1 的 promotion 接口，会自动退回普通通知。
-- ColorOS 15 的流体云必须走 OPPO 合作申请；本项目不包含私有 SDK。
+- 被提升为流体云的通知由系统渲染，**不支持 RemoteInput 直接回复**：胶囊大卡片只保留
+  「复制验证码 / 标为已读」两个动作；未提升的普通通知仍带「回复」。
+- ColorOS 15 的流体云必须走 OPPO 合作申请（`serviceId`）；本项目不包含私有 SDK，
+  仅使用 Android 标准 Live Updates。
 - ColorOS 可能折叠同一会话的多次通知；已使用 group + 每会话 ID。
-- 通知正文预览可在设置关闭；验证码不会写入流体云短文本，避免锁屏泄露。
+- ColorOS 可能在后台发送短信时插入系统二次确认弹窗，导致无人工确认的
+  自动化发送被丢弃；正常前台使用不受影响，真实收发仍需人工走一遍。

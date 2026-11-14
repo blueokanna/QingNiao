@@ -4,4 +4,16 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <application>
+        <!-- 仅 debug 构建：用 adb 广播验证通知/短信链路，release 不包含。 -->
+        <receiver
+            android:name=".DebugNotifyReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.blue.qingniao.DEBUG_NOTIFY" />
+                <action android:name="com.blue.qingniao.DEBUG_SEND" />
+                <action android:name="com.blue.qingniao.DEBUG_ACCESS" />
+            </intent-filter>
+        </receiver>
+    </application>
 </manifest>

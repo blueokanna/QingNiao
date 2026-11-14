@@ -43,7 +43,13 @@ class AppearanceBridge(private val activity: Activity) {
                     else -> false
                 }
                 if (!valid) result.error("invalid_setting", "设置值无效", null)
-                else { preferences.edit().putString(key, value).apply(); result.success(null) }
+                else {
+                    // 布尔项写真正的 Boolean，避免 Kotlin getBoolean 与 Dart 字符串写入互相打架。
+                    val editor = preferences.edit()
+                    if (key in booleans) editor.putBoolean(key, value == "true") else editor.putString(key, value)
+                    editor.apply()
+                    result.success(null)
+                }
             }
             "deviceDiagnostics" -> {
                 val power = activity.getSystemService(PowerManager::class.java)

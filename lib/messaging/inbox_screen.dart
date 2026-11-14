@@ -330,7 +330,8 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
   Widget _brandBar(BuildContext context, MessageHub hub) {
     final scheme = context.colors;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 16, 0),
+      // 沉浸式状态下为系统状态栏让位；列表其余部分可以继续从其下方流过。
+      padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + 8, 16, 0),
       child: Row(
         children: [
           AuroraShapeContainer(

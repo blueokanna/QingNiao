@@ -58,6 +58,16 @@ class AuroraBridge(private val activity: Activity) {
                     result.success(null)
                 }
                 "stats" -> result.success(stats())
+                "testNotification" -> {
+                    Notifications.showSms(
+                        context,
+                        "青鸟小助手",
+                        "【青鸟】验证码 864213，5 分钟内有效。",
+                        SubscriptionManager.getDefaultSmsSubscriptionId(),
+                        -1L,
+                    )
+                    result.success(Notifications.canPromote(context))
+                }
                 "notificationCapabilities" -> result.success(notificationCapabilities())
                 "batteryUnrestricted" -> result.success(requestBatteryUnrestricted())
                 "autoStartSettings" -> result.success(openAutoStartSettings())
@@ -281,6 +291,7 @@ class AuroraBridge(private val activity: Activity) {
         "stats", "exportBackup", "importBackup", "syncStatus", "syncConfigure",
         "syncPair", "syncNow", "syncReset", "syncState", "syncStateSet",
         "remoteMessagesSince", "insertRemoteMessage", "notificationCapabilities",
+        "testNotification",
         "batteryUnrestricted", "autoStartSettings",
     )
 
@@ -292,16 +303,16 @@ class AuroraBridge(private val activity: Activity) {
     }
 
     private fun access(): Map<String, Boolean> = mapOf(
-        "defaultApp" to (Telephony.Sms.getDefaultSmsPackage(context) == context.packageName),
-        "readSms" to granted(Manifest.permission.READ_SMS),
-        "sendSms" to granted(Manifest.permission.SEND_SMS),
-        "receiveSms" to granted(Manifest.permission.RECEIVE_SMS),
-        "readContacts" to granted(Manifest.permission.READ_CONTACTS),
+        "defaultApp" to SmsAccess.isDefaultSmsApp(context),
+        "readSms" to SmsAccess.granted(context, Manifest.permission.READ_SMS),
+        "sendSms" to SmsAccess.granted(context, Manifest.permission.SEND_SMS),
+        "receiveSms" to SmsAccess.granted(context, Manifest.permission.RECEIVE_SMS),
+        "readContacts" to SmsAccess.granted(context, Manifest.permission.READ_CONTACTS),
         "notifications" to context.getSystemService(NotificationManager::class.java).areNotificationsEnabled(),
-        "roleAvailable" to context.getSystemService(android.app.role.RoleManager::class.java).isRoleAvailable(android.app.role.RoleManager.ROLE_SMS),
+        "roleAvailable" to SmsAccess.roleAvailable(context),
     )
 
-    private fun granted(permission: String) = context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+    private fun granted(permission: String) = SmsAccess.granted(context, permission)
 
 
     private fun conversations(store: AuroraStore, query: String, filter: String): List<Map<String, Any?>> {
@@ -824,7 +835,7 @@ class AuroraBridge(private val activity: Activity) {
     )?.use { it.count } ?: 0
 
     private fun importBackup(uri: Uri): Boolean {
-        check(Telephony.Sms.getDefaultSmsPackage(context) == context.packageName) {
+        check(SmsAccess.isDefaultSmsApp(context)) {
             "请先设为默认短信应用再恢复备份"
         }
         val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
@@ -1128,6 +1139,7 @@ class AuroraBridge(private val activity: Activity) {
         val power = context.getSystemService(PowerManager::class.java)
         return mapOf(
             "fluidCloud" to Notifications.canPromote(context),
+            "fluidCloudActive" to Notifications.promotionActive(context),
             "fluidCloudEnabled" to Notifications.fluidCloudEnabled(context),
             "batteryUnrestricted" to power.isIgnoringBatteryOptimizations(context.packageName),
             "sdk" to Build.VERSION.SDK_INT,

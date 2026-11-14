@@ -18,7 +18,7 @@ import android.telephony.SubscriptionManager
 class SmsReceivedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
-        if (Telephony.Sms.getDefaultSmsPackage(context) == context.packageName) return
+        if (SmsAccess.isDefaultSmsApp(context)) return
         val parts = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
         if (parts.isEmpty()) return
         val address = parts.first().originatingAddress ?: "未知号码"

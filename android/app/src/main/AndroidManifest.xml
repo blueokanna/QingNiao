@@ -15,6 +15,9 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- 默认短信应用会由系统自动授予该运行时权限；声明后 OEM 的 SmsApplication
+         才能完成授权（否则 ColorOS 会反复记录 lost android:read_cell_broadcasts）。 -->
+    <uses-permission android:name="android.permission.READ_CELL_BROADCASTS" />
     <uses-feature android:name="android.hardware.telephony" android:required="true" />
     <application android:label="青鸟短信" android:name="${applicationName}" android:icon="@mipmap/ic_launcher" android:allowBackup="false" android:enableOnBackInvokedCallback="true" android:dataExtractionRules="@xml/message_data_extraction_rules" android:usesCleartextTraffic="false">
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:taskAffinity="" android:theme="@style/LaunchTheme" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" android:hardwareAccelerated="true" android:windowSoftInputMode="adjustResize">

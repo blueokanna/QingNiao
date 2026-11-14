@@ -46,7 +46,7 @@ object MessageNotifications {
         manager.createNotificationChannel(NotificationChannel("incoming", "消息", NotificationManager.IMPORTANCE_HIGH))
         val open = Intent(context, MainActivity::class.java).putExtra("address", address)
         val action = PendingIntent.getActivity(context, id, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val notification = Notification.Builder(context, "incoming").setSmallIcon(android.R.drawable.stat_notify_chat)
+        val notification = Notification.Builder(context, "incoming").setSmallIcon(R.drawable.ic_stat_message)
             .setContentTitle("青鸟短信").setContentText(text).setContentIntent(action)
             .setVisibility(Notification.VISIBILITY_PRIVATE).setAutoCancel(true).build()
         try { manager.notify(id, notification) } catch (_: SecurityException) { }
