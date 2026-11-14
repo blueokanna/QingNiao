@@ -54,7 +54,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File server-rs\scripts\smoke.ps1
 | `GET` | `/v1/envelopes?after=&wait=` | 按游标拉取 / 长轮询 |
 | `POST` | `/v1/devices/{id}/revoke` | 撤销设备 |
 
-完整字段、密码学与威胁模型见 [../docs/SYNC-PROTOCOL.md](../docs/SYNC-PROTOCOL.md)。
+部署方式、同步能力与安全边界见 [项目说明](../README.md)。HTTP 字段与校验逻辑以 [服务端源码](src/main.rs) 为准。
 
 ## 部署建议
 

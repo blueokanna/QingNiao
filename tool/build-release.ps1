@@ -38,7 +38,7 @@ try {
     }
     if ($missing.Count -gt 0) {
         Write-Host "Missing signing environment variables: $($missing -join ', ')" -ForegroundColor Red
-        Write-Host "See docs/RELEASE.md for setup." -ForegroundColor Red
+        Write-Host "See README_EN.md for release signing setup." -ForegroundColor Red
         exit 1
     }
     if (-not (Test-Path -LiteralPath $env:QINGNIAO_KEYSTORE_PATH -PathType Leaf)) {

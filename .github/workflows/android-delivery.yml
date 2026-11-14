@@ -41,24 +41,30 @@ jobs:
           ref: c197ca5199e9ee5661e865596c9c07294dfab51c
           path: .toolchains/flutter
           persist-credentials: false
-      - name: Install pinned Android toolchain
+      - name: Initialize Android SDK and install pinned packages
+        shell: bash
+        run: bash tool/setup_android_sdk.sh
+      - name: Install pinned Rust toolchain and expose Flutter
         shell: bash
         run: |
           echo "$GITHUB_WORKSPACE/.toolchains/flutter/bin" >> "$GITHUB_PATH"
+          echo "FLUTTER_ROOT=$GITHUB_WORKSPACE/.toolchains/flutter" >> "$GITHUB_ENV"
           rustup toolchain install 1.99.1 --profile minimal
           rustup target add --toolchain 1.99.1 aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
-          sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358'
       - name: Validate source
         shell: bash
         run: |
           flutter config --no-analytics
+          flutter config --android-sdk "$ANDROID_HOME"
           flutter pub get --enforce-lockfile
           dart run tool/check_localization.dart
           python3 tool/generate_android_strings.py --check
           python3 tool/check_sms_contract.py
+          python3 -m unittest discover -s tool/tests -p 'test_android_ci.py'
           flutter analyze
           flutter test
           cargo test --locked --manifest-path rust/Cargo.toml
+          cargo test --locked --manifest-path server-rs/Cargo.toml
       - name: Prepare production key
         if: ${{ inputs.production == true }}
         shell: bash
@@ -84,6 +90,7 @@ jobs:
           mkdir -p build/delivery
           cp build/native-pages.json build/delivery/native-pages.json
           cp "build/app/outputs/flutter-apk/app-$mode.apk" "build/delivery/qingniao-$mode.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 4 "build/delivery/qingniao-$mode.apk"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "build/delivery/qingniao-$mode.apk" > build/delivery/signature.txt
           git rev-parse HEAD > build/delivery/source-commit.txt
           flutter --version --machine > build/delivery/flutter-version.json
@@ -93,6 +100,18 @@ jobs:
         if: always()
         shell: bash
         run: rm -f -- "$RUNNER_TEMP/qingniao-release.jks"
+      - name: Preserve validation reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qingniao-validation-reports
+          path: |
+            build/app/reports/
+            build/app/test-results/
+            build/reports/
+            build/native-pages.json
+          if-no-files-found: ignore
+          retention-days: 14
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: qingniao-android

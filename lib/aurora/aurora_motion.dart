@@ -2,6 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'aurora_engine.dart';
+
+bool _motionDisabled(BuildContext context) =>
+    MediaQuery.disableAnimationsOf(context) ||
+    AuroraEngine.instance.reduceMotion;
+
 abstract final class AuroraMotion {
   static const fast = Duration(milliseconds: 160);
   static const base = Duration(milliseconds: 280);
@@ -31,9 +37,39 @@ class AuroraPageTransitionsTheme extends PageTransitionsTheme {
   AuroraPageTransitionsTheme()
     : super(
         builders: const <TargetPlatform, PageTransitionsBuilder>{
-          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+          TargetPlatform.android: AuroraAccessiblePageTransitionsBuilder(),
         },
       );
+}
+
+class AuroraAccessiblePageTransitionsBuilder extends PageTransitionsBuilder {
+  const AuroraAccessiblePageTransitionsBuilder();
+
+  static const _delegate = PredictiveBackPageTransitionsBuilder();
+
+  @override
+  Duration get transitionDuration => _delegate.transitionDuration;
+
+  @override
+  Duration get reverseTransitionDuration => _delegate.reverseTransitionDuration;
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    if (_motionDisabled(context)) return child;
+    return _delegate.buildTransitions(
+      route,
+      context,
+      animation,
+      secondaryAnimation,
+      child,
+    );
+  }
 }
 
 class AuroraPageTransitionsBuilder extends PageTransitionsBuilder {
@@ -53,7 +89,7 @@ class AuroraPageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    if (MediaQuery.disableAnimationsOf(context)) return child;
+    if (_motionDisabled(context)) return child;
     final enter = CurvedAnimation(
       parent: animation,
       curve: AuroraMotion.decelerate,
@@ -103,7 +139,7 @@ class AuroraSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.disableAnimationsOf(context)) return child;
+    if (_motionDisabled(context)) return child;
     final begin = axis == Axis.vertical
         ? const Offset(0, .035)
         : const Offset(.04, 0);
@@ -143,7 +179,7 @@ class AuroraReveal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.disableAnimationsOf(context)) return child;
+    if (_motionDisabled(context)) return child;
     final extra = delay ? (math.min(index, 9) * 38) : 0;
     final duration = AuroraMotion.reveal + Duration(milliseconds: extra);
     final start = extra / duration.inMilliseconds;
@@ -177,7 +213,7 @@ class AuroraCounter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.disableAnimationsOf(context)) {
+    if (_motionDisabled(context)) {
       return Text('$value', style: style);
     }
     return TweenAnimationBuilder<double>(
@@ -210,7 +246,7 @@ class AuroraParallax extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.disableAnimationsOf(context)) return child;
+    if (_motionDisabled(context)) return child;
     return AnimatedBuilder(
       animation: controller,
       child: child,

@@ -62,7 +62,6 @@ class AuroraSpring extends ChangeNotifier {
     final omega = math.sqrt(stiffness);
     final zeta = dampingRatio;
     final displacement = _value - _target;
-    // Analytic integration preserves velocity across retargets and long frames.
     if ((zeta - 1).abs() < 0.0001) {
       final coefficient = _velocity + omega * displacement;
       final decay = math.exp(-omega * dt);
@@ -118,9 +117,11 @@ class AuroraEngine extends ChangeNotifier {
   ValueListenable<double> get clock => _clock;
 
   final Set<AuroraSpring> _springs = <AuroraSpring>{};
+  final Set<AuroraSpring> _activeSprings = <AuroraSpring>{};
+  List<AuroraSpring>? _activeSnapshot;
   final Set<VoidCallback> _qualityListeners = <VoidCallback>{};
   Ticker? _ticker;
-  Duration _lastElapsed = Duration.zero;
+  Duration? _lastElapsed;
   double _refreshRate = 60;
   double _elapsedSeconds = 0;
   bool _scrolling = false;
@@ -169,6 +170,7 @@ class AuroraEngine extends ChangeNotifier {
     if (backdrop != null) _backdropEnabled = backdrop;
     if (reduce) {
       for (final spring in List<AuroraSpring>.of(_springs)) {
+        if (!_springs.contains(spring)) continue;
         spring.jumpTo(spring.target);
       }
     }
@@ -182,14 +184,16 @@ class AuroraEngine extends ChangeNotifier {
     if (_paused || _ticker == null) return;
     if (_reduceMotion) {
       for (final spring in List<AuroraSpring>.of(_springs)) {
+        if (!_springs.contains(spring)) continue;
         spring.jumpTo(spring.target);
       }
+      _activeSprings.removeWhere((spring) => spring.settled);
+      _activeSnapshot = null;
     }
     final needed =
-        !_reduceMotion &&
-        (_backdropEnabled || _springs.any((spring) => !spring.settled));
+        !_reduceMotion && (_backdropEnabled || _activeSprings.isNotEmpty);
     if (needed && !_ticker!.isActive) {
-      _lastElapsed = Duration.zero;
+      _lastElapsed = null;
       _ticker!.start();
     }
     if (!needed && _ticker!.isActive) _ticker!.stop();
@@ -217,7 +221,7 @@ class AuroraEngine extends ChangeNotifier {
   void resume() {
     if (!_paused) return;
     _paused = false;
-    _lastElapsed = Duration.zero;
+    _lastElapsed = null;
     _syncTicker();
   }
 
@@ -231,11 +235,18 @@ class AuroraEngine extends ChangeNotifier {
     double stiffness = 340,
     double dampingRatio = 0.78,
   }) {
-    final spring = AuroraSpring(
+    late final AuroraSpring spring;
+    spring = AuroraSpring(
       value: value,
       stiffness: stiffness,
       dampingRatio: dampingRatio,
-      onActivity: _syncTicker,
+      onActivity: () {
+        if (_activeSprings.add(spring)) _activeSnapshot = null;
+        _syncTicker();
+        if (spring.settled && _activeSprings.remove(spring)) {
+          _activeSnapshot = null;
+        }
+      },
     );
     _springs.add(spring);
     return spring;
@@ -243,7 +254,9 @@ class AuroraEngine extends ChangeNotifier {
 
   void releaseSpring(AuroraSpring spring) {
     _springs.remove(spring);
+    if (_activeSprings.remove(spring)) _activeSnapshot = null;
     spring.dispose();
+    _syncTicker();
   }
 
   void addQualityListener(VoidCallback listener) =>
@@ -261,16 +274,22 @@ class AuroraEngine extends ChangeNotifier {
 
   void _tick(Duration elapsed) {
     if (_paused) return;
-    final rawDt = _lastElapsed == Duration.zero
+    final rawDt = _lastElapsed == null
         ? 1 / _refreshRate
-        : (elapsed - _lastElapsed).inMicroseconds / 1000000;
+        : (elapsed - _lastElapsed!).inMicroseconds / 1000000;
     _lastElapsed = elapsed;
-    final dt = rawDt.clamp(0.0, 0.05);
-    _elapsedSeconds += dt;
+    final dt = math.max(0.0, rawDt);
+    _elapsedSeconds += dt.clamp(0.0, 0.05);
 
     if (!_reduceMotion) {
-      for (final spring in List<AuroraSpring>.of(_springs)) {
+      final active = _activeSnapshot ??= _activeSprings.toList(growable: false);
+      for (final spring in active) {
+        // A listener can remove another spring while this frame is being delivered.
+        if (!_activeSprings.contains(spring)) continue;
         spring.drive(dt);
+        if (spring.settled && _activeSprings.remove(spring)) {
+          _activeSnapshot = null;
+        }
       }
     }
 
@@ -281,7 +300,7 @@ class AuroraEngine extends ChangeNotifier {
   }
 
   void _onTimings(List<FrameTiming> timings) {
-    if (timings.isEmpty) return;
+    if (_paused || timings.isEmpty) return;
     var total = 0.0;
     for (final timing in timings) {
       total +=
