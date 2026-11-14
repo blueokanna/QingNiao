@@ -121,7 +121,7 @@ class AuroraEngine extends ChangeNotifier {
   final Set<VoidCallback> _qualityListeners = <VoidCallback>{};
   Ticker? _ticker;
   Duration _lastElapsed = Duration.zero;
-  double _emitAccumulator = 0;
+  double _refreshRate = 60;
   double _elapsedSeconds = 0;
   bool _scrolling = false;
   bool _paused = false;
@@ -142,11 +142,11 @@ class AuroraEngine extends ChangeNotifier {
   double get elapsedSeconds => _elapsedSeconds;
   double get averageFrameMs => _averageFrameMs;
 
-  int get backdropFps => switch (_quality) {
-    AuroraQuality.full => _motionLevel == AuroraMotionLevel.full ? 30 : 20,
-    AuroraQuality.balanced => 24,
-    AuroraQuality.efficient => 15,
-  };
+  double get refreshRate => _refreshRate;
+
+  void setRefreshRate(double value) {
+    if (value.isFinite && value >= 24 && value <= 480) _refreshRate = value;
+  }
 
   int get blobCount => switch (_quality) {
     AuroraQuality.full => 5,
@@ -262,7 +262,7 @@ class AuroraEngine extends ChangeNotifier {
   void _tick(Duration elapsed) {
     if (_paused) return;
     final rawDt = _lastElapsed == Duration.zero
-        ? 1 / 60
+        ? 1 / _refreshRate
         : (elapsed - _lastElapsed).inMicroseconds / 1000000;
     _lastElapsed = elapsed;
     final dt = rawDt.clamp(0.0, 0.05);
@@ -274,10 +274,7 @@ class AuroraEngine extends ChangeNotifier {
       }
     }
 
-    final interval = 1 / (_scrolling ? math.min(backdropFps, 20) : backdropFps);
-    _emitAccumulator += dt;
-    if (_backdropEnabled && !_reduceMotion && _emitAccumulator >= interval) {
-      _emitAccumulator %= interval;
+    if (_backdropEnabled && !_reduceMotion) {
       _clock.value = _elapsedSeconds;
     }
     _syncTicker();
@@ -287,7 +284,12 @@ class AuroraEngine extends ChangeNotifier {
     if (timings.isEmpty) return;
     var total = 0.0;
     for (final timing in timings) {
-      total += timing.totalSpan.inMicroseconds / 1000;
+      total +=
+          math.max(
+            timing.buildDuration.inMicroseconds,
+            timing.rasterDuration.inMicroseconds,
+          ) /
+          1000;
     }
     final sample = total / timings.length;
     _averageFrameMs = _averageFrameMs * 0.82 + sample * 0.18;
@@ -295,7 +297,8 @@ class AuroraEngine extends ChangeNotifier {
       if (_averageFrameMs < 40) _warmedUp = true;
       return;
     }
-    if (_averageFrameMs > 26) {
+    final budget = 1000 / _refreshRate;
+    if (_averageFrameMs > budget * 1.1) {
       _badFrames += timings.length;
       _goodFrames = 0;
       if (_badFrames > 90 && _quality != AuroraQuality.efficient) {
@@ -303,7 +306,7 @@ class AuroraEngine extends ChangeNotifier {
         _badFrames = 0;
         _notifyQuality();
       }
-    } else if (_averageFrameMs < 13) {
+    } else if (_averageFrameMs < budget * .7) {
       _goodFrames += timings.length;
       _badFrames = 0;
       if (_goodFrames > 600 && _quality != AuroraQuality.full) {

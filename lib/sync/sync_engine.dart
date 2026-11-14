@@ -1,3 +1,5 @@
+import 'package:qingniao/l10n/app_strings.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -5,7 +7,6 @@ import 'dart:io';
 import '../messaging/message_repository.dart';
 import '../src/rust/api/engine.dart';
 
-/// 同步失败时携带可读信息与 HTTP 状态，UI 直接展示。
 class SyncException implements Exception {
   SyncException(this.message, {this.status});
 
@@ -16,7 +17,6 @@ class SyncException implements Exception {
   String toString() => message;
 }
 
-/// 同步状态的本地快照。只保存路由与游标，不保存任何明文。
 class SyncState {
   String serverUrl = '';
   String token = '';
@@ -29,7 +29,8 @@ class SyncState {
   int lastSync = 0;
   List<String> seen = const [];
 
-  bool get registered => token.isNotEmpty && spaceId.isNotEmpty && deviceId.isNotEmpty;
+  bool get registered =>
+      token.isNotEmpty && spaceId.isNotEmpty && deviceId.isNotEmpty;
 
   Map<String, dynamic> toJson() => {
     'serverUrl': serverUrl,
@@ -54,23 +55,27 @@ class SyncState {
     ..cursor = (json['cursor'] as num?)?.toInt() ?? 0
     ..lastPush = (json['lastPush'] as num?)?.toInt() ?? 0
     ..lastSync = (json['lastSync'] as num?)?.toInt() ?? 0
-    ..seen = (json['seen'] as List? ?? const []).whereType<String>().toList(growable: false);
+    ..seen = (json['seen'] as List? ?? const []).whereType<String>().toList(
+      growable: false,
+    );
 }
 
 class SyncResult {
-  const SyncResult({required this.pushed, required this.pulled, required this.cursor});
+  const SyncResult({
+    required this.pushed,
+    required this.pulled,
+    required this.cursor,
+  });
 
   final int pushed;
   final int pulled;
   final int cursor;
 
-  String get message => '已同步 · 发出 $pushed 条 · 接收 $pulled 条';
+  String get message =>
+      tr("Synced \u00b7 Sent: {p0} \u00b7 Received: {p1}", [pushed, pulled]);
 }
 
-/// 端到端加密同步客户端。
 ///
-/// 密码学由 Rust 完成（X25519 + HKDF + AES-256-GCM）；这里只负责
-/// HTTP 传输、游标、去重与把解出的消息写回系统短信库。
 class SyncEngine {
   SyncEngine(this.repository);
 
@@ -79,15 +84,25 @@ class SyncEngine {
     ..connectionTimeout = const Duration(seconds: 12)
     ..idleTimeout = const Duration(seconds: 20);
 
+  void invalidateState() {
+    _cached = null;
+  }
+
   SyncState? _cached;
   DeviceIdentity? _identity;
 
   Future<DeviceIdentity> identity() async {
     if (_identity != null) return _identity!;
     final ready = await repository.initEngine();
-    if (!ready) throw SyncException('本地引擎尚未就绪，请稍后再试');
+    if (!ready) {
+      throw SyncException(
+        tr("The local engine is not ready. Try again shortly."),
+      );
+    }
     final value = await syncInit();
-    if (value == null) throw SyncException('无法生成设备密钥');
+    if (value == null) {
+      throw SyncException(tr("Unable to generate device keys"));
+    }
     _identity = value;
     return value;
   }
@@ -103,9 +118,7 @@ class SyncEngine {
           return _cached!;
         }
       }
-    } catch (_) {
-      // 状态损坏时从头开始，避免阻塞同步入口。
-    }
+    } catch (_) {}
     _cached = SyncState();
     return _cached!;
   }
@@ -148,19 +161,24 @@ class SyncEngine {
   }
 
   String _deviceName(SyncState value) {
-    final id = value.deviceId.isEmpty ? '未注册' : value.deviceId.substring(0, 6);
+    final id = value.deviceId.isEmpty
+        ? tr("Not registered")
+        : value.deviceId.substring(0, 6);
     try {
       final host = Platform.localHostname;
       if (host.isNotEmpty && host != 'localhost') return host;
     } catch (_) {}
-    return '青鸟 · $id';
+    return tr("Qingniao \u00b7 {p0}", [id]);
   }
 
-  Future<void> configure({required String serverUrl, required bool enabled}) async {
+  Future<void> configure({
+    required String serverUrl,
+    required bool enabled,
+  }) async {
     final value = await state();
     final normalized = _normalizeServer(serverUrl);
     if (enabled && normalized.isEmpty) {
-      throw SyncException('请先填写同步服务器地址');
+      throw SyncException(tr("Enter a sync server address first"));
     }
     value.serverUrl = normalized;
     value.enabled = enabled;
@@ -168,7 +186,6 @@ class SyncEngine {
       if (!value.registered) {
         await _register(value);
       } else {
-        // 验证令牌；服务器重置后旧令牌会失效，自动重建空间。
         try {
           await _peers(value);
         } catch (failure) {
@@ -207,13 +224,20 @@ class SyncEngine {
       ..cursor = 0
       ..lastPush = 0
       ..seen = const [];
-    if (!value.registered) throw SyncException('服务器未返回有效的设备令牌');
+    if (!value.registered) {
+      throw SyncException(tr("The server did not return a valid device token"));
+    }
   }
 
   Future<String> rotatePairingCode() async {
     final value = await state();
-    if (!value.registered) throw SyncException('请先启用同步');
-    final response = await _request('POST', '/v1/pairing-code', value, body: const {});
+    if (!value.registered) throw SyncException(tr("Enable sync first"));
+    final response = await _request(
+      'POST',
+      '/v1/pairing-code',
+      value,
+      body: const {},
+    );
     value.pairingCode = '${response['pairingCode'] ?? ''}';
     await _save(value);
     return value.pairingCode;
@@ -221,7 +245,9 @@ class SyncEngine {
 
   Future<void> join(String pairingCode) async {
     final value = await state();
-    if (value.serverUrl.isEmpty) throw SyncException('请先填写同步服务器地址');
+    if (value.serverUrl.isEmpty) {
+      throw SyncException(tr("Enter a sync server address first"));
+    }
     final id = await identity();
     final response = await _request(
       'POST',
@@ -243,7 +269,9 @@ class SyncEngine {
       ..cursor = 0
       ..lastPush = 0
       ..seen = const [];
-    if (!value.registered) throw SyncException('配对失败：服务器未返回令牌');
+    if (!value.registered) {
+      throw SyncException(tr("Pairing failed: no device token returned"));
+    }
     await _save(value);
   }
 
@@ -262,7 +290,7 @@ class SyncEngine {
       } catch (_) {}
       result.add({
         'id': id,
-        'name': '${device['name'] ?? '设备'}',
+        'name': '${device['name'] ?? tr('Device')}',
         'publicKey': publicKey,
         'fingerprint': fingerprint,
         'thisDevice': id == value.deviceId,
@@ -274,18 +302,22 @@ class SyncEngine {
 
   Future<SyncResult> syncNow() async {
     final value = await state();
-    if (!value.enabled) throw SyncException('同步未启用');
+    if (!value.enabled) throw SyncException(tr("Sync is disabled"));
     if (!value.registered) {
       await _register(value);
       await _save(value);
     }
-    final peers = (await _peers(value)).where((peer) => peer['thisDevice'] != true).toList();
+    final peers = (await _peers(value))
+        .where((peer) => peer['thisDevice'] != true)
+        .toList();
     var pushed = 0;
     var pulled = 0;
 
     if (peers.isNotEmpty) {
       final since = value.lastPush == 0
-          ? DateTime.now().subtract(const Duration(days: 7)).millisecondsSinceEpoch
+          ? DateTime.now()
+                .subtract(const Duration(days: 7))
+                .millisecondsSinceEpoch
           : value.lastPush;
       final local = await repository.remoteMessagesSince(since);
       var newest = since;
@@ -331,8 +363,13 @@ class SyncEngine {
       value.lastPush = newest;
     }
 
-    final response = await _request('GET', '/v1/envelopes?after=${value.cursor}&wait=0', value);
-    final envelopes = (response['envelopes'] as List? ?? const []).whereType<Map>();
+    final response = await _request(
+      'GET',
+      '/v1/envelopes?after=${value.cursor}&wait=0',
+      value,
+    );
+    final envelopes = (response['envelopes'] as List? ?? const [])
+        .whereType<Map>();
     final seen = [...value.seen];
     final seenSet = seen.toSet();
     var cursor = value.cursor;
@@ -359,7 +396,8 @@ class SyncEngine {
       if (messageId.isEmpty || seenSet.contains(messageId)) continue;
       final address = '${payload['address'] ?? ''}';
       final body = '${payload['body'] ?? ''}';
-      final date = (payload['date'] as num?)?.toInt() ??
+      final date =
+          (payload['date'] as num?)?.toInt() ??
           DateTime.now().millisecondsSinceEpoch;
       if (address.isEmpty || body.isEmpty) continue;
       await repository.insertRemoteMessage(
@@ -396,23 +434,36 @@ class SyncEngine {
     bool auth = true,
   }) async {
     final base = value.serverUrl;
-    if (base.isEmpty) throw SyncException('未配置同步服务器');
+    if (base.isEmpty) throw SyncException(tr("No sync server configured"));
     final uri = Uri.tryParse('$base$path');
     if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
-      throw SyncException('服务器地址无效');
+      throw SyncException(tr("Invalid server address"));
     }
     try {
-      final request = await _client.openUrl(method, uri).timeout(const Duration(seconds: 15));
-      request.headers.contentType = ContentType('application', 'json', charset: 'utf-8');
+      final request = await _client
+          .openUrl(method, uri)
+          .timeout(const Duration(seconds: 15));
+      request.headers.contentType = ContentType(
+        'application',
+        'json',
+        charset: 'utf-8',
+      );
       if (auth) {
-        if (value.token.isEmpty) throw SyncException('设备未注册', status: 401);
-        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer ${value.token}');
+        if (value.token.isEmpty) {
+          throw SyncException(tr("Device is not registered"), status: 401);
+        }
+        request.headers.set(
+          HttpHeaders.authorizationHeader,
+          'Bearer ${value.token}',
+        );
       }
       if (body != null) request.write(jsonEncode(body));
-      final response = await request.close().timeout(const Duration(seconds: 20));
+      final response = await request.close().timeout(
+        const Duration(seconds: 20),
+      );
       final text = await utf8.decoder.bind(response).join();
       if (response.statusCode >= 400) {
-        String message = '同步服务器返回 ${response.statusCode}';
+        String message = tr("Sync server returned {p0}", [response.statusCode]);
         try {
           final decoded = jsonDecode(text);
           if (decoded is Map && decoded['error'] is String) {
@@ -427,11 +478,13 @@ class SyncEngine {
     } on SyncException {
       rethrow;
     } on SocketException catch (error) {
-      throw SyncException('无法连接同步服务器：${error.message}');
+      throw SyncException(
+        tr("Unable to connect to sync server: {p0}", [error.message]),
+      );
     } on TimeoutException {
-      throw SyncException('同步请求超时');
+      throw SyncException(tr("Sync request timed out"));
     } catch (error) {
-      throw SyncException('同步失败：$error');
+      throw SyncException(tr("Sync failed: {p0}", [error]));
     }
   }
 
@@ -442,8 +495,12 @@ class SyncEngine {
     }
     if (value.isEmpty) return '';
     final uri = Uri.tryParse(value);
-    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https') || uri.host.isEmpty) {
-      throw SyncException('服务器地址必须以 http:// 或 https:// 开头');
+    if (uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty) {
+      throw SyncException(
+        tr("Server address must start with http:// or https://"),
+      );
     }
     return value;
   }

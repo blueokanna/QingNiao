@@ -22,21 +22,16 @@ class AuroraBackdrop extends StatelessWidget {
     final scheme = context.colors;
     final dark = Theme.of(context).brightness == Brightness.dark;
     return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: Listenable.merge([engine.clock, engine]),
-        builder: (context, _) => CustomPaint(
-          size: Size.infinite,
-          isComplex: true,
-          willChange: !engine.reduceMotion,
-          painter: _AuroraPainter(
-            time: engine.reduceMotion ? 0 : engine.clock.value,
-            dark: dark,
-            colors: colors,
-            surface: scheme.surface,
-            quality: engine.quality,
-            scrolling: engine.scrolling,
-            veil: veil,
-          ),
+      child: CustomPaint(
+        size: Size.infinite,
+        isComplex: true,
+        willChange: !engine.reduceMotion,
+        painter: _AuroraPainter(
+          engine: engine,
+          dark: dark,
+          colors: colors,
+          surface: scheme.surface,
+          veil: veil,
         ),
       ),
     );
@@ -45,21 +40,24 @@ class AuroraBackdrop extends StatelessWidget {
 
 class _AuroraPainter extends CustomPainter {
   _AuroraPainter({
-    required this.time,
+    required this.engine,
     required this.dark,
     required this.colors,
     required this.surface,
-    required this.quality,
-    required this.scrolling,
     required this.veil,
-  });
+  }) : super(repaint: Listenable.merge([engine.clock, engine]));
 
-  final double time;
+  final AuroraEngine engine;
+  double get time => engine.reduceMotion ? 0 : engine.clock.value;
   final bool dark;
   final AuroraColors colors;
   final Color surface;
-  final AuroraQuality quality;
-  final bool scrolling;
+  AuroraQuality get quality =>
+      engine.motionLevel == AuroraMotionLevel.balanced &&
+          engine.quality == AuroraQuality.full
+      ? AuroraQuality.balanced
+      : engine.quality;
+  bool get scrolling => engine.scrolling;
   final bool veil;
 
   static final List<_Blob> _blobs = [
@@ -218,4 +216,12 @@ class _Star {
   final double x;
   final double y;
   final double phase;
+}
+
+class AuroraBackdropScope extends InheritedWidget {
+  const AuroraBackdropScope({super.key, required super.child});
+  static bool exists(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<AuroraBackdropScope>() != null;
+  @override
+  bool updateShouldNotify(AuroraBackdropScope oldWidget) => false;
 }

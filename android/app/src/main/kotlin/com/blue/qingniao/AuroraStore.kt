@@ -5,7 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-class AuroraStore(context: Context) : SQLiteOpenHelper(context, "aurora.db", null, 2) {
+class AuroraStore(context: Context) : SQLiteOpenHelper(context, "aurora.db", null, 3) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             "CREATE TABLE thread_state (" +
@@ -49,6 +49,9 @@ class AuroraStore(context: Context) : SQLiteOpenHelper(context, "aurora.db", nul
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) {
             db.execSQL("CREATE TABLE IF NOT EXISTS remote (id INTEGER PRIMARY KEY)")
+        }
+        if (oldVersion < 3) {
+            db.execSQL("UPDATE trash SET id=-id WHERE kind=1 AND id>0")
         }
     }
 

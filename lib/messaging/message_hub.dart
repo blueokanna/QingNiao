@@ -18,6 +18,8 @@ class MessageHub extends ChangeNotifier {
   bool loading = true;
   String? error;
   int intentTick = 0;
+  int syncTick = 0;
+  bool _disposed = false;
   DateTime? lastLoaded;
 
   StreamSubscription<String>? _subscription;
@@ -42,6 +44,7 @@ class MessageHub extends ChangeNotifier {
     _subscription ??= repository.changes.listen(
       (event) {
         if (event == 'intent') intentTick++;
+        if (event == 'sync') syncTick++;
         _indexDirty = true;
         refresh(silent: true);
       },
@@ -56,7 +59,10 @@ class MessageHub extends ChangeNotifier {
   void search(String value) {
     query = value;
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 240), () => refresh(silent: true));
+    _debounce = Timer(
+      const Duration(milliseconds: 240),
+      () => refresh(silent: true),
+    );
     notifyListeners();
   }
 
@@ -68,6 +74,7 @@ class MessageHub extends ChangeNotifier {
   }
 
   Future<void> refresh({bool silent = false}) async {
+    if (_disposed) return;
     if (_refreshing) {
       _again = true;
       return;
@@ -132,7 +139,7 @@ class MessageHub extends ChangeNotifier {
           seen.add(thread.threadId);
         }
       }
-      // Rust 语料不含彩信正文；把 provider 直接命中的彩信线程补在后面。
+
       for (final thread in direct) {
         if (seen.add(thread.threadId)) merged.add(thread);
       }
@@ -176,7 +183,13 @@ class MessageHub extends ChangeNotifier {
   }
 
   @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
+  @override
   void dispose() {
+    _disposed = true;
     _debounce?.cancel();
     _subscription?.cancel();
     super.dispose();

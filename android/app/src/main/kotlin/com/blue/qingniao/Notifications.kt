@@ -21,10 +21,7 @@ import android.provider.Telephony
 import android.telephony.SubscriptionManager
 import android.widget.Toast
 
-/**
- * 通知栏体验：按 SIM 分渠道、会话分组、直接回复与标记已读。
- * 通知只在本机生成；正文预览可在设置中关闭。
- */
+
 object Notifications {
     const val KEY_REPLY = "qingniao_reply"
     const val GROUP = "com.blue.qingniao.MESSAGES"
@@ -45,10 +42,10 @@ object Notifications {
         val channelId = "messages_${subscriptionId.coerceAtLeast(0)}"
         val channel = NotificationChannel(
             channelId,
-            if (subscriptionId >= 0) "短信 · SIM $subscriptionId" else "短信",
+            if (subscriptionId >= 0) "SMS · SIM $subscriptionId" else "SMS",
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
-            description = "新短信、直接回复与标记已读"
+            description = LocalizedResources.text(context, R.string.notification_messages)
             enableVibration(true)
             setShowBadge(true)
         }
@@ -75,10 +72,10 @@ object Notifications {
             replyIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
         )
-        val remoteInput = RemoteInputBuilder.build()
+        val remoteInput = RemoteInputBuilder.build(context)
         val replyAction = Notification.Action.Builder(
             Icon.createWithResource(context, android.R.drawable.ic_menu_send),
-            "回复",
+            LocalizedResources.text(context, R.string.notification_reply),
             replyPending,
         ).addRemoteInput(remoteInput).build()
 
@@ -94,12 +91,12 @@ object Notifications {
         )
         val readAction = Notification.Action.Builder(
             Icon.createWithResource(context, android.R.drawable.ic_menu_view),
-            "标为已读",
+            LocalizedResources.text(context, R.string.notification_mark_read),
             readPending,
         ).build()
 
-        val text = if (preview) body else "新短信"
-        val otp = if (preview) extractOtp(body) else null
+        val text = if (preview) body else LocalizedResources.text(context, R.string.notification_new_message)
+        val otp = if (preview) extractOtp(context, body) else null
         val copyPending = otp?.let { code ->
             PendingIntent.getBroadcast(
                 context,
@@ -113,7 +110,7 @@ object Notifications {
         val copyAction = copyPending?.let {
             Notification.Action.Builder(
                 Icon.createWithResource(context, android.R.drawable.ic_menu_edit),
-                "复制验证码",
+                LocalizedResources.text(context, R.string.notification_copy_code),
                 it,
             ).build()
         }
@@ -132,25 +129,24 @@ object Notifications {
         if (copyAction != null) builder.addAction(copyAction)
         builder.addAction(readAction)
 
-        // Android 16 Live Updates：ColorOS 16/17 会把它呈现在流体云胶囊。
-        // 系统与 OEM 仍可拒绝；失败时自动退回普通高优先级通知。
+
         val promoted = canPromote(context) && AppPrefs.bool(prefs, "fluidCloud", true)
-        if (promoted) {
+        if (promoted && Build.VERSION.SDK_INT >= 36) {
             try {
                 builder
                     .setOngoing(true)
                     .setAutoCancel(false)
-                    .setShortCriticalText(if (otp != null) "验证码" else "新短信")
+                    .setShortCriticalText(if (otp != null) "OTP" else "SMS")
                 requestPromotedOngoing(builder)
             } catch (_: Throwable) {
-                // 某些 ROM 在运行时移除了该能力。
+
             }
         }
 
         val summary = Notification.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_message)
-            .setContentTitle("青鸟短信")
-            .setContentText("有新短信")
+            .setContentTitle(LocalizedResources.text(context, R.string.app_name))
+            .setContentText(LocalizedResources.text(context, R.string.notification_new_message))
             .setGroup(GROUP)
             .setGroupSummary(true)
             .setAutoCancel(true)
@@ -160,11 +156,10 @@ object Notifications {
             manager.notify(SUMMARY_ID, summary)
             if (promoted) scheduleExpiry(context, id)
         } catch (_: SecurityException) {
-            // 用户关闭通知权限时静默失败。
         }
     }
 
-    /** ongoing 的流体云提醒 15 分钟后自动撤下，避免胶囊长期占位。 */
+    
     private fun scheduleExpiry(context: Context, id: Int) {
         try {
             val alarm = context.getSystemService(AlarmManager::class.java)
@@ -176,11 +171,11 @@ object Notifications {
             )
             alarm.set(AlarmManager.RTC, System.currentTimeMillis() + 15 * 60 * 1000L, pending)
         } catch (_: Exception) {
-            // 闹钟不可用时仅损失自动收起，不影响通知本身。
+
         }
     }
 
-    /** 彩信下载中的低打扰进度通知；完成后由富通知替换。 */
+    
     fun showProgress(
         context: Context,
         address: String,
@@ -195,10 +190,10 @@ object Notifications {
         manager.createNotificationChannel(
             NotificationChannel(
                 channelId,
-                if (subscriptionId >= 0) "短信 · SIM $subscriptionId" else "短信",
+                if (subscriptionId >= 0) "SMS · SIM $subscriptionId" else "SMS",
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "新短信、彩信与直接回复"
+                description = LocalizedResources.text(context, R.string.notification_messages)
                 enableVibration(true)
                 setShowBadge(true)
             },
@@ -214,7 +209,7 @@ object Notifications {
         )
         val builder = Notification.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_message)
-            .setContentTitle(address.ifBlank { "彩信" })
+            .setContentTitle(address.ifBlank { "MMS" })
             .setContentText(text)
             .setStyle(Notification.BigTextStyle().bigText(text))
             .setContentIntent(contentIntent)
@@ -227,25 +222,18 @@ object Notifications {
         try {
             manager.notify(notificationId, builder.build())
         } catch (_: SecurityException) {
-            // 通知权限关闭时静默失败。
+
         }
     }
 
-    /**
-     * 是否尝试 Live Updates 提升。
-     *
-     * `canPostPromotedNotifications()` 在真机上会随调用时机短暂返回 false
-     * （例如进程刚被广播拉起时），若以它作为唯一开关，第一条短信就会错过流体云。
-     * 这里只要系统提供该 API 且权限已授予就尝试提升，最终由系统决定是否接受；
-     * 需要展示状态时用 [promotionActive]。
-     */
+    
     fun canPromote(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < 36) return false
         if (context.checkSelfPermission(POST_PROMOTED) != PackageManager.PERMISSION_GRANTED) return false
         return promotionApiAvailable()
     }
 
-    /** 系统当前是否真的允许提升（用于设置页/诊断页展示）。 */
+    
     fun promotionActive(context: Context): Boolean {
         if (!canPromote(context)) return false
         return try {
@@ -261,21 +249,17 @@ object Notifications {
         NotificationManager::class.java.getMethod("canPostPromotedNotifications")
         true
     } catch (_: Throwable) {
-        // Android 16.0（API 36）没有 promoted 通知接口。
+
         false
     }
 
-    /**
-     * `setRequestPromotedOngoing` 位于 Android 16.1（API 36.1），
-     * 而当前 compileSdk 为 36；用反射调用，避免锁死 Preview SDK。
-     */
+    
     private fun requestPromotedOngoing(builder: Notification.Builder) {
         try {
             val method = Notification.Builder::class.java
                 .getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
             method.invoke(builder, true)
         } catch (_: Throwable) {
-            // 不支持时保持普通通知。
         }
     }
 
@@ -288,7 +272,7 @@ object Notifications {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.cancel(notificationId)
         Handler(Looper.getMainLooper()).post {
-            Toast.makeText(context, "已回复 $address", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Replied to $address", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -301,26 +285,22 @@ object Notifications {
             }
             if (!remaining) manager.cancel(SUMMARY_ID)
         } catch (_: Exception) {
-            // activeNotifications 在极少数 ROM 上不可用。
         }
     }
 }
 
-/** 单独抽出 RemoteInput，方便在通知与回复接收器之间共享 key。 */
+
 private object RemoteInputBuilder {
-    fun build() = android.app.RemoteInput.Builder(Notifications.KEY_REPLY)
-        .setLabel("直接回复")
+    fun build(context: Context) = android.app.RemoteInput.Builder(Notifications.KEY_REPLY)
+        .setLabel(LocalizedResources.text(context, R.string.notification_reply))
         .setAllowFreeFormInput(true)
         .build()
 }
 
-/** 通知栏“复制验证码”。保守识别，仅在唯一候选时出现。 */
-private fun extractOtp(body: String): String? {
+
+private fun extractOtp(context: Context, body: String): String? {
     val lower = body.lowercase()
-    val keywords = listOf(
-        "验证码", "校验码", "动态码", "激活码", "verification code",
-        "security code", "one-time", "otp", "passcode", "code",
-    )
+    val keywords = context.resources.getStringArray(R.array.verification_keywords)
     if (keywords.none { lower.contains(it) }) return null
     val candidates = Regex("(?<!\\d)(\\d{4,8})(?!\\d)").findAll(body).toList()
     if (candidates.size != 1) return null
@@ -333,10 +313,14 @@ class CopyOtpReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val code = intent.getStringExtra("code") ?: return
         val clipboard = context.getSystemService(ClipboardManager::class.java)
-        clipboard.setPrimaryClip(ClipData.newPlainText("验证码", code))
+        val clip = ClipData.newPlainText("Verification code", code)
+        clip.description.extras = android.os.PersistableBundle().apply {
+            putBoolean("android.content.extra.IS_SENSITIVE", true)
+        }
+        clipboard.setPrimaryClip(clip)
         Notifications.cancel(context, intent.getIntExtra("notif", code.hashCode()))
-        Handler(Looper.getMainLooper()).post {
-            Toast.makeText(context, "验证码已复制", Toast.LENGTH_SHORT).show()
+        if (Build.VERSION.SDK_INT < 33) Handler(Looper.getMainLooper()).post {
+            Toast.makeText(context, LocalizedResources.text(context, R.string.notification_code_copied), Toast.LENGTH_SHORT).show()
         }
     }
 }
@@ -366,7 +350,7 @@ class ReplyReceiver : BroadcastReceiver() {
                 MessageNotifications.show(
                     context,
                     address,
-                    "回复失败：${error.message ?: "请打开应用重试"}",
+                    LocalizedResources.text(context, R.string.notification_failed),
                     notificationId + 9000,
                 )
             } finally {
@@ -409,7 +393,6 @@ class MarkReadReceiver : BroadcastReceiver() {
             }
             Notifications.cancel(context, notificationId)
         } catch (_: Exception) {
-            // 权限撤销时忽略。
         }
     }
 }

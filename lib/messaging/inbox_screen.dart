@@ -1,7 +1,13 @@
+import '../messaging/sensitive_clipboard.dart';
+
+import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
+
+import '../app/app_settings.dart';
+import 'trash_screen.dart';
+
 import 'package:material_new_shapes/material_new_shapes.dart';
 
-import '../aurora/aurora_engine.dart';
 import '../aurora/aurora_shapes.dart';
 import '../aurora/aurora_theme.dart';
 import '../aurora/aurora_widgets.dart';
@@ -12,7 +18,6 @@ import '../messaging/message_widgets.dart';
 import '../messaging/models.dart';
 import 'compose_screen.dart';
 import 'conversation_screen.dart';
-import 'trash_screen.dart';
 
 class InboxScreen extends StatefulWidget {
   const InboxScreen({super.key, required this.repository, required this.hub});
@@ -28,6 +33,9 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
   final TextEditingController _search = TextEditingController();
   final ScrollController _scroll = ScrollController();
   bool _requesting = false;
+  bool _bulkBusy = false;
+  bool _selecting = false;
+  final Set<int> _selected = {};
   int _handledIntent = 0;
 
   @override
@@ -56,20 +64,16 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
       await widget.repository.requestAccess();
       await widget.hub.refresh();
     } catch (error) {
-      if (mounted) showAuroraSnack(context, messageError(error), icon: Icons.error_outline_rounded);
+      if (mounted) {
+        showAuroraSnack(
+          context,
+          messageError(error),
+          icon: Icons.error_outline_rounded,
+        );
+      }
     } finally {
       if (mounted) setState(() => _requesting = false);
     }
-  }
-
-  // ignore: unused_element
-  Future<void> _compose() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ComposeScreen(repository: widget.repository, hub: widget.hub),
-      ),
-    );
-    await widget.hub.refresh(silent: true);
   }
 
   Future<void> _openThread(ThreadSummary thread) async {
@@ -93,7 +97,8 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
       await widget.hub.refresh(silent: true);
       if (!mounted || !widget.hub.access.ready) return;
       final matches = widget.hub.threads.where(
-        (thread) => thread.address == address || thread.recipients.contains(address),
+        (thread) =>
+            thread.address == address || thread.recipients.contains(address),
       );
       if (matches.isNotEmpty) {
         await _openThread(matches.first);
@@ -109,9 +114,7 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
         );
         await widget.hub.refresh(silent: true);
       }
-    } catch (_) {
-      // 冷启动权限未就绪时忽略；用户仍可从列表进入。
-    }
+    } catch (_) {}
   }
 
   Future<void> _actions(ThreadSummary thread) async {
@@ -124,7 +127,11 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
             padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
             child: Row(
               children: [
-                AuroraAvatar(seed: thread.address, size: 42, label: thread.title),
+                AuroraAvatar(
+                  seed: thread.address,
+                  size: 42,
+                  label: thread.title,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -144,22 +151,26 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
             ),
           ),
           AuroraSettingTile(
-            title: thread.pinned ? '取消置顶' : '置顶会话',
-            icon: thread.pinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+            title: thread.pinned ? tr("Unpin") : tr("Pin conversation"),
+            icon: thread.pinned
+                ? Icons.push_pin_outlined
+                : Icons.push_pin_rounded,
             onTap: () => Navigator.pop(context, 'pin'),
           ),
           AuroraSettingTile(
-            title: thread.archived ? '移出存档' : '归档会话',
+            title: thread.archived
+                ? tr("Unarchive")
+                : tr("Archive conversation"),
             icon: Icons.archive_outlined,
             onTap: () => Navigator.pop(context, 'archive'),
           ),
           AuroraSettingTile(
-            title: '标为已读',
+            title: tr("Mark as read"),
             icon: Icons.mark_chat_read_outlined,
             onTap: () => Navigator.pop(context, 'read'),
           ),
           AuroraSettingTile(
-            title: '屏蔽此号码',
+            title: tr("Block this number"),
             icon: Icons.block_rounded,
             destructive: true,
             onTap: () => Navigator.pop(context, 'block'),
@@ -177,9 +188,189 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
         await widget.hub.markRead(thread.threadId);
       case 'block':
         await widget.hub.block(thread.address);
-        if (mounted) showAuroraSnack(context, '已屏蔽 ${thread.title}');
+        if (mounted) {
+          showAuroraSnack(context, tr("Blocked: {p0}", [thread.title]));
+        }
     }
   }
+
+  void _toggle(ThreadSummary thread) => setState(() {
+    _selecting = true;
+    if (!_selected.add(thread.threadId)) _selected.remove(thread.threadId);
+  });
+
+  Future<void> _perform(Future<void> Function() operation) async {
+    if (_bulkBusy) return;
+    setState(() => _bulkBusy = true);
+    try {
+      await operation();
+      await widget.hub.refresh(silent: true);
+    } catch (error) {
+      if (mounted) showAuroraSnack(context, messageError(error));
+    } finally {
+      if (mounted) setState(() => _bulkBusy = false);
+    }
+  }
+
+  Future<void> _bulk(String action) async {
+    final ids = _selected.toList(growable: false);
+    if (ids.isEmpty) return;
+    if (action == 'trash') {
+      final confirmed = await showAuroraDialog<bool>(
+        context: context,
+        title: Text(tr('Move conversations to trash: {p0}?', [ids.length])),
+        content: Text(
+          tr('You can restore these messages until the retention period ends.'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(tr('Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(tr('Move to trash')),
+          ),
+        ],
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    await _perform(() async {
+      switch (action) {
+        case 'trash':
+          await widget.repository.trashThreads(ids);
+        case 'read':
+          await widget.repository.markThreadsRead(ids);
+        case 'copy':
+          final text = await widget.repository.copyThreads(ids);
+          await SensitiveClipboard.copy(text);
+          if (mounted) showAuroraSnack(context, tr('Copied'));
+      }
+      if (mounted) {
+        setState(() {
+          _selected.clear();
+          _selecting = false;
+        });
+      }
+    });
+  }
+
+  Future<void> _swipe(ThreadSummary thread, ThreadSwipeAction action) =>
+      _perform(() async {
+        switch (action) {
+          case ThreadSwipeAction.trash:
+            await widget.repository.trashThreads([thread.threadId]);
+            if (mounted) showAuroraSnack(context, tr('Moved to trash'));
+          case ThreadSwipeAction.read:
+            await widget.repository.markRead(thread.threadId);
+          case ThreadSwipeAction.archive:
+            await widget.repository.archive(thread.threadId, !thread.archived);
+          case ThreadSwipeAction.pin:
+            await widget.repository.pin(thread.threadId, !thread.pinned);
+          case ThreadSwipeAction.none:
+            break;
+        }
+      });
+
+  Widget _toolbar() => SliverAppBar(
+    primary: false,
+    pinned: true,
+    automaticallyImplyLeading: false,
+    backgroundColor: context.colors.surface,
+    surfaceTintColor: Colors.transparent,
+    titleTextStyle: context.texts.titleLarge,
+    title: Text(
+      _selecting ? tr('Selected: {p0}', [_selected.length]) : tr('Messages'),
+    ),
+    leading: _selecting
+        ? IconButton(
+            tooltip: tr('Cancel'),
+            icon: const Icon(Icons.close_rounded),
+            onPressed: () => setState(() {
+              _selecting = false;
+              _selected.clear();
+            }),
+          )
+        : null,
+    actions: _selecting
+        ? [
+            IconButton(
+              tooltip: tr('Select all'),
+              icon: const Icon(Icons.select_all_rounded),
+              onPressed: _bulkBusy
+                  ? null
+                  : () => setState(
+                      () => _selected.addAll(
+                        widget.hub.threads.map((t) => t.threadId),
+                      ),
+                    ),
+            ),
+            MenuAnchor(
+              menuChildren: [
+                for (final action in ['copy', 'read', 'trash'])
+                  MenuItemButton(
+                    onPressed: _bulkBusy || _selected.isEmpty
+                        ? null
+                        : () => _bulk(action),
+                    child: Text(
+                      action == 'copy'
+                          ? tr('Copy text')
+                          : action == 'read'
+                          ? tr('Mark as read')
+                          : tr('Move to trash'),
+                    ),
+                  ),
+                if (_selected.length == 1)
+                  MenuItemButton(
+                    onPressed: () => _actions(
+                      widget.hub.threads.firstWhere(
+                        (t) => _selected.contains(t.threadId),
+                      ),
+                    ),
+                    child: Text(tr('View details')),
+                  ),
+              ],
+              builder: (context, controller, child) => IconButton(
+                tooltip: tr('Actions'),
+                onPressed: () =>
+                    controller.isOpen ? controller.close() : controller.open(),
+                icon: const Icon(Icons.more_vert_rounded),
+              ),
+            ),
+          ]
+        : [
+            IconButton(
+              tooltip: tr('Mark all as read'),
+              icon: const Icon(Icons.done_all_rounded),
+              onPressed: _bulkBusy || !widget.hub.access.ready
+                  ? null
+                  : () => _perform(widget.repository.markAllRead),
+            ),
+            MenuAnchor(
+              menuChildren: [
+                MenuItemButton(
+                  onPressed: () => setState(() => _selecting = true),
+                  child: Text(tr('Select conversations')),
+                ),
+                MenuItemButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          TrashScreen(repository: widget.repository),
+                    ),
+                  ),
+                  child: Text(tr('Trash')),
+                ),
+              ],
+              builder: (context, controller, child) => IconButton(
+                tooltip: tr('Actions'),
+                onPressed: () =>
+                    controller.isOpen ? controller.close() : controller.open(),
+                icon: const Icon(Icons.more_vert_rounded),
+              ),
+            ),
+          ],
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -191,91 +382,134 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
           _handledIntent = hub.intentTick;
           WidgetsBinding.instance.addPostFrameCallback((_) => _openIntent());
         }
-        final pinned = hub.threads.where((thread) => thread.pinned).toList(growable: false);
-        final recent = hub.threads.where((thread) => !thread.pinned).toList(growable: false);
-        return RefreshIndicator(
-          onRefresh: () => hub.refresh(),
-          color: context.colors.primary,
-          backgroundColor: context.colors.surfaceContainerHigh,
-          child: CustomScrollView(
-            controller: _scroll,
-            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-            slivers: [
-              SliverToBoxAdapter(child: _brandBar(context, hub)),
-              SliverToBoxAdapter(
-                child: AuroraLargeHeader(
-                  eyebrow: MessageFormat.todayLabel(),
-                  title: '消息',
-                  description: hub.access.ready
-                      ? '${hub.unread} 条未读 · ${hub.threads.length} 个会话'
-                      : '本地优先的短信与彩信',
-                  padding: const EdgeInsets.fromLTRB(24, 6, 24, 2),
-                ),
+        final pinned = hub.threads
+            .where((thread) => thread.pinned)
+            .toList(growable: false);
+        final recent = hub.threads
+            .where((thread) => !thread.pinned)
+            .toList(growable: false);
+        return PopScope(
+          canPop: !_selecting,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop && _selecting) {
+              setState(() {
+                _selecting = false;
+                _selected.clear();
+              });
+            }
+          },
+          child: RefreshIndicator(
+            onRefresh: () => hub.refresh(),
+            color: context.colors.primary,
+            backgroundColor: context.colors.surfaceContainerHigh,
+            child: CustomScrollView(
+              controller: _scroll,
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
               ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
-                  child: AuroraSearchField(
-                    controller: _search,
-                    hintText: '搜索号码、联系人或是短信里的短语',
-                    onChanged: hub.search,
+              slivers: [
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: MediaQuery.paddingOf(context).top + 8,
                   ),
                 ),
-              ),
-              SliverToBoxAdapter(
-                child: AuroraFilterBar(
-                  selected: hub.filter,
-                  onSelected: hub.setFilter,
-                  items: [
-                    AuroraFilterItem('all', '全部', count: hub.countFor('all')),
-                    AuroraFilterItem('unread', '未读', count: hub.countFor('unread')),
-                    AuroraFilterItem('otp', '验证码', count: hub.countFor('otp')),
-                    AuroraFilterItem('pinned', '置顶', count: hub.countFor('pinned')),
-                    AuroraFilterItem('archived', '存档', count: hub.countFor('archived')),
-                  ],
-                ),
-              ),
-              if (!hub.access.ready) SliverToBoxAdapter(child: _accessCard(context, hub)),
-              if (hub.error != null)
-                SliverToBoxAdapter(
-                  child: AuroraErrorBanner(message: hub.error!, onRetry: () => hub.refresh()),
-                ),
-              if (hub.loading && hub.threads.isEmpty)
-                const SliverToBoxAdapter(child: _InboxSkeleton()),
-              if (!hub.loading && hub.access.ready && hub.threads.isEmpty)
+                _toolbar(),
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 30),
-                    child: AuroraEmpty(
-                      title: hub.query.isNotEmpty ? '没有找到匹配的消息' : '收件箱很安静',
-                      message: hub.query.isNotEmpty
-                          ? '换个关键词，或清空搜索看看全部会话。'
-                          : '新的短信会像光一样落在这里。',
-                      icon: Icons.mark_chat_unread_outlined,
-                      action: hub.query.isNotEmpty
-                          ? TextButton(
-                              onPressed: () {
-                                _search.clear();
-                                hub.search('');
-                              },
-                              child: const Text('清空搜索'),
-                            )
-                          : null,
+                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+                    child: AuroraSearchField(
+                      controller: _search,
+                      hintText: tr("Search messages or contacts"),
+                      onChanged: hub.search,
                     ),
                   ),
                 ),
-              if (pinned.isNotEmpty) ...[
-                SliverToBoxAdapter(child: _sectionLabel(context, '置顶')),
-                _threadSliver(pinned),
-              ],
-              if (recent.isNotEmpty) ...[
                 SliverToBoxAdapter(
-                  child: _sectionLabel(context, pinned.isEmpty ? '全部会话' : '最近'),
+                  child: AuroraFilterBar(
+                    selected: hub.filter,
+                    onSelected: hub.setFilter,
+                    items: [
+                      AuroraFilterItem(
+                        'all',
+                        tr("All"),
+                        count: hub.countFor('all'),
+                      ),
+                      AuroraFilterItem(
+                        'unread',
+                        tr("Unread"),
+                        count: hub.countFor('unread'),
+                      ),
+                      AuroraFilterItem(
+                        'otp',
+                        tr("Verification codes"),
+                        count: hub.countFor('otp'),
+                      ),
+                      AuroraFilterItem(
+                        'pinned',
+                        tr("Pinned"),
+                        count: hub.countFor('pinned'),
+                      ),
+                      AuroraFilterItem(
+                        'archived',
+                        tr("Archived"),
+                        count: hub.countFor('archived'),
+                      ),
+                    ],
+                  ),
                 ),
-                _threadSliver(recent),
+                if (!hub.access.ready && !hub.loading)
+                  SliverToBoxAdapter(child: _accessCard(context, hub)),
+                if (hub.error != null)
+                  SliverToBoxAdapter(
+                    child: AuroraErrorBanner(
+                      message: hub.error!,
+                      onRetry: () => hub.refresh(),
+                    ),
+                  ),
+                if (hub.loading && hub.threads.isEmpty)
+                  const SliverToBoxAdapter(child: _InboxSkeleton()),
+                if (!hub.loading && hub.access.ready && hub.threads.isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsetsDirectional.only(top: 30),
+                      child: AuroraEmpty(
+                        title: hub.query.isNotEmpty
+                            ? tr("No matching messages")
+                            : tr("Your inbox is empty"),
+                        message: hub.query.isNotEmpty
+                            ? tr("Try another keyword or clear your search.")
+                            : tr("New messages will appear here."),
+                        icon: Icons.mark_chat_unread_outlined,
+                        action: hub.query.isNotEmpty
+                            ? TextButton(
+                                onPressed: () {
+                                  _search.clear();
+                                  hub.search('');
+                                },
+                                child: Text(tr("Clear search")),
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+                if (pinned.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: _sectionLabel(context, tr("Pinned")),
+                  ),
+                  _threadSliver(pinned),
+                ],
+                if (recent.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: _sectionLabel(
+                      context,
+                      pinned.isEmpty ? tr("All conversations") : tr("Recent"),
+                    ),
+                  ),
+                  _threadSliver(recent),
+                ],
+                const SliverToBoxAdapter(child: SizedBox(height: 120)),
               ],
-              const SliverToBoxAdapter(child: SizedBox(height: 120)),
-            ],
+            ),
           ),
         );
       },
@@ -289,36 +523,57 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
         itemCount: threads.length,
         itemBuilder: (context, index) {
           final thread = threads[index];
+          final settings = AppScope.maybeOf(context);
+          final left = settings?.swipeLeft ?? ThreadSwipeAction.trash;
+          final right = settings?.swipeRight ?? ThreadSwipeAction.read;
+          final rtl = Directionality.of(context) == TextDirection.rtl;
+          final start = rtl ? left : right;
+          final end = rtl ? right : left;
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Dismissible(
-              key: ValueKey('thread-${thread.threadId}'),
-              direction: DismissDirection.horizontal,
-              background: _SwipeBackground(
-                alignment: Alignment.centerLeft,
-                color: context.colors.primary,
-                icon: thread.pinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
-                label: thread.pinned ? '取消置顶' : '置顶',
-              ),
-              secondaryBackground: _SwipeBackground(
-                alignment: Alignment.centerRight,
-                color: context.colors.tertiary,
-                icon: Icons.archive_outlined,
-                label: '归档',
-              ),
-              confirmDismiss: (direction) async {
-                if (direction == DismissDirection.startToEnd) {
-                  await widget.hub.pin(thread.threadId, !thread.pinned);
-                } else {
-                  await widget.hub.archive(thread.threadId, true);
-                }
-                return false;
-              },
-              child: ConversationTile(
-                thread: thread,
-                showSim: widget.hub.sims.length > 1,
-                onTap: () => _openThread(thread),
-                onLongPress: () => _actions(thread),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(26),
+              child: Dismissible(
+                key: ValueKey('thread-${thread.threadId}'),
+                direction: _selecting || _bulkBusy
+                    ? DismissDirection.none
+                    : start == ThreadSwipeAction.none &&
+                          end == ThreadSwipeAction.none
+                    ? DismissDirection.none
+                    : start == ThreadSwipeAction.none
+                    ? DismissDirection.endToStart
+                    : end == ThreadSwipeAction.none
+                    ? DismissDirection.startToEnd
+                    : DismissDirection.horizontal,
+                resizeDuration: null,
+                dismissThresholds: const {
+                  DismissDirection.startToEnd: .38,
+                  DismissDirection.endToStart: .38,
+                },
+                background: _swipeBackground(
+                  start,
+                  AlignmentDirectional.centerStart,
+                ),
+                secondaryBackground: _swipeBackground(
+                  end,
+                  AlignmentDirectional.centerEnd,
+                ),
+                confirmDismiss: (direction) async {
+                  await _swipe(
+                    thread,
+                    direction == DismissDirection.startToEnd ? start : end,
+                  );
+                  return false;
+                },
+                child: ConversationTile(
+                  thread: thread,
+                  selected: _selected.contains(thread.threadId),
+                  selectionMode: _selecting,
+                  showSim: widget.hub.sims.length > 1,
+                  onTap: () =>
+                      _selecting ? _toggle(thread) : _openThread(thread),
+                  onLongPress: () => _toggle(thread),
+                ),
               ),
             ),
           );
@@ -327,130 +582,28 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _brandBar(BuildContext context, MessageHub hub) {
-    final scheme = context.colors;
-    return Padding(
-      // 沉浸式状态下为系统状态栏让位；列表其余部分可以继续从其下方流过。
-      padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + 8, 16, 0),
-      child: Row(
-        children: [
-          AuroraShapeContainer(
-            shape: AuroraShapes.bloom,
-            size: 40,
-            gradient: [scheme.primary, scheme.tertiary],
-            border: scheme.onPrimary.withValues(alpha: .2),
-            child: Icon(Icons.bolt_rounded, size: 19, color: scheme.onPrimary),
-          ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '青鸟短信',
-                style: context.texts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              Text(
-                '短信与彩信',
-                style: context.texts.labelSmall?.copyWith(
-                  fontSize: 8.5,
-                  letterSpacing: 1.6,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          AuroraIconButton(
-            icon: Icons.delete_outline_rounded,
-            tooltip: '回收站',
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => TrashScreen(repository: widget.repository),
-                ),
-              );
-              widget.hub.refresh(silent: true);
-            },
-          ),
-          const SizedBox(width: 8),
-          AuroraIconButton(
-            icon: Icons.bolt_outlined,
-            tooltip: '引擎状态',
-            onPressed: () => _showEngine(context, hub),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _swipeBackground(
+    ThreadSwipeAction action,
+    AlignmentGeometry alignment,
+  ) => _SwipeBackground(
+    alignment: alignment,
+    color: action == ThreadSwipeAction.trash
+        ? context.colors.error
+        : context.colors.primary,
+    icon: switch (action) {
+      ThreadSwipeAction.trash => Icons.delete_outline_rounded,
+      ThreadSwipeAction.read => Icons.done_all_rounded,
+      ThreadSwipeAction.archive => Icons.archive_outlined,
+      ThreadSwipeAction.pin => Icons.push_pin_outlined,
+      ThreadSwipeAction.none => Icons.block_rounded,
+    },
+    label: swipeActionLabel(action),
+  );
 
-  void _showEngine(BuildContext context, MessageHub hub) {
-    final engine = AuroraEngine.instance;
-    showAuroraSheet<void>(
-      context: context,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('极光引擎', style: context.texts.headlineSmall),
-            const SizedBox(height: 6),
-            Text(
-              '统一帧调度 · 自适应画质 · 跨页连续动效',
-              style: context.texts.bodyMedium?.copyWith(color: context.colors.onSurfaceVariant),
-            ),
-            const SizedBox(height: 16),
-            AuroraGlass(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _engineRow(context, '渲染质量', engine.quality.name),
-                  _engineRow(context, '平均帧耗时', '${engine.averageFrameMs.toStringAsFixed(1)} ms'),
-                  _engineRow(context, '背景帧率', '${engine.backdropFps} fps'),
-                  _engineRow(context, '会话数量', '${hub.threads.length}'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '引擎根据真实 build/raster 耗时自动降级；滚动时背景让出 GPU 预算。',
-              style: context.texts.bodySmall?.copyWith(color: context.colors.onSurfaceVariant),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _engineRow(BuildContext context, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: context.texts.bodySmall?.copyWith(color: context.colors.onSurfaceVariant),
-          ),
-          const Spacer(),
-          Text(value, style: context.texts.titleSmall),
-        ],
-      ),
-    );
-  }
-
-  Widget _sectionLabel(BuildContext context, String label) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(26, 16, 26, 8),
-      child: Text(
-        label,
-        style: context.texts.labelMedium?.copyWith(
-          color: context.colors.onSurfaceVariant,
-          letterSpacing: 1,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
+  Widget _sectionLabel(BuildContext context, String label) => Padding(
+    padding: const EdgeInsets.fromLTRB(24, 12, 24, 6),
+    child: Text(label, style: context.texts.labelLarge),
+  );
 
   Widget _accessCard(BuildContext context, MessageHub hub) {
     final scheme = context.colors;
@@ -459,7 +612,10 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
       child: AuroraGlass(
         padding: const EdgeInsets.all(20),
         gradient: [
-          Color.alphaBlend(scheme.primaryContainer.withValues(alpha: .5), scheme.surface),
+          Color.alphaBlend(
+            scheme.primaryContainer.withValues(alpha: .5),
+            scheme.surface,
+          ),
           scheme.surfaceContainerLow.withValues(alpha: .4),
         ],
         child: Column(
@@ -471,18 +627,28 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
                   shape: MaterialShapes.arch,
                   size: 44,
                   color: scheme.primaryContainer,
-                  child: Icon(Icons.sms_outlined, color: scheme.onPrimaryContainer),
+                  child: Icon(
+                    Icons.sms_outlined,
+                    color: scheme.onPrimaryContainer,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('把青鸟设为默认短信应用', style: context.texts.titleMedium),
+                      Text(
+                        tr("Make Qingniao your default SMS app"),
+                        style: context.texts.titleMedium,
+                      ),
                       const SizedBox(height: 3),
                       Text(
-                        '只有默认短信应用才能完整读取、接收与发送短信。',
-                        style: context.texts.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                        tr(
+                          "The default SMS role is required to read, receive and send messages.",
+                        ),
+                        style: context.texts.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -490,7 +656,9 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
               ],
             ),
             const SizedBox(height: 16),
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
               children: [
                 FilledButton.icon(
                   onPressed: _requesting ? null : _requestAccess,
@@ -501,12 +669,15 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.verified_user_outlined, size: 18),
-                  label: Text(_requesting ? '等待系统确认…' : '去设置'),
+                  label: Text(
+                    _requesting
+                        ? tr("Waiting for system confirmation\u2026")
+                        : tr("Set as default SMS app"),
+                  ),
                 ),
-                const SizedBox(width: 8),
                 TextButton(
                   onPressed: () => widget.repository.openAppSettings(),
-                  child: const Text('应用设置'),
+                  child: Text(tr("App settings")),
                 ),
               ],
             ),
@@ -525,30 +696,29 @@ class _SwipeBackground extends StatelessWidget {
     required this.label,
   });
 
-  final Alignment alignment;
+  final AlignmentGeometry alignment;
   final Color color;
   final IconData icon;
   final String label;
 
   @override
   Widget build(BuildContext context) {
-    final left = alignment == Alignment.centerLeft;
+    final left = alignment == AlignmentDirectional.centerStart;
     return Container(
       alignment: alignment,
-      padding: EdgeInsets.only(left: left ? 24 : 0, right: left ? 0 : 24),
+      padding: EdgeInsetsDirectional.only(
+        start: left ? 24 : 0,
+        end: left ? 0 : 24,
+      ),
       decoration: ShapeDecoration(
         color: color.withValues(alpha: .18),
-        shape: RoundedSuperellipseBorder(borderRadius: BorderRadius.circular(26)),
+        shape: RoundedSuperellipseBorder(
+          borderRadius: BorderRadius.circular(26),
+        ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (!left) Text(label, style: context.texts.labelSmall?.copyWith(color: color)),
-          if (!left) const SizedBox(width: 8),
-          Icon(icon, color: color, size: 20),
-          if (left) const SizedBox(width: 8),
-          if (left) Text(label, style: context.texts.labelSmall?.copyWith(color: color)),
-        ],
+      child: Tooltip(
+        message: label,
+        child: Icon(icon, color: color, size: 24),
       ),
     );
   }
@@ -565,7 +735,7 @@ class _InboxSkeleton extends StatelessWidget {
         children: [
           for (var index = 0; index < 4; index++)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsetsDirectional.only(bottom: 8),
               child: AuroraGlass(
                 height: 82,
                 child: Padding(
@@ -577,7 +747,9 @@ class _InboxSkeleton extends StatelessWidget {
                         height: 54,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: context.colors.onSurface.withValues(alpha: .05),
+                          color: context.colors.onSurface.withValues(
+                            alpha: .05,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 13),
@@ -589,7 +761,9 @@ class _InboxSkeleton extends StatelessWidget {
                               width: 120,
                               height: 12,
                               decoration: BoxDecoration(
-                                color: context.colors.onSurface.withValues(alpha: .06),
+                                color: context.colors.onSurface.withValues(
+                                  alpha: .06,
+                                ),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
@@ -597,7 +771,9 @@ class _InboxSkeleton extends StatelessWidget {
                             Container(
                               height: 10,
                               decoration: BoxDecoration(
-                                color: context.colors.onSurface.withValues(alpha: .04),
+                                color: context.colors.onSurface.withValues(
+                                  alpha: .04,
+                                ),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),

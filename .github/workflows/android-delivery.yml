@@ -53,7 +53,10 @@ jobs:
         run: |
           flutter config --no-analytics
           flutter pub get --enforce-lockfile
-          flutter analyze --no-fatal-infos --no-fatal-warnings
+          dart run tool/check_localization.dart
+          python3 tool/generate_android_strings.py --check
+          python3 tool/check_sms_contract.py
+          flutter analyze
           flutter test
           cargo test --locked --manifest-path rust/Cargo.toml
       - name: Prepare production key
@@ -77,8 +80,9 @@ jobs:
           if [[ "$PRODUCTION" == 'true' ]]; then mode=release; else mode=debug; fi
           flutter build apk --"$mode"
           python3 tool/verify_android_pages.py "build/app/outputs/flutter-apk/app-$mode.apk" --report build/native-pages.json
-          (cd android && chmod +x gradlew && ./gradlew lintDebug --no-daemon)
+          (cd android && chmod +x gradlew && ./gradlew testDebugUnitTest lintDebug --no-daemon)
           mkdir -p build/delivery
+          cp build/native-pages.json build/delivery/native-pages.json
           cp "build/app/outputs/flutter-apk/app-$mode.apk" "build/delivery/qingniao-$mode.apk"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "build/delivery/qingniao-$mode.apk" > build/delivery/signature.txt
           git rev-parse HEAD > build/delivery/source-commit.txt

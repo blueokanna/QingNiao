@@ -1,3 +1,5 @@
+import 'package:qingniao/l10n/app_strings.dart';
+
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -64,16 +66,16 @@ class _MmsScreenState extends State<MmsScreen> {
                   child: Image.memory(
                     bytes,
                     cacheWidth: 1440,
-                    errorBuilder: (_, _, _) => const Padding(
+                    errorBuilder: (_, _, _) => Padding(
                       padding: EdgeInsets.all(24),
-                      child: Text('无法解码图片'),
+                      child: Text(tr("Unable to decode image")),
                     ),
                   ),
                 ),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('关闭'),
+                child: Text(tr("Close")),
               ),
             ],
           ),
@@ -102,10 +104,10 @@ class _MmsScreenState extends State<MmsScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('彩信'),
+      title: Text(tr("MMS messages")),
       actions: [
         IconButton(
-          tooltip: '重试未完成的下载',
+          tooltip: tr("Retry pending downloads"),
           onPressed: _busy
               ? null
               : () async {
@@ -125,7 +127,7 @@ class _MmsScreenState extends State<MmsScreen> {
     ),
     floatingActionButton: FloatingActionButton.extended(
       onPressed: _compose,
-      label: const Text('写彩信'),
+      label: Text(tr("Compose MMS")),
       icon: const Icon(Icons.edit_outlined),
     ),
     body: Column(
@@ -144,11 +146,15 @@ class _MmsScreenState extends State<MmsScreen> {
                     child: _more
                         ? TextButton(
                             onPressed: () => _load(older: true),
-                            child: const Text('加载更多'),
+                            child: Text(tr("Load more")),
                           )
                         : Padding(
                             padding: const EdgeInsets.all(32),
-                            child: Text(_messages.isEmpty ? '暂无彩信' : '已显示全部'),
+                            child: Text(
+                              _messages.isEmpty
+                                  ? tr("No MMS messages")
+                                  : tr("All messages loaded"),
+                            ),
                           ),
                   );
                 }
@@ -169,7 +175,9 @@ class _MmsScreenState extends State<MmsScreen> {
                           Text(message['subject'] as String),
                         SelectableText(message['body'] as String),
                         if (message['pending'] == true)
-                          const Text('等待下载，可点右上角重试'),
+                          Text(
+                            tr("Waiting to download. Use Retry to try again."),
+                          ),
                         Wrap(
                           spacing: 8,
                           children: attachments.map((item) {
@@ -184,10 +192,10 @@ class _MmsScreenState extends State<MmsScreen> {
                         const SizedBox(height: 8),
                         Text(
                           '${messageTime(message['date'] as int)} · ${switch (message['type']) {
-                            1 => '收到',
-                            2 => '已发送',
-                            5 => '发送失败',
-                            _ => '正在发送',
+                            1 => tr('Received'),
+                            2 => tr('Sent'),
+                            5 => tr('Failed to send'),
+                            _ => tr('Sending'),
                           }}',
                           style: Theme.of(context).textTheme.labelSmall,
                         ),
@@ -241,7 +249,7 @@ class _MmsComposerState extends State<MmsComposer> {
   Future<void> _send() async {
     if (_sending) return;
     if (_sims.length > 1 && _sim == null) {
-      setState(() => _error = '请选择 SIM 卡');
+      setState(() => _error = tr("Choose a SIM card"));
       return;
     }
     setState(() => _sending = true);
@@ -274,16 +282,22 @@ class _MmsComposerState extends State<MmsComposer> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('新的彩信')),
+    appBar: AppBar(title: Text(tr("New MMS"))),
     body: ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        const Text('支持多收件人。彩信由运营商发送，可能产生费用；请保持移动数据可用。'),
+        Text(
+          tr(
+            "MMS supports multiple recipients. Carrier charges may apply. Keep mobile data available.",
+          ),
+        ),
         const SizedBox(height: 20),
         TextField(
           controller: _recipients,
           enabled: !_sending,
-          decoration: const InputDecoration(labelText: '收件号码，以逗号分隔'),
+          decoration: InputDecoration(
+            labelText: tr("Recipient numbers, separated by commas"),
+          ),
         ),
         const SizedBox(height: 16),
         TextField(
@@ -292,21 +306,22 @@ class _MmsComposerState extends State<MmsComposer> {
           minLines: 4,
           maxLines: 12,
           maxLength: 10000,
-          decoration: const InputDecoration(labelText: '彩信正文'),
+          decoration: InputDecoration(labelText: tr("MMS text")),
         ),
-        DropdownButton<int>(
-          isExpanded: true,
-          value: _sim,
-          hint: const Text('选择 SIM 卡'),
-          items: _sims
-              .map(
-                (sim) => DropdownMenuItem<int>(
-                  value: sim['id'] as int,
-                  child: Text('SIM ${sim['slot']} · ${sim['name']}'),
-                ),
-              )
-              .toList(),
-          onChanged: _sending ? null : (value) => setState(() => _sim = value),
+        DropdownMenu<int>(
+          expandedInsets: EdgeInsets.zero,
+          requestFocusOnTap: false,
+          enabled: !_sending,
+          initialSelection: _sim,
+          label: Text(tr('Select SIM card')),
+          dropdownMenuEntries: [
+            for (final sim in _sims)
+              DropdownMenuEntry(
+                value: sim['id'] as int,
+                label: 'SIM ${sim['slot']} ? ${sim['name']}',
+              ),
+          ],
+          onSelected: (value) => setState(() => _sim = value),
         ),
         OutlinedButton.icon(
           onPressed: _sending
@@ -325,7 +340,9 @@ class _MmsComposerState extends State<MmsComposer> {
                 },
           icon: const Icon(Icons.attach_file),
           label: Text(
-            _attachment == null ? '添加图片、音频或视频' : '已选择 ${_attachment!['type']}',
+            _attachment == null
+                ? tr("Add image, audio or video")
+                : tr("Selected: {p0}", [_attachment!['type']]),
           ),
         ),
         if (_attachment != null)
@@ -333,14 +350,14 @@ class _MmsComposerState extends State<MmsComposer> {
             onPressed: _sending
                 ? null
                 : () => setState(() => _attachment = null),
-            child: const Text('移除附件'),
+            child: Text(tr("Remove attachment")),
           ),
         if (_error != null) Text(_error!),
         const SizedBox(height: 24),
         FilledButton.icon(
           onPressed: _sending ? null : _send,
           icon: const Icon(Icons.send_outlined),
-          label: Text(_sending ? '正在提交…' : '发送彩信'),
+          label: Text(_sending ? tr("Submitting\u2026") : tr("Send MMS")),
         ),
       ],
     ),

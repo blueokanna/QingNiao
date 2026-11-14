@@ -600,28 +600,28 @@ mod tests {
 
     #[test]
     fn round_trip_text_and_attachments() {
-        let recipients = vec!["+8613800138000".to_string(), "张三".to_string()];
-        let text = "你好🌿，这是一条彩信。\n第二行";
+        let recipients = vec!["+8613800138000".to_string(), "\u{5f20}\u{4e09}".to_string()];
+        let text = "\u{4f60}\u{597d}🌿，\u{8fd9}\u{662f}\u{4e00}\u{6761}\u{5f69}\u{4fe1}。\n\u{7b2c}\u{4e8c}\u{884c}";
         let attachments = vec![
             attachment("image/jpeg", "photo.jpg", &[0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0xD9]),
             attachment("audio/amr", "voice.amr", b"#!AMR\n...."),
         ];
-        let pdu = encode(&recipients, text, "标题 subject", &attachments);
+        let pdu = encode(&recipients, text, "\u{6807}\u{9898} subject", &attachments);
         let decoded = decode(&pdu).expect("decode");
         assert_eq!(decoded.message_type, 132);
         assert_eq!(decoded.recipients, recipients);
-        assert_eq!(decoded.subject, "标题 subject");
+        assert_eq!(decoded.subject, "\u{6807}\u{9898} subject");
         assert_eq!(decoded.text, text);
         assert!(decoded.date_ms > 1_600_000_000_000);
         assert_eq!(decoded.attachments, attachments);
-        assert_eq!(decoded.sender, "", "insert-address-token 表示本机");
+        assert_eq!(decoded.sender, "", "insert-address-token \u{8868}\u{793a}\u{672c}\u{673a}");
     }
 
     #[test]
     fn round_trip_without_attachments() {
-        let pdu = encode(&["10086".into()], "只有文本", "", &[]);
+        let pdu = encode(&["10086".into()], "\u{53ea}\u{6709}\u{6587}\u{672c}", "", &[]);
         let decoded = decode(&pdu).expect("decode");
-        assert_eq!(decoded.text, "只有文本");
+        assert_eq!(decoded.text, "\u{53ea}\u{6709}\u{6587}\u{672c}");
         assert!(decoded.attachments.is_empty());
         assert_eq!(decoded.recipients, vec!["10086".to_string()]);
     }
@@ -652,29 +652,29 @@ mod tests {
         let mut content_type: Vec<u8> = vec![0x80 | TEXT_PLAIN_INDEX];
         write_parameter_text(&mut content_type, 0x81, "utf-8");
         write_uintvar(&mut pdu, 1);
-        write_part(&mut pdu, &content_type, None, "来自 10086".as_bytes());
+        write_part(&mut pdu, &content_type, None, "\u{6765}\u{81ea} 10086".as_bytes());
 
         let decoded = decode(&pdu).expect("decode");
         assert_eq!(decoded.sender, "10086");
-        assert_eq!(decoded.text, "来自 10086");
+        assert_eq!(decoded.text, "\u{6765}\u{81ea} 10086");
     }
 
     #[test]
     fn skips_unknown_headers() {
-        let pdu = encode(&["10086".into()], "未知头测试", "", &[]);
+        let pdu = encode(&["10086".into()], "\u{672a}\u{77e5}\u{5934}\u{6d4b}\u{8bd5}", "", &[]);
         let mut injected: Vec<u8> = vec![0xA5, 0x03, b'x', b'y', b'z'];
         injected.extend_from_slice(&pdu);
         let decoded = decode(&injected).expect("decode");
-        assert_eq!(decoded.text, "未知头测试");
+        assert_eq!(decoded.text, "\u{672a}\u{77e5}\u{5934}\u{6d4b}\u{8bd5}");
         assert_eq!(decoded.message_type, 132);
     }
 
     #[test]
     fn rejects_truncated_and_invalid_lengths() {
-        let pdu = encode(&["10086".into()], "截断测试", "主题", &[]);
-        assert!(decode(&pdu[..2]).is_none(), "缺少 Content-Type");
+        let pdu = encode(&["10086".into()], "\u{622a}\u{65ad}\u{6d4b}\u{8bd5}", "\u{4e3b}\u{9898}", &[]);
+        assert!(decode(&pdu[..2]).is_none(), "\u{7f3a}\u{5c11} Content-Type");
         assert!(decode(&pdu[..6]).is_none());
-        assert!(decode(&pdu[..pdu.len() / 2]).is_none(), "正文被截断");
+        assert!(decode(&pdu[..pdu.len() / 2]).is_none(), "\u{6b63}\u{6587}\u{88ab}\u{622a}\u{65ad}");
         assert!(decode(&[]).is_none());
 
         let mut broken: Vec<u8> = vec![0x8C, 0x84, 0x84, 0x80 | MULTIPART_MIXED_INDEX];
@@ -700,13 +700,13 @@ mod tests {
         let smil = b"<smil><body/></smil>";
         let pdu = encode(
             &["10086".into()],
-            "带 SMIL",
+            "\u{5e26} SMIL",
             "",
             &[attachment("application/smil", "smil.xml", smil)],
         );
         let decoded = decode(&pdu).expect("decode");
-        assert_eq!(decoded.text, "带 SMIL");
-        assert!(decoded.attachments.is_empty(), "SMIL 只用于排版，被忽略");
+        assert_eq!(decoded.text, "\u{5e26} SMIL");
+        assert!(decoded.attachments.is_empty(), "SMIL \u{53ea}\u{7528}\u{4e8e}\u{6392}\u{7248}，\u{88ab}\u{5ffd}\u{7565}");
     }
 
     #[test]
@@ -735,10 +735,10 @@ mod tests {
         let mut content_type: Vec<u8> = vec![0x80 | TEXT_PLAIN_INDEX];
         write_parameter_text(&mut content_type, 0x81, "utf-8");
         write_uintvar(&mut pdu, 1);
-        write_part(&mut pdu, &content_type, None, "参数块之后的正文".as_bytes());
+        write_part(&mut pdu, &content_type, None, "\u{53c2}\u{6570}\u{5757}\u{4e4b}\u{540e}\u{7684}\u{6b63}\u{6587}".as_bytes());
 
         let decoded = decode(&pdu).expect("decode");
-        assert_eq!(decoded.text, "参数块之后的正文");
+        assert_eq!(decoded.text, "\u{53c2}\u{6570}\u{5757}\u{4e4b}\u{540e}\u{7684}\u{6b63}\u{6587}");
     }
 
     #[test]
@@ -746,7 +746,7 @@ mod tests {
         let big = vec![0x5A; 300_000];
         let pdu = encode(
             &["10086".into()],
-            "大附件",
+            "\u{5927}\u{9644}\u{4ef6}",
             "",
             &[attachment("image/png", "big.png", &big)],
         );

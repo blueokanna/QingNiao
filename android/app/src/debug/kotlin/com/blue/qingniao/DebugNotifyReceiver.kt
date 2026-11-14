@@ -6,21 +6,11 @@ import android.content.Intent
 import android.telephony.SubscriptionManager
 import android.util.Log
 
-/**
- * 仅 debug 构建包含的验证入口，方便用 adb 在没有 UI 交互的情况下验证
- * 通知（含流体云 / Live Updates）与真实短信收发链路。
- *
- * ```
- * adb shell am broadcast -a com.blue.qingniao.DEBUG_NOTIFY \
- *     --es address 10086 --es body "验证码 123456" --ei sub 1
- * adb shell am broadcast -a com.blue.qingniao.DEBUG_SEND \
- *     --es address 13054434880 --es body "self test" --ei sub 1
- * ```
- */
+
 class DebugNotifyReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val address = intent.getStringExtra("address") ?: "10086"
-        val body = intent.getStringExtra("body") ?: "青鸟调试通知"
+        val body = intent.getStringExtra("body") ?: "Qingniao debug notification"
         val subscription = intent.getIntExtra("sub", -1)
         when (intent.action) {
             ACTION_NOTIFY -> {

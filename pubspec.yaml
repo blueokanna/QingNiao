@@ -1,7 +1,8 @@
 name: qingniao
-description: "青鸟短信：Rust 驱动的本地优先短信与彩信客户端，Material 3 Expressive 与极光流体界面。"
+description: "Local-first Android SMS and MMS with a Rust core and Material 3 Expressive interface."
 publish_to: 'none'
-version: 0.4.0+40
+version: 0.1.0+1
+
 environment:
   sdk: ^3.13.7
 dependencies:
@@ -14,6 +15,8 @@ dependencies:
     path: rust_builder
   flutter_rust_bridge: 2.13.0
   material_new_shapes: 1.0.0
+  intl: ^0.20.3
+  characters: ^1.4.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

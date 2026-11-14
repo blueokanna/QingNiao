@@ -36,6 +36,9 @@ abstract class CargoKitBuildTask extends DefaultTask {
     String sdkDirectory
 
     @Input
+    String flutterSdkDirectory
+
+    @Input
     int compileSdkVersion;
 
     @Input
@@ -85,6 +88,7 @@ abstract class CargoKitBuildTask extends DefaultTask {
             environment "CARGOKIT_MIN_SDK_VERSION", minSdkVersion
             environment "CARGOKIT_TARGET_PLATFORMS", targetPlatforms.join(",")
             environment "CARGOKIT_JAVA_HOME", System.properties['java.home']
+            environment "FLUTTER_ROOT", flutterSdkDirectory
         }
     }
 }
@@ -122,6 +126,18 @@ class CargoKitPlugin implements Plugin<Project> {
             print("Flutter plugin not found, CargoKit plugin will not be applied.")
             return;
         }
+
+        def localProperties = new Properties()
+        def propertiesFile = new File(project.rootProject.projectDir, "local.properties")
+        if (propertiesFile.exists()) {
+            propertiesFile.withInputStream { localProperties.load(it) }
+        }
+        def flutterSdk = plugin.project.findProperty("flutter.sdk") ?:
+            localProperties.getProperty("flutter.sdk", System.getenv("FLUTTER_ROOT"))
+        if (!flutterSdk) {
+            throw new GradleException("Define flutter.sdk in local.properties or set FLUTTER_ROOT.")
+        }
+        def resolvedFlutterSdkDirectory = plugin.project.file(flutterSdk).absolutePath
 
         def cargoBuildDir = "${project.buildDir}/build"
 
@@ -169,6 +185,7 @@ class CargoKitPlugin implements Plugin<Project> {
                     outputDir = cargoOutputDir
                     ndkVersion = plugin.project.android.ndkVersion
                     sdkDirectory = plugin.project.android.sdkDirectory
+                    flutterSdkDirectory = resolvedFlutterSdkDirectory
                     minSdkVersion = plugin.project.android.defaultConfig.minSdkVersion.apiLevel as int
                     compileSdkVersion = plugin.project.android.compileSdkVersion.substring(8) as int
                     targetPlatforms = platforms

@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Qingniao</string>
+    <string name="push_title">ہم وقت سازی کے لیے پیغامات دستیاب ہیں</string>
+    <string name="push_body">محفوظ ہم وقت سازی کے لیے Qingniao کھولیں۔</string>
+    <string name="notification_reply">جواب دیں</string>
+    <string name="notification_messages">پیغامات</string>
+    <string name="notification_new_message">نیا پیغام</string>
+    <string name="notification_mark_read">پڑھا ہوا نشان لگائیں</string>
+    <string name="notification_copy_code">کاپی کریں</string>
+    <string name="notification_code_copied">کاپی ہو گیا</string>
+    <string name="notification_loading">لوڈ ہو رہا ہے…</string>
+    <string name="notification_new_mms">نیا MMS</string>
+    <string name="notification_failed">بھیجنے میں ناکامی</string>
+    <string name="notification_retry">عمل مکمل نہیں ہوا۔ دوبارہ کوشش کریں۔</string>
+    <string name="notification_test_title">اطلاع کی آزمائش</string>
+    <string name="notification_test_body">آزمائشی کوڈ: 864213۔ کوئی SMS نہیں بھیجا گیا۔</string>
+</resources>

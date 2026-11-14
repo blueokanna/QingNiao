@@ -484,7 +484,7 @@ mod tests {
                 id: 1,
                 thread_id: 11,
                 address: "10086".into(),
-                body: "您的验证码为 123456，5分钟内有效".into(),
+                body: include_str!("../../resources/message_samples/sms_text_584261655e06.txt").into(),
                 date: now_ms(),
                 read: false,
             },
@@ -492,15 +492,15 @@ mod tests {
                 id: 2,
                 thread_id: 12,
                 address: "95588".into(),
-                body: "招商银行账单已出，点击查看".into(),
+                body: include_str!("../../resources/message_samples/sms_text_335659327bcb.txt").into(),
                 date: now_ms() - 10 * 24 * 60 * 60 * 1000,
                 read: true,
             },
             Document {
                 id: 3,
                 thread_id: 13,
-                address: "张三".into(),
-                body: "今晚一起吃饭吗？验证码稍后发你".into(),
+                address: include_str!("../../resources/message_samples/sms_text_1d841bc0ee98.txt").into(),
+                body: include_str!("../../resources/message_samples/sms_text_d776146c93af.txt").into(),
                 date: now_ms() - 30 * 24 * 60 * 60 * 1000,
                 read: true,
             },
@@ -511,10 +511,10 @@ mod tests {
     fn indexes_and_searches_chinese() {
         let mut index = Index::default();
         assert_eq!(index.rebuild(sample()), 3);
-        let hits = index.search("验证码", 10);
+        let hits = index.search(include_str!("../../resources/message_samples/sms_text_bb015c60bafc.txt"), 10);
         assert_eq!(hits.len(), 2);
         assert_eq!(hits[0].id, 1);
-        assert!(hits[0].snippet.contains("验证码"));
+        assert!(hits[0].snippet.contains(include_str!("../../resources/message_samples/sms_text_bb015c60bafc.txt")));
         assert!(!hits[0].highlights.is_empty());
     }
 
@@ -525,7 +525,7 @@ mod tests {
         assert!(index.search("", 10).is_empty());
         assert!(index.search("   ", 10).is_empty());
         assert!(index.search("！！！", 10).is_empty());
-        assert!(index.search("验证码", 0).is_empty());
+        assert!(index.search(include_str!("../../resources/message_samples/sms_text_bb015c60bafc.txt"), 0).is_empty());
         assert!(index.search("zzzz", 10).is_empty());
         assert!(index.search("🦄", 10).is_empty());
     }
@@ -538,7 +538,7 @@ mod tests {
                 id: 1,
                 thread_id: 1,
                 address: "alice".into(),
-                body: "你好".into(),
+                body: include_str!("../../resources/message_samples/sms_text_670d9743542c.txt").into(),
                 date: 0,
                 read: true,
             },
@@ -546,14 +546,14 @@ mod tests {
                 id: 2,
                 thread_id: 2,
                 address: "bob".into(),
-                body: "alice 你好".into(),
+                body: include_str!("../../resources/message_samples/sms_text_46eb63156987.txt").into(),
                 date: 0,
                 read: true,
             },
         ]);
         let hits = index.search("alice", 10);
         assert_eq!(hits.len(), 2);
-        assert_eq!(hits[0].id, 1, "号码匹配权重更高");
+        assert_eq!(hits[0].id, 1, include_str!("../../resources/message_samples/sms_text_2e551b739ec3.txt"));
     }
 
     #[test]
@@ -562,8 +562,8 @@ mod tests {
         index.rebuild(vec![Document {
             id: 7,
             thread_id: 7,
-            address: "客服".into(),
-            body: "您的订单 13800138000 已发货".into(),
+            address: include_str!("../../resources/message_samples/sms_text_eae0efe236c3.txt").into(),
+            body: include_str!("../../resources/message_samples/sms_text_1daad67ece67.txt").into(),
             date: 0,
             read: true,
         }]);
@@ -596,14 +596,14 @@ mod tests {
             id: 5,
             thread_id: 5,
             address: "10086".into(),
-            body: "🌿验证码 123456".into(),
+            body: include_str!("../../resources/message_samples/sms_text_50bd53624d3a.txt").into(),
             date: 0,
             read: true,
         }]);
-        let hits = index.search("验证码", 10);
+        let hits = index.search(include_str!("../../resources/message_samples/sms_text_bb015c60bafc.txt"), 10);
         assert_eq!(hits.len(), 1);
         let (start, end) = hits[0].highlights[0];
-        assert_eq!(start, 2, "emoji 占 2 个 UTF-16 码元");
+        assert_eq!(start, 2, include_str!("../../resources/message_samples/sms_text_2ccc2ee80430.txt"));
         assert_eq!(end, 5);
         let snippet: Vec<u16> = hits[0].snippet.encode_utf16().collect();
         assert_eq!(&snippet[start as usize..end as usize], &[0x9A8C, 0x8BC1, 0x7801]);
@@ -611,7 +611,7 @@ mod tests {
 
     #[test]
     fn snippet_is_bounded_and_ellipsized() {
-        let long_body = format!("{} 关键词 {}", "前".repeat(3000), "后".repeat(3000));
+        let long_body = format!(include_str!("../../resources/message_samples/sms_text_bf5b35623a87.txt"), include_str!("../../resources/message_samples/sms_text_6044e9f095e0.txt").repeat(3000), include_str!("../../resources/message_samples/sms_text_60be66d61586.txt").repeat(3000));
         let mut index = Index::default();
         index.rebuild(vec![Document {
             id: 6,
@@ -621,7 +621,7 @@ mod tests {
             date: 0,
             read: true,
         }]);
-        let hits = index.search("关键词", 10);
+        let hits = index.search(include_str!("../../resources/message_samples/sms_text_1f7f0db90f93.txt"), 10);
         assert_eq!(hits.len(), 1);
         let units = utf16::utf16_len(&hits[0].snippet);
         assert!(units <= SNIPPET_UNITS + 2, "snippet units = {units}");
@@ -640,16 +640,16 @@ mod tests {
             id: 8,
             thread_id: 8,
             address: "x".into(),
-            body: "验证码 验证码".into(),
+            body: include_str!("../../resources/message_samples/sms_text_6f7661eba766.txt").into(),
             date: 0,
             read: true,
         }]);
-        let hits = index.search("验证码 验证", 10);
+        let hits = index.search(include_str!("../../resources/message_samples/sms_text_7b8ce0f5a89e.txt"), 10);
         assert_eq!(hits.len(), 1);
         let highlights = &hits[0].highlights;
         assert!(!highlights.is_empty());
         for pair in highlights.windows(2) {
-            assert!(pair[0].1 <= pair[1].0, "范围必须升序且不重叠");
+            assert!(pair[0].1 <= pair[1].0, include_str!("../../resources/message_samples/sms_text_c4d67ae2e7c1.txt"));
         }
     }
 
@@ -660,14 +660,14 @@ mod tests {
                 id: i,
                 thread_id: i,
                 address: "10086".into(),
-                body: "验证码 123456".into(),
+                body: include_str!("../../resources/message_samples/sms_text_870272fdf94f.txt").into(),
                 date: 0,
                 read: true,
             })
             .collect();
         let mut index = Index::default();
         assert_eq!(index.rebuild(docs), 150);
-        assert_eq!(index.search("验证码", 1000).len(), MAX_RESULTS);
+        assert_eq!(index.search(include_str!("../../resources/message_samples/sms_text_bb015c60bafc.txt"), 1000).len(), MAX_RESULTS);
     }
 
     #[test]
@@ -677,12 +677,12 @@ mod tests {
             id: 1,
             thread_id: 1,
             address: "x".into(),
-            body: format!("{}TAILMARK", "字".repeat(10_000)),
+            body: format!("{}TAILMARK", include_str!("../../resources/message_samples/sms_text_c55038b272b1.txt").repeat(10_000)),
             date: 0,
             read: true,
         }]);
         assert!(index.search("tailmark", 10).is_empty());
-        assert_eq!(index.search("字", 10).len(), 1);
+        assert_eq!(index.search(include_str!("../../resources/message_samples/sms_text_c55038b272b1.txt"), 10).len(), 1);
     }
 
     #[test]
@@ -690,7 +690,7 @@ mod tests {
         let mut index = Index::default();
         index.rebuild(sample());
         let handles: Vec<_> = (0..4)
-            .map(|_| std::thread::spawn(|| search_messages("验证码", 5).len()))
+            .map(|_| std::thread::spawn(|| search_messages(include_str!("../../resources/message_samples/sms_text_bb015c60bafc.txt"), 5).len()))
             .collect();
         for handle in handles {
             assert!(handle.join().is_ok());

@@ -13,7 +13,7 @@ class RespondViaMessageService : Service() {
         if (intent?.action == "android.intent.action.RESPOND_VIA_MESSAGE" && address != null && body != null) {
             MessageIo.executor.execute {
                 try { MessageStore(this).use { SmsTransport.send(this, it, address, body, SubscriptionManager.getDefaultSmsSubscriptionId()) } }
-                catch (_: Exception) { MessageNotifications.show(this, address, "快捷回复发送失败，请打开应用查看", address.hashCode()) }
+                catch (_: Exception) { MessageNotifications.show(this, address, "Quick reply failed. Open the app to check.", address.hashCode()) }
                 finally { stopSelf(startId) }
             }
         } else stopSelf(startId)

@@ -327,8 +327,8 @@ mod tests {
     #[test]
     fn analyzes_messages_with_utf16_ranges() {
         let results = analyze_messages(vec![
-            "🌿您的验证码是 246810，请勿泄露".into(),
-            "退订回T".into(),
+            include_str!("../../resources/message_samples/sms_text_f7f5b3822364.txt").into(),
+            include_str!("../../resources/message_samples/sms_text_ae5f66a6b0bb.txt").into(),
             String::new(),
         ]);
         assert_eq!(results.len(), 3);
@@ -354,7 +354,7 @@ mod tests {
         assert_eq!(single.remaining, 155);
         assert_eq!(single.max_chars, 160);
 
-        let long = segment_message("中".repeat(80));
+        let long = segment_message(include_str!("../../resources/message_samples/sms_text_a567bdaa1136.txt").repeat(80));
         assert_eq!(long.encoding, "UCS-2");
         assert_eq!(long.segments, 2);
         assert_eq!(long.max_chars, 67);
@@ -383,7 +383,7 @@ mod tests {
                 id: 1,
                 thread_id: 1,
                 address: "10086".into(),
-                body: "您的验证码为 123456".into(),
+                body: include_str!("../../resources/message_samples/sms_text_1a06ef81989c.txt").into(),
                 date: 1_700_000_000_000,
                 read: false,
             },
@@ -391,7 +391,7 @@ mod tests {
                 id: 2,
                 thread_id: 2,
                 address: "95588".into(),
-                body: "银行账单已出".into(),
+                body: include_str!("../../resources/message_samples/sms_text_417b3c17c9a6.txt").into(),
                 date: 1_600_000_000_000,
                 read: true,
             },
@@ -399,10 +399,10 @@ mod tests {
         assert_eq!(indexed, 2);
         assert_eq!(indexed_count(), 2);
 
-        let hits = search_messages("验证码".into(), 10);
+        let hits = search_messages(include_str!("../../resources/message_samples/sms_text_bb015c60bafc.txt").into(), 10);
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].id, 1);
-        assert!(hits[0].snippet.contains("验证码"));
+        assert!(hits[0].snippet.contains(include_str!("../../resources/message_samples/sms_text_bb015c60bafc.txt")));
         assert!(!hits[0].highlights.is_empty());
         let range = &hits[0].highlights[0];
         assert!(range.start < range.end);
@@ -422,15 +422,15 @@ mod tests {
             1,
             10,
             "10086".into(),
-            "第一条".into(),
+            include_str!("../../resources/message_samples/sms_text_039321239145.txt").into(),
             1_700_000_000_000,
             0
         ));
         assert!(trash_add(
             2,
             20,
-            "张三".into(),
-            "第二条".into(),
+            include_str!("../../resources/message_samples/sms_text_1d841bc0ee98.txt").into(),
+            include_str!("../../resources/message_samples/sms_text_09aa890b58c6.txt").into(),
             1_700_000_000_001,
             1
         ));
@@ -467,8 +467,8 @@ mod tests {
     fn mms_round_trip_through_facade() {
         let pdu = encode_mms_pdu(
             vec!["+8613800138000".into()],
-            "你好，彩信".into(),
-            "主题".into(),
+            include_str!("../../resources/message_samples/sms_text_d59fd1083663.txt").into(),
+            include_str!("../../resources/message_samples/sms_text_788db1cfec2a.txt").into(),
             vec![MmsAttachmentData {
                 mime: "image/jpeg".into(),
                 name: "photo.jpg".into(),
@@ -477,8 +477,8 @@ mod tests {
         );
         let decoded = decode_mms_pdu(pdu).expect("decode");
         assert_eq!(decoded.recipients, vec!["+8613800138000".to_string()]);
-        assert_eq!(decoded.subject, "主题");
-        assert_eq!(decoded.text, "你好，彩信");
+        assert_eq!(decoded.subject, include_str!("../../resources/message_samples/sms_text_788db1cfec2a.txt"));
+        assert_eq!(decoded.text, include_str!("../../resources/message_samples/sms_text_d59fd1083663.txt"));
         assert_eq!(decoded.message_type, 132);
         assert!(decoded.date_ms > 0);
         assert_eq!(decoded.attachments.len(), 1);
@@ -502,14 +502,14 @@ mod tests {
             identity.fingerprint
         );
 
-        let envelope = sync_encrypt(identity.public_key.clone(), "同步载荷 🌿".into()).expect("seal");
+        let envelope = sync_encrypt(identity.public_key.clone(), include_str!("../../resources/message_samples/sms_text_44277a0bf6e4.txt").into()).expect("seal");
         let opened = sync_decrypt(
             envelope.ephemeral_public_key,
             envelope.nonce,
             envelope.ciphertext,
         )
         .expect("open");
-        assert_eq!(opened, "同步载荷 🌿");
+        assert_eq!(opened, include_str!("../../resources/message_samples/sms_text_44277a0bf6e4.txt"));
 
         assert!(sync_encrypt("bad-key".into(), "x".into()).is_none());
         assert!(sync_decrypt("bad".into(), "bad".into(), "bad".into()).is_none());

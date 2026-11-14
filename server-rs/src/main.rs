@@ -14,7 +14,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use rand::Rng;
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -87,7 +87,7 @@ impl ApiError {
         Self(StatusCode::BAD_REQUEST, message.into())
     }
     fn unauthorized() -> Self {
-        Self(StatusCode::UNAUTHORIZED, "设备令牌无效".into())
+        Self(StatusCode::UNAUTHORIZED, "Invalid device token".into())
     }
     fn not_found(message: impl Into<String>) -> Self {
         Self(StatusCode::NOT_FOUND, message.into())
@@ -107,7 +107,7 @@ impl Store {
     fn load(path: &FsPath) -> Self {
         match std::fs::read(path) {
             Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_else(|error| {
-                eprintln!("数据文件损坏（{error}），已备份并重新开始");
+                eprintln!("Data file is corrupt ({error}); backed up and restarted");
                 let _ = std::fs::rename(path, path.with_extension("bak"));
                 Store::default()
             }),
@@ -123,7 +123,7 @@ impl Store {
                     let _ = std::fs::rename(&temp, path);
                 }
             }
-            Err(error) => eprintln!("无法序列化数据：{error}"),
+            Err(error) => eprintln!("Unable to serialize data: {error}"),
         }
     }
 
@@ -254,16 +254,16 @@ fn new_token() -> String {
 
 fn new_pairing_code() -> String {
     const ALPHABET: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     (0..8)
-        .map(|_| ALPHABET[rng.gen_range(0..ALPHABET.len())] as char)
+        .map(|_| ALPHABET[rng.random_range(0..ALPHABET.len())] as char)
         .collect()
 }
 
 fn clean_name(value: &str) -> String {
     let trimmed = value.trim();
     if trimmed.is_empty() {
-        "未命名设备".into()
+        "Unnamed device".into()
     } else {
         trimmed.chars().take(40).collect()
     }
@@ -271,7 +271,7 @@ fn clean_name(value: &str) -> String {
 
 fn validate_public_key(value: &str) -> Result<(), ApiError> {
     if value.len() < 32 || value.len() > 256 {
-        return Err(ApiError::bad("公钥格式无效"));
+        return Err(ApiError::bad("Invalid public key format"));
     }
     Ok(())
 }
@@ -283,17 +283,17 @@ fn validate_envelope(body: &EnvelopeRequest) -> Result<(), ApiError> {
         ("ciphertext", body.ciphertext.as_str()),
     ] {
         if value.is_empty() || value.len() > MAX_ENVELOPE_BYTES {
-            return Err(ApiError::bad(format!("{label} 为空或过长")));
+            return Err(ApiError::bad(format!("{label} is empty or too long")));
         }
         if !value
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'=')
         {
-            return Err(ApiError::bad(format!("{label} 不是合法的 base64url")));
+            return Err(ApiError::bad(format!("{label} is not valid base64url")));
         }
     }
     if body.ciphertext.len() < 24 {
-        return Err(ApiError::bad("密文过短"));
+        return Err(ApiError::bad("Ciphertext is too short"));
     }
     Ok(())
 }
@@ -440,13 +440,13 @@ async fn join_space(
         .pairings
         .get(&code)
         .cloned()
-        .ok_or_else(|| ApiError::not_found("配对码不存在或已过期"))?;
+        .ok_or_else(|| ApiError::not_found("Pairing code is missing or expired"))?;
     let space = store
         .spaces
         .get_mut(&pairing.space_id)
-        .ok_or_else(|| ApiError::not_found("设备空间不存在"))?;
+        .ok_or_else(|| ApiError::not_found("Device space does not exist"))?;
     if space.devices.len() >= MAX_DEVICES {
-        return Err(ApiError::conflict("设备数量已达上限"));
+        return Err(ApiError::conflict("Device limit reached"));
     }
     let device = Device {
         id: Uuid::new_v4().simple().to_string(),
@@ -487,7 +487,7 @@ async fn space_info(
     let space = store
         .spaces
         .get_mut(&auth.space_id)
-        .ok_or_else(|| ApiError::not_found("设备空间不存在"))?;
+        .ok_or_else(|| ApiError::not_found("Device space does not exist"))?;
     if let Some(device) = space.devices.iter_mut().find(|item| item.id == auth.device_id) {
         device.last_seen = timestamp;
     }
@@ -543,10 +543,10 @@ async fn push_envelope(
     let space = store
         .spaces
         .get_mut(&auth.space_id)
-        .ok_or_else(|| ApiError::not_found("设备空间不存在"))?;
+        .ok_or_else(|| ApiError::not_found("Device space does not exist"))?;
     if let Some(target) = body.to.as_deref() {
         if !space.devices.iter().any(|device| device.id == target) {
-            return Err(ApiError::bad("目标设备不在当前空间"));
+            return Err(ApiError::bad("Target device does not belong to this space"));
         }
     }
     let id = space.next_envelope;
@@ -578,7 +578,7 @@ fn poll_envelopes(
     let space = store
         .spaces
         .get_mut(&auth.space_id)
-        .ok_or_else(|| ApiError::not_found("设备空间不存在"))?;
+        .ok_or_else(|| ApiError::not_found("Device space does not exist"))?;
     if let Some(device) = space.devices.iter_mut().find(|item| item.id == auth.device_id) {
         device.last_seen = timestamp;
     }
@@ -643,13 +643,13 @@ async fn revoke_device(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let auth = authenticate(&state, &headers)?;
     if id == auth.device_id {
-        return Err(ApiError::bad("不能撤销当前设备"));
+        return Err(ApiError::bad("Cannot revoke the current device"));
     }
     let mut store = state.store.lock().unwrap();
     let space = store
         .spaces
         .get_mut(&auth.space_id)
-        .ok_or_else(|| ApiError::not_found("设备空间不存在"))?;
+        .ok_or_else(|| ApiError::not_found("Device space does not exist"))?;
     space.devices.retain(|device| device.id != id);
     store
         .tokens
@@ -677,8 +677,8 @@ fn parse_args() -> (SocketAddr, PathBuf) {
             }
             "--help" | "-h" => {
                 println!(
-                    "青鸟同步服务\n\n用法:\n  qingniao-sync [--bind 127.0.0.1:8787] [--data ./data.json]\n\n\
-                     服务器只保存端到端加密信封；请置于 TLS 反向代理之后。"
+                    "Qingniao sync service\n\nUsage:\n  qingniao-sync [--bind 127.0.0.1:8787] [--data ./data.json]\n\n\
+                     The server stores encrypted envelopes. Deploy behind a TLS reverse proxy."
                 );
                 std::process::exit(0);
             }
@@ -686,7 +686,7 @@ fn parse_args() -> (SocketAddr, PathBuf) {
         }
     }
     let address = bind.parse().unwrap_or_else(|_| {
-        eprintln!("监听地址无效：{bind}");
+        eprintln!("Invalid listening address: {bind}");
         std::process::exit(2);
     });
     (address, data)
@@ -707,20 +707,20 @@ async fn main() {
     let listener = match tokio::net::TcpListener::bind(address).await {
         Ok(listener) => listener,
         Err(error) => {
-            eprintln!("无法监听 {address}：{error}");
+            eprintln!("Unable to listen on {address}: {error}");
             std::process::exit(1);
         }
     };
-    println!("青鸟同步服务已启动：http://{address}");
-    println!("数据文件：{}", data_path.display());
-    println!("只保存密文信封；请使用 TLS 反向代理。");
+    println!("Qingniao sync service started: http://{address}");
+    println!("Data file: {}", data_path.display());
+    println!("Only encrypted envelopes are stored. Use a TLS reverse proxy.");
     if let Err(error) = axum::serve(listener, app)
         .with_graceful_shutdown(async {
             let _ = tokio::signal::ctrl_c().await;
         })
         .await
     {
-        eprintln!("服务异常退出：{error}");
+        eprintln!("Service terminated unexpectedly: {error}");
     }
 }
 
@@ -759,7 +759,7 @@ mod tests {
                 created_at: now(),
                 devices: vec![Device {
                     id: "dev".into(),
-                    name: "测试".into(),
+                    name: "Test device".into(),
                     public_key: "pk".into(),
                     created_at: now(),
                     last_seen: now(),
@@ -797,7 +797,7 @@ mod tests {
         };
         assert!(validate_envelope(&bad).is_err());
         bad.ephemeral_public_key = "AAAA".into();
-        bad.ciphertext = "密文".into();
+        bad.ciphertext = "\u{5bc6}\u{6587}".into();
         assert!(validate_envelope(&bad).is_err());
         bad.ciphertext = "C".repeat(MAX_ENVELOPE_BYTES + 1);
         assert!(validate_envelope(&bad).is_err());

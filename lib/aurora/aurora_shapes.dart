@@ -36,16 +36,28 @@ abstract final class AuroraShapes {
     return avatars[hash % avatars.length];
   }
 
-  static final Map<int, Morph> _morphs = {};
+  static final Map<(RoundedPolygon, RoundedPolygon), Morph> _morphs = {};
+
+  static void clearCache() => _morphs.clear();
 
   static Morph morph(RoundedPolygon from, RoundedPolygon to) {
-    final key = Object.hash(identityHashCode(from), identityHashCode(to));
-    return _morphs.putIfAbsent(key, () => Morph(from, to));
+    final key = (from, to);
+    final cached = _morphs.remove(key);
+    if (cached != null) {
+      _morphs[key] = cached;
+      return cached;
+    }
+    final result = Morph(from, to);
+    if (_morphs.length >= 64) _morphs.remove(_morphs.keys.first);
+    _morphs[key] = result;
+    return result;
   }
 
   static Path path(RoundedPolygon polygon, Size size) {
     final path = polygon.toPath();
-    return path.transform(Matrix4.diagonal3Values(size.width, size.height, 1).storage);
+    return path.transform(
+      Matrix4.diagonal3Values(size.width, size.height, 1).storage,
+    );
   }
 
   static Path rotatedPath(RoundedPolygon polygon, Size size, double rotate) {
@@ -98,7 +110,10 @@ class AuroraAvatar extends StatelessWidget {
         end: active,
         progress: unread ? 1 : 0,
         colors: [
-          Color.alphaBlend(colors.primary.withValues(alpha: bright ? .34 : .16), colors.surface),
+          Color.alphaBlend(
+            colors.primary.withValues(alpha: bright ? .34 : .16),
+            colors.surface,
+          ),
           Color.alphaBlend(
             colors.tertiary.withValues(alpha: bright ? .24 : .12),
             colors.surfaceContainerHigh,
@@ -127,13 +142,23 @@ class AuroraAvatar extends StatelessWidget {
     );
 
     if (onTap != null) {
-      avatar = GestureDetector(onTap: onTap, behavior: HitTestBehavior.opaque, child: avatar);
+      avatar = GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: avatar,
+      );
     }
     if (heroTag != null) {
       avatar = Hero(
         tag: heroTag!,
-        flightShuttleBuilder: (context, animation, direction, fromContext, toContext) =>
-            AuroraAvatarFlight(animation: animation, seed: seed, size: size, label: label),
+        flightShuttleBuilder:
+            (context, animation, direction, fromContext, toContext) =>
+                AuroraAvatarFlight(
+                  animation: animation,
+                  seed: seed,
+                  size: size,
+                  label: label,
+                ),
         child: avatar,
       );
     }
@@ -171,7 +196,8 @@ class AuroraAvatarFlight extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: animation,
-      builder: (context, _) => AuroraAvatar(seed: seed, size: size, label: label),
+      builder: (context, _) =>
+          AuroraAvatar(seed: seed, size: size, label: label),
     );
   }
 }
@@ -283,7 +309,10 @@ class AuroraShapeContainer extends StatelessWidget {
         child: SizedBox(
           width: w,
           height: h,
-          child: Padding(padding: padding, child: Center(child: child)),
+          child: Padding(
+            padding: padding,
+            child: Center(child: child),
+          ),
         ),
       ),
     );
@@ -313,9 +342,9 @@ class _ContainerPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final inset = glow != null ? 3.0 : 0.0;
     final drawSize = Size(size.width - inset * 2, size.height - inset * 2);
-    var path = shape
-        .toPath()
-        .transform(Matrix4.diagonal3Values(drawSize.width, drawSize.height, 1).storage);
+    var path = shape.toPath().transform(
+      Matrix4.diagonal3Values(drawSize.width, drawSize.height, 1).storage,
+    );
     if (rotate != 0) {
       final center = Offset(drawSize.width / 2, drawSize.height / 2);
       path = path.transform(
@@ -394,7 +423,11 @@ class _AuroraBloomState extends State<AuroraBloom> {
           final t = AuroraEngine.instance.reduceMotion || widget.static
               ? 0.0
               : _clock.value;
-          final path = AuroraShapes.rotatedPath(_shape, Size.square(widget.size), t * .12);
+          final path = AuroraShapes.rotatedPath(
+            _shape,
+            Size.square(widget.size),
+            t * .12,
+          );
           return CustomPaint(
             size: Size.square(widget.size),
             painter: _BloomPainter(
@@ -412,7 +445,13 @@ class _AuroraBloomState extends State<AuroraBloom> {
 }
 
 class _BloomPainter extends CustomPainter {
-  _BloomPainter({required this.path, required this.phase, required this.a, required this.b, required this.surface});
+  _BloomPainter({
+    required this.path,
+    required this.phase,
+    required this.a,
+    required this.b,
+    required this.surface,
+  });
 
   final Path path;
   final double phase;
@@ -425,7 +464,9 @@ class _BloomPainter extends CustomPainter {
     final rect = Offset.zero & size;
     for (var layer = 0; layer < 3; layer++) {
       final scale = 1 - layer * .17;
-      final path = this.path.transform(Matrix4.diagonal3Values(scale, scale, 1).storage);
+      final path = this.path.transform(
+        Matrix4.diagonal3Values(scale, scale, 1).storage,
+      );
       final center = size.width / 2;
       canvas.save();
       canvas.translate(center * (1 - scale), center * (1 - scale));
@@ -446,7 +487,11 @@ class _BloomPainter extends CustomPainter {
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = .8
-          ..color = Color.lerp(a, b, (math.sin(phase + layer) + 1) / 2)!.withValues(alpha: .26),
+          ..color = Color.lerp(
+            a,
+            b,
+            (math.sin(phase + layer) + 1) / 2,
+          )!.withValues(alpha: .26),
       );
       canvas.restore();
     }
@@ -457,7 +502,8 @@ class _BloomPainter extends CustomPainter {
       old.phase != phase || old.path != path || old.a != a || old.b != b;
 }
 
-final AuroraColors _fallback = AuroraColors(  auroraA: const Color(0xFF0E7C6B),
+final AuroraColors _fallback = AuroraColors(
+  auroraA: const Color(0xFF0E7C6B),
   auroraB: const Color(0xFF5B6CFF),
   auroraC: const Color(0xFF1677A8),
   glow: const Color(0x330E7C6B),

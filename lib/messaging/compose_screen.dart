@@ -1,3 +1,4 @@
+import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../app/app_settings.dart';
@@ -38,8 +39,11 @@ class _ComposeScreenState extends State<ComposeScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialRecipient != null && widget.initialRecipient!.isNotEmpty) {
-      _recipients.add(ContactChoice(number: widget.initialRecipient!, name: ''));
+    if (widget.initialRecipient != null &&
+        widget.initialRecipient!.isNotEmpty) {
+      _recipients.add(
+        ContactChoice(number: widget.initialRecipient!, name: ''),
+      );
     }
     _loadSims();
   }
@@ -79,7 +83,9 @@ class _ComposeScreenState extends State<ComposeScreen> {
   Future<void> _pickAttachment() async {
     try {
       final attachment = await widget.repository.pickAttachment();
-      if (attachment != null && mounted) setState(() => _attachment = attachment);
+      if (attachment != null && mounted) {
+        setState(() => _attachment = attachment);
+      }
     } catch (error) {
       if (mounted) setState(() => _error = messageError(error));
     }
@@ -98,7 +104,11 @@ class _ComposeScreenState extends State<ComposeScreen> {
               subtitle: sim.carrier,
               icon: Icons.sim_card_outlined,
               trailing: sim.id == _simId
-                  ? Icon(Icons.check_circle_rounded, color: context.colors.primary, size: 20)
+                  ? Icon(
+                      Icons.check_circle_rounded,
+                      color: context.colors.primary,
+                      size: 20,
+                    )
                   : null,
               onTap: () => Navigator.pop(context, sim.id),
             ),
@@ -111,11 +121,15 @@ class _ComposeScreenState extends State<ComposeScreen> {
   Future<void> _schedule() async {
     final body = _body.text.trim();
     if (body.isEmpty) {
-      showAuroraSnack(context, '先写下要定时发送的内容', icon: Icons.schedule_rounded);
+      showAuroraSnack(
+        context,
+        tr("Write a message before scheduling it"),
+        icon: Icons.schedule_rounded,
+      );
       return;
     }
     if (_recipients.isEmpty) {
-      showAuroraSnack(context, '先添加收件人');
+      showAuroraSnack(context, tr("Add a recipient first"));
       return;
     }
     final now = DateTime.now();
@@ -131,9 +145,15 @@ class _ComposeScreenState extends State<ComposeScreen> {
       initialTime: TimeOfDay.fromDateTime(now.add(const Duration(hours: 1))),
     );
     if (time == null || !mounted) return;
-    final at = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    final at = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
     if (at.isBefore(DateTime.now())) {
-      showAuroraSnack(context, '请选择一个未来的时间');
+      showAuroraSnack(context, tr("Choose a future time"));
       return;
     }
     try {
@@ -147,7 +167,9 @@ class _ComposeScreenState extends State<ComposeScreen> {
       if (mounted) {
         showAuroraSnack(
           context,
-          '将在 ${MessageFormat.dateTime(at.millisecondsSinceEpoch)} 发送',
+          tr("Scheduled for {p0}", [
+            MessageFormat.dateTime(at.millisecondsSinceEpoch),
+          ]),
         );
       }
     } catch (error) {
@@ -159,7 +181,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
     if (_sending) return;
     final body = _body.text.trim();
     if (_recipients.isEmpty) {
-      setState(() => _error = '请添加至少一位收件人');
+      setState(() => _error = tr("Add at least one recipient"));
       return;
     }
     if (body.isEmpty && _attachment == null) return;
@@ -169,10 +191,14 @@ class _ComposeScreenState extends State<ComposeScreen> {
     });
     try {
       final signature = AppScope.of(context).signature.trim();
-      final full = signature.isEmpty || body.isEmpty ? body : '$body\n\n$signature';
+      final full = signature.isEmpty || body.isEmpty
+          ? body
+          : '$body\n\n$signature';
       if (_attachment != null || _recipients.length > 1) {
         await widget.repository.sendMms(
-          recipients: _recipients.map((item) => item.number).toList(growable: false),
+          recipients: _recipients
+              .map((item) => item.number)
+              .toList(growable: false),
           body: full,
           subscriptionId: _simId,
           attachment: _attachment?.uri,
@@ -210,26 +236,29 @@ class _ComposeScreenState extends State<ComposeScreen> {
         child: Column(
           children: [
             AuroraTopBar(
-              title: '新短信',
+              title: tr("New message"),
               subtitle: _recipients.isEmpty
-                  ? '输入号码或从联系人中选择'
-                  : '${_recipients.length} 位收件人',
+                  ? tr("Enter a number or choose a contact")
+                  : tr("Recipients: {p0}", [_recipients.length]),
               actions: [
                 AuroraIconButton(
                   icon: Icons.schedule_rounded,
-                  tooltip: '定时发送',
+                  tooltip: tr('Schedule message'),
                   onPressed: _sending ? null : _schedule,
                 ),
                 AuroraIconButton(
                   icon: Icons.send_rounded,
-                  tooltip: '发送',
+                  tooltip: tr("Send"),
                   filled: true,
                   onPressed: _sending ? null : _send,
                 ),
               ],
             ),
             if (_error != null)
-              AuroraErrorBanner(message: _error!, onRetry: () => setState(() => _error = null)),
+              AuroraErrorBanner(
+                message: _error!,
+                onRetry: () => setState(() => _error = null),
+              ),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
@@ -242,13 +271,20 @@ class _ComposeScreenState extends State<ComposeScreen> {
                     children: [
                       for (final recipient in _recipients)
                         InputChip(
-                          avatar: const Icon(Icons.person_outline_rounded, size: 16),
+                          avatar: const Icon(
+                            Icons.person_outline_rounded,
+                            size: 16,
+                          ),
                           label: Text(
-                            recipient.name.isEmpty ? recipient.number : recipient.name,
+                            recipient.name.isEmpty
+                                ? recipient.number
+                                : recipient.name,
                           ),
                           onDeleted: _sending
                               ? null
-                              : () => setState(() => _recipients.remove(recipient)),
+                              : () => setState(
+                                  () => _recipients.remove(recipient),
+                                ),
                           deleteIcon: const Icon(Icons.close_rounded, size: 15),
                           shape: RoundedSuperellipseBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -262,10 +298,13 @@ class _ComposeScreenState extends State<ComposeScreen> {
                           keyboardType: TextInputType.phone,
                           textInputAction: TextInputAction.done,
                           onSubmitted: _addRecipient,
-                          decoration: const InputDecoration(
-                            hintText: '号码',
+                          decoration: InputDecoration(
+                            hintText: tr("Number"),
                             isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
                           ),
                         ),
                       ),
@@ -278,24 +317,38 @@ class _ComposeScreenState extends State<ComposeScreen> {
                     children: [
                       TextButton.icon(
                         onPressed: _sending ? null : _pickContact,
-                        icon: const Icon(Icons.person_add_alt_outlined, size: 18),
-                        label: const Text('从联系人选择'),
+                        icon: const Icon(
+                          Icons.person_add_alt_outlined,
+                          size: 18,
+                        ),
+                        label: Text(tr("Choose a contact")),
                       ),
                       TextButton.icon(
                         onPressed: _sending ? null : _pickAttachment,
                         icon: const Icon(Icons.attach_file_rounded, size: 18),
-                        label: Text(_attachment == null ? '添加附件' : '更换附件'),
+                        label: Text(
+                          _attachment == null
+                              ? tr("Add attachment")
+                              : tr("Change attachment"),
+                        ),
                       ),
                     ],
                   ),
                   if (_attachment != null)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsetsDirectional.only(bottom: 10),
                       child: AuroraGlass(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         child: Row(
                           children: [
-                            Icon(Icons.image_outlined, size: 16, color: scheme.primary),
+                            Icon(
+                              Icons.image_outlined,
+                              size: 16,
+                              color: scheme.primary,
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -306,7 +359,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
                               ),
                             ),
                             IconButton(
-                              onPressed: () => setState(() => _attachment = null),
+                              onPressed: () =>
+                                  setState(() => _attachment = null),
                               icon: const Icon(Icons.close_rounded, size: 16),
                             ),
                           ],
@@ -325,8 +379,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
                         maxLines: 18,
                         maxLength: 20000,
                         style: context.texts.bodyLarge?.copyWith(height: 1.55),
-                        decoration: const InputDecoration(
-                          hintText: '写下消息…',
+                        decoration: InputDecoration(
+                          hintText: tr("Write a message\u2026"),
                           filled: false,
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
@@ -346,7 +400,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                           label: Text(
                             _sims.length == 1
                                 ? 'SIM ${_sims.first.slot} · ${_sims.first.name}'
-                                : '选择 SIM',
+                                : tr("Choose SIM"),
                           ),
                           onPressed: _sending ? null : _pickSim,
                         ),

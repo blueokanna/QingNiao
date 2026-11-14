@@ -78,14 +78,22 @@ REM which means  we need to do pub get and precompile
 if not exist "%PRECOMPILED%" (
     echo Running pub get in "%cd%"
     "%DART%" pub get --no-precompile
+    if errorlevel 1 exit /b !ERRORLEVEL!
     "%DART%" compile kernel bin/build_tool_runner.dart
+    if errorlevel 1 exit /b !ERRORLEVEL!
 )
 
 "%DART%" "%PRECOMPILED%" %*
+set "CARGOKIT_RUN_EXIT_CODE=%ERRORLEVEL%"
 
 REM 253 means invalid snapshot version.
-If %ERRORLEVEL% equ 253 (
+If %CARGOKIT_RUN_EXIT_CODE% equ 253 (
     "%DART%" pub get --no-precompile
+    if errorlevel 1 exit /b !ERRORLEVEL!
     "%DART%" compile kernel bin/build_tool_runner.dart
+    if errorlevel 1 exit /b !ERRORLEVEL!
     "%DART%" "%PRECOMPILED%" %*
+    set "CARGOKIT_RUN_EXIT_CODE=!ERRORLEVEL!"
 )
+
+exit /b %CARGOKIT_RUN_EXIT_CODE%

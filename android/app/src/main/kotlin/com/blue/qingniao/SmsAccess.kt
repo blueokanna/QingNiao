@@ -7,14 +7,7 @@ import android.provider.Settings
 import android.provider.Telephony
 import android.util.Log
 
-/**
- * 默认短信应用的判定。
- *
- * 部分 OEM（ColorOS / HyperOS 等）通过 RoleManager 授予短信角色后并不会同步写入
- * Settings.Secure 的 s ms_default_application，而旧接口 getDefaultSmsPackage 在个别
- * 版本上会返回 null，导致应用明明已经是默认短信应用却仍被判定为未授权。
- * 这里以 RoleManager 为准，再回退到两套旧接口。
- */
+
 object SmsAccess {
     private const val TAG = "QingniaoAccess"
     private const val LEGACY_SETTING = "sms_default_application"

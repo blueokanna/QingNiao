@@ -1,3 +1,4 @@
+import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/services.dart';
 
 import '../src/rust/api/engine.dart';
@@ -8,20 +9,29 @@ typedef MessageRecord = Map<String, dynamic>;
 class MessageRepository {
   const MessageRepository();
 
-  static const MethodChannel _channel = MethodChannel('com.blue.qingniao/messages');
+  static const MethodChannel _channel = MethodChannel(
+    'com.blue.qingniao/messages',
+  );
   static const EventChannel _events = EventChannel('com.blue.qingniao/changes');
 
-  Stream<String> get changes => _events.receiveBroadcastStream().cast<String>();
+  static final Stream<String> _changes = _events
+      .receiveBroadcastStream()
+      .cast<String>();
+  Stream<String> get changes => _changes;
 
   Future<T?> invoke<T>(String method, [MessageRecord? arguments]) =>
       _channel.invokeMethod<T>(method, arguments);
 
-  Future<List<MessageRecord>> records(String method, [MessageRecord? arguments]) =>
-      _list(method, arguments);
+  Future<List<MessageRecord>> records(
+    String method, [
+    MessageRecord? arguments,
+  ]) => _list(method, arguments);
 
   Future<bool> hasAccess() async {
     final state = await _map('access');
-    return state['defaultApp'] == true && state['readSms'] == true && state['sendSms'] == true;
+    return state['defaultApp'] == true &&
+        state['readSms'] == true &&
+        state['sendSms'] == true;
   }
 
   Future<Map<String, dynamic>> _map(
@@ -68,7 +78,8 @@ class MessageRepository {
   Future<bool> openAutoStartSettings() async =>
       await _invoke<bool>('autoStartSettings') ?? false;
 
-  Future<void> openUrl(String url) => _channel.invokeMethod<void>('openUrl', {'url': url});
+  Future<void> openUrl(String url) =>
+      _channel.invokeMethod<void>('openUrl', {'url': url});
 
   static bool _engineReady = false;
 
@@ -94,7 +105,10 @@ class MessageRepository {
     }
   }
 
-  Future<List<SearchHit>> searchMessagesRust(String query, {int limit = 40}) async {
+  Future<List<SearchHit>> searchMessagesRust(
+    String query, {
+    int limit = 40,
+  }) async {
     try {
       if (!await initEngine()) return const [];
       return await searchMessages(query: query, limit: limit);
@@ -103,7 +117,6 @@ class MessageRepository {
     }
   }
 
-  /// 全量重建 Rust 搜索索引。语料来自系统短信库（短信正文 + 彩信主题）。
   Future<int> indexSearchCorpus() async {
     if (!await initEngine()) return 0;
     final rows = await _list('searchCorpus');
@@ -136,11 +149,13 @@ class MessageRepository {
   Future<List<SmsMessage>> messages({
     required int threadId,
     int? before,
+    int? beforeDate,
     int limit = 80,
   }) async {
     final rows = await _list('messages', {
       'threadId': threadId,
       if (before != null) 'before': before,
+      if (beforeDate != null) 'beforeDate': beforeDate,
       'limit': limit,
     });
     return rows.map(SmsMessage.fromMap).toList(growable: false);
@@ -170,6 +185,17 @@ class MessageRepository {
 
   Future<void> markRead(int threadId) =>
       _channel.invokeMethod<void>('markRead', {'threadId': threadId});
+
+  Future<void> markAllRead() => _channel.invokeMethod<void>('markAllRead');
+  Future<void> markThreadsRead(List<int> ids) =>
+      _channel.invokeMethod<void>('markThreadsRead', {'threadIds': ids});
+  Future<void> trashThreads(List<int> ids) =>
+      _channel.invokeMethod<void>('trashThreads', {'threadIds': ids});
+  Future<String> copyThreads(List<int> ids) async =>
+      await _channel.invokeMethod<String>('copyThreads', {'threadIds': ids}) ??
+      '';
+  Future<void> hideMessages(List<int> ids) =>
+      _channel.invokeMethod<void>('hideMessages', {'ids': ids});
 
   Future<void> hide(int id) => _channel.invokeMethod<void>('hide', {'id': id});
 
@@ -213,13 +239,16 @@ class MessageRepository {
   }
 
   Future<AttachmentChoice?> pickAttachment() async {
-    final map = await _channel.invokeMapMethod<String, dynamic>('pickAttachment');
+    final map = await _channel.invokeMapMethod<String, dynamic>(
+      'pickAttachment',
+    );
     if (map == null) return null;
     final uri = '${map['uri'] ?? ''}';
     if (uri.isEmpty) return null;
     final mime = '${map['mime'] ?? map['type'] ?? 'application/octet-stream'}';
     final segments = Uri.tryParse(uri)?.pathSegments;
-    final name = '${map['name'] ?? (segments != null && segments.isNotEmpty ? segments.last : '附件')}';
+    final name =
+        '${map['name'] ?? (segments != null && segments.isNotEmpty ? segments.last : tr('Attachment'))}';
     return AttachmentChoice(uri: uri, mime: mime, name: name);
   }
 
@@ -393,37 +422,8 @@ Future<List<MessageAnalysis>> analyzeMessagesRust({
 }) => analyzeMessages(bodies: bodies);
 
 String messageError(Object error) => switch (error) {
-  PlatformException(:final message) => message ?? '系统消息服务不可用',
-  MissingPluginException() => '短信功能需要在 Android 手机上运行',
-  _ => '操作未完成，请重试',
+  PlatformException(:final message) =>
+    message ?? tr("System messaging service unavailable"),
+  MissingPluginException() => tr("SMS requires an Android phone"),
+  _ => tr("Could not complete the action. Try again."),
 };
-
-ThreadSummary demoThread({
-  required int id,
-  required String address,
-  required String name,
-  required String body,
-  required int date,
-  int unread = 0,
-  bool pinned = false,
-  bool archived = false,
-  MessageCategory category = MessageCategory.personal,
-  String? otp,
-  int subscriptionId = 1,
-  bool hasMms = false,
-}) => ThreadSummary(
-  threadId: id,
-  address: address,
-  displayName: name,
-  preview: body,
-  date: date,
-  unread: unread,
-  subscriptionId: subscriptionId,
-  pinned: pinned,
-  archived: archived,
-  category: category,
-  otp: otp,
-  count: 1 + unread,
-  hasMms: hasMms,
-  latestBody: body,
-);

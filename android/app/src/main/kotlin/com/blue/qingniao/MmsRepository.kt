@@ -18,7 +18,7 @@ class MmsRepository(private val context: Context) {
                         while (parts.moveToNext()) {
                             val type = parts.getString(1) ?: "application/octet-stream"
                             if (type == "text/plain") { if (text.isNotEmpty()) text.append('\n'); text.append(parts.getString(2) ?: "") }
-                            else if (type != "application/smil") attachments.add(mapOf("id" to parts.getString(0), "type" to type, "name" to (parts.getString(3) ?: "附件")))
+                            else if (type != "application/smil") attachments.add(mapOf("id" to parts.getString(0), "type" to type, "name" to (parts.getString(3) ?: "Attachment")))
                         }
                     }
                     add(mapOf("id" to id, "date" to cursor.getLong(1) * 1000, "type" to cursor.getInt(2), "subject" to (cursor.getString(3) ?: ""), "pending" to (cursor.getInt(4) == 130), "address" to recipients.joinToString(", "), "body" to text.toString(), "attachments" to attachments))
@@ -29,14 +29,14 @@ class MmsRepository(private val context: Context) {
     fun image(part: Long): ByteArray {
         val uri = Uri.parse("content://mms/part/$part")
         val type = context.contentResolver.query(uri, arrayOf("ct"), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null }
-        require(type in setOf("image/jpeg", "image/png", "image/webp", "image/gif")) { "暂不支持预览此附件类型" }
+        require(type in setOf("image/jpeg", "image/png", "image/webp", "image/gif")) { "Preview is unavailable for this attachment type" }
         return requireNotNull(context.contentResolver.openInputStream(uri)).use { input ->
             val output = java.io.ByteArrayOutputStream()
             val buffer = ByteArray(16384)
             while (true) {
                 val count = input.read(buffer)
                 if (count < 0) break
-                require(output.size() + count <= 5 * 1024 * 1024) { "图片超过预览限制" }
+                require(output.size() + count <= 5 * 1024 * 1024) { "Image exceeds the preview limit" }
                 output.write(buffer, 0, count)
             }
             output.toByteArray()

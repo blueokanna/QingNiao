@@ -22,7 +22,9 @@ Future<void> main() async {
   );
   if (!conditional.hasMatch(source) &&
       !source.contains("import 'frb_generated.io.dart';")) {
-    throw StateError('Unexpected bridge entrypoint; review the generator output.');
+    throw StateError(
+      'Unexpected bridge entrypoint; review the generator output.',
+    );
   }
   await entrypoint.writeAsString(
     source.replaceAll(conditional, "import 'frb_generated.io.dart';"),

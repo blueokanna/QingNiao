@@ -33,10 +33,10 @@ object MmsTransport {
         val prefs = context.getSharedPreferences("mms_pending", Context.MODE_PRIVATE)
         check(prefs.edit().putString("$token.location", location).putString("$token.notification", saved.toString()).putInt("$token.subscription", subscription).commit())
         val savedId = ContentUris.parseId(saved)
-        val address = mmsAddress(context, savedId) ?: "彩信"
+        val address = mmsAddress(context, savedId) ?: "MMS"
         val progressId = address.hashCode()
         prefs.edit().putInt("$token.progress", progressId).commit()
-        Notifications.showProgress(context, address, "正在接收彩信…", subscription, progressId)
+        Notifications.showProgress(context, address, LocalizedResources.text(context, R.string.notification_loading), subscription, progressId)
         download(context, token)
     }
     fun download(context: Context, token: String) {
@@ -58,7 +58,7 @@ object MmsTransport {
             context.contentResolver.update(Uri.parse(message), ContentValues().apply { put("msg_box", if (success) 2 else 5) }, null, null)
             prefs.edit().remove("$token.message").commit()
             file(context, token).delete()
-            if (!success) MessageNotifications.show(context, "", "彩信发送失败", token.hashCode())
+            if (!success) MessageNotifications.show(context, "", "MMS sending failed", token.hashCode())
             return
         }
         if (!prefs.contains("$token.location")) return
@@ -66,7 +66,7 @@ object MmsTransport {
         if (!success) {
             Notifications.cancel(context, prefs.getInt("$token.progress", token.hashCode()))
             prefs.edit().remove("$token.progress").commit()
-            MessageNotifications.show(context, "", "彩信下载失败，请在彩信页面重试", token.hashCode())
+            MessageNotifications.show(context, "", "MMS download failed. Retry from MMS messages.", token.hashCode())
             return
         }
         val source = file(context, token)
@@ -79,7 +79,7 @@ object MmsTransport {
         prefs.getString("$token.notification", null)?.let { context.contentResolver.delete(Uri.parse(it), null, null) }
         prefs.edit().remove("$token.location").remove("$token.notification").remove("$token.subscription").commit()
         source.delete()
-        // 用与短信一致的富通知：发件人、会话、直接回复与流体云。
+
         val savedId = ContentUris.parseId(saved)
         val row = context.contentResolver.query(
             Telephony.Mms.CONTENT_URI,
@@ -94,16 +94,16 @@ object MmsTransport {
                 null
             }
         }
-        val address = mmsAddress(context, savedId) ?: "彩信"
+        val address = mmsAddress(context, savedId) ?: "MMS"
         val threadId = row?.first ?: -1L
         val subscriptionId = row?.second?.takeIf { it >= 0 } ?: subscription
         val subject = row?.third.orEmpty()
         val text = mmsText(context, savedId)
         val preview = when {
-            text.isNotEmpty() && subject.isNotEmpty() -> "彩信 · $subject\n$text"
-            text.isNotEmpty() -> "彩信 · $text"
-            subject.isNotEmpty() -> "彩信 · $subject"
-            else -> "收到新彩信"
+            text.isNotEmpty() && subject.isNotEmpty() -> "MMS · $subject\n$text"
+            text.isNotEmpty() -> "MMS · $text"
+            subject.isNotEmpty() -> "MMS · $subject"
+            else -> LocalizedResources.text(context, R.string.notification_new_mms)
         }
         Notifications.cancel(context, prefs.getInt("$token.progress", address.hashCode()))
         prefs.edit().remove("$token.progress").commit()
@@ -173,7 +173,7 @@ object MmsTransport {
                 while (true) {
                     val count = input.read(buffer)
                     if (count < 0) break
-                    require(output.size() + count <= limit) { "附件超过运营商彩信大小限制" }
+                    require(output.size() + count <= limit) { "Attachment exceeds the carrier MMS size limit" }
                     output.write(buffer, 0, count)
                 }
                 output.toByteArray()
@@ -192,7 +192,7 @@ object MmsTransport {
             body = content
         }
         val bytes = checkNotNull(PduComposer(context, request).make())
-        require(bytes.size <= limit) { "彩信超过运营商大小限制" }
+        require(bytes.size <= limit) { "MMS exceeds the carrier size limit" }
         val token = UUID.randomUUID().toString()
         file(context, token).writeBytes(bytes)
         val saved = checkNotNull(PduPersister.getPduPersister(context).persist(request, Telephony.Mms.Outbox.CONTENT_URI, true, true, null, subscription))
@@ -210,7 +210,7 @@ class IncomingMmsReceiver : BroadcastReceiver() {
         val pending = goAsync()
         MessageIo.receiverExecutor.execute {
             try { MmsTransport.receive(context, data, subscription) }
-            catch (_: Exception) { MessageNotifications.show(context, "", "彩信接收未完成，请打开应用检查", 9021) }
+            catch (_: Exception) { MessageNotifications.show(context, "", "MMS reception is incomplete. Open the app to check.", 9021) }
             finally { pending.finish() }
         }
     }
@@ -224,7 +224,7 @@ class MmsResultReceiver : BroadcastReceiver() {
         val pending = goAsync()
         MessageIo.receiverExecutor.execute {
             try { MmsTransport.complete(context, token, phase, success) }
-            catch (_: Exception) { MessageNotifications.show(context, "", "彩信处理失败，请在彩信页面重试", 9022) }
+            catch (_: Exception) { MessageNotifications.show(context, "", "MMS processing failed. Retry from MMS messages.", 9022) }
             finally { pending.finish() }
         }
     }

@@ -15,8 +15,12 @@ class ScheduledSendReceiver : BroadcastReceiver() {
             try {
                 AuroraStore(context).use { store ->
                     val row = store.scheduled(id) ?: return@use
+                    if (row.at > System.currentTimeMillis()) {
+                        ScheduledMessageAlarms.arm(context, row.id, row.at)
+                        return@use
+                    }
                     if (!SmsAccess.isDefaultSmsApp(context)) {
-                        MessageNotifications.show(context, row.address, "定时短信未发送：青鸟不是默认短信应用", 8100 + id.toInt())
+                        MessageNotifications.show(context, row.address, "Scheduled message not sent: this app is not the default SMS app", 8100 + id.toInt())
                         return@use
                     }
                     try {
@@ -26,7 +30,7 @@ class ScheduledSendReceiver : BroadcastReceiver() {
                         }
                         store.cancelScheduled(id)
                     } catch (_: Exception) {
-                        MessageNotifications.show(context, row.address, "定时短信发送失败，可在会话中重发", 8100 + id.toInt())
+                        MessageNotifications.show(context, row.address, "Scheduled message failed. Retry in the conversation.", 8100 + id.toInt())
                     }
                 }
             } catch (_: Exception) {

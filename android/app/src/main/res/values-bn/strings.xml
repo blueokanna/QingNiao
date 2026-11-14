@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Qingniao</string>
+    <string name="push_title">সিঙ্ক করার জন্য বার্তা আছে</string>
+    <string name="push_body">নিরাপদে সিঙ্ক করতে Qingniao খুলুন।</string>
+    <string name="notification_reply">উত্তর দিন</string>
+    <string name="notification_messages">বার্তা</string>
+    <string name="notification_new_message">নতুন বার্তা</string>
+    <string name="notification_mark_read">পঠিত হিসেবে চিহ্নিত করুন</string>
+    <string name="notification_copy_code">কপি করুন</string>
+    <string name="notification_code_copied">কপি হয়েছে</string>
+    <string name="notification_loading">লোড হচ্ছে…</string>
+    <string name="notification_new_mms">নতুন MMS</string>
+    <string name="notification_failed">পাঠানো যায়নি</string>
+    <string name="notification_retry">কাজটি শেষ হয়নি। আবার চেষ্টা করুন।</string>
+    <string name="notification_test_title">বিজ্ঞপ্তি পরীক্ষা</string>
+    <string name="notification_test_body">পরীক্ষার কোড: 864213। কোনো SMS পাঠানো হয়নি।</string>
+</resources>

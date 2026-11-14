@@ -24,11 +24,11 @@ pub struct Analysis {
 }
 
 const VERIFICATION_KEYWORDS: &[&str] = &[
-    "验证码",
-    "校验码",
-    "动态码",
-    "口令",
-    "激活码",
+    include_str!("../../resources/message_samples/sms_text_bb015c60bafc.txt"),
+    include_str!("../../resources/message_samples/sms_text_b25b7420115a.txt"),
+    include_str!("../../resources/message_samples/sms_text_e465dbcbda1b.txt"),
+    include_str!("../../resources/message_samples/sms_text_f265a7b34089.txt"),
+    include_str!("../../resources/message_samples/sms_text_2854598f453b.txt"),
     "verification code",
     "security code",
     "one-time code",
@@ -39,46 +39,46 @@ const VERIFICATION_KEYWORDS: &[&str] = &[
 ];
 
 const FINANCE_KEYWORDS: &[&str] = &[
-    "贷款",
-    "账单",
-    "银行",
-    "还款",
-    "余额",
-    "转账",
-    "信用卡",
-    "支付",
-    "利息",
-    "额度",
-    "尾号",
+    include_str!("../../resources/message_samples/sms_text_f87e87c10ad8.txt"),
+    include_str!("../../resources/message_samples/sms_text_4bf3c13e5809.txt"),
+    include_str!("../../resources/message_samples/sms_text_920e88c5a602.txt"),
+    include_str!("../../resources/message_samples/sms_text_d6581a636919.txt"),
+    include_str!("../../resources/message_samples/sms_text_dc569f3d8dfd.txt"),
+    include_str!("../../resources/message_samples/sms_text_4c3be7e0b72e.txt"),
+    include_str!("../../resources/message_samples/sms_text_bf4fe76a2668.txt"),
+    include_str!("../../resources/message_samples/sms_text_5d3ba34cc66c.txt"),
+    include_str!("../../resources/message_samples/sms_text_3dd1b22caa55.txt"),
+    include_str!("../../resources/message_samples/sms_text_32ce9f06589c.txt"),
+    include_str!("../../resources/message_samples/sms_text_1e35fe2417c8.txt"),
 ];
 
 const PROMOTION_KEYWORDS: &[&str] = &[
-    "优惠",
-    "促销",
-    "退订",
-    "折扣",
-    "红包",
-    "满减",
-    "限时",
-    "特价",
-    "领取",
-    "活动",
+    include_str!("../../resources/message_samples/sms_text_58aa6825b704.txt"),
+    include_str!("../../resources/message_samples/sms_text_e008fed0fa3a.txt"),
+    include_str!("../../resources/message_samples/sms_text_660aa1f65abc.txt"),
+    include_str!("../../resources/message_samples/sms_text_ec11d9abcf5a.txt"),
+    include_str!("../../resources/message_samples/sms_text_710d79db0126.txt"),
+    include_str!("../../resources/message_samples/sms_text_c30cd6893f88.txt"),
+    include_str!("../../resources/message_samples/sms_text_e1f7a0a1daa2.txt"),
+    include_str!("../../resources/message_samples/sms_text_6b4a16122715.txt"),
+    include_str!("../../resources/message_samples/sms_text_844ab9477225.txt"),
+    include_str!("../../resources/message_samples/sms_text_9e9bead81498.txt"),
     "unsubscribe",
     "promo",
 ];
 
 const ORDER_KEYWORDS: &[&str] = &[
-    "订单编号",
-    "订单号",
-    "订单",
-    "单号",
-    "流水号",
-    "交易号",
+    include_str!("../../resources/message_samples/sms_text_fbcefbb4c11a.txt"),
+    include_str!("../../resources/message_samples/sms_text_977f0f7e3be0.txt"),
+    include_str!("../../resources/message_samples/sms_text_3d5436ea23d2.txt"),
+    include_str!("../../resources/message_samples/sms_text_5c2eb0883fd7.txt"),
+    include_str!("../../resources/message_samples/sms_text_612e15418603.txt"),
+    include_str!("../../resources/message_samples/sms_text_79bc295346e9.txt"),
     "order no",
     "invoice",
 ];
 
-const LOGISTICS_KEYWORDS: &[&str] = &["快递", "取件", "驿站", "派送", "物流"];
+const LOGISTICS_KEYWORDS: &[&str] = &[include_str!("../../resources/message_samples/sms_text_8ca229382be4.txt"), include_str!("../../resources/message_samples/sms_text_7c5cbcd62028.txt"), include_str!("../../resources/message_samples/sms_text_6214411ed9ba.txt"), include_str!("../../resources/message_samples/sms_text_168780b420d3.txt"), include_str!("../../resources/message_samples/sms_text_40416ed59137.txt")];
 
 #[derive(Clone, Copy, Debug)]
 struct Span {
@@ -253,7 +253,7 @@ fn is_bounded(chars: &[char], start: usize, end: usize) -> bool {
 }
 
 fn is_date_marker(ch: char) -> bool {
-    matches!(ch, '年' | '月' | '日')
+    matches!(ch, '\u{5e74}' | '\u{6708}' | '\u{65e5}')
 }
 
 fn is_date_like(chars: &[char], start: usize, end: usize) -> bool {
@@ -289,7 +289,7 @@ fn digits_value(digits: &[char]) -> u32 {
 
 fn is_amount_like(chars: &[char], start: usize, end: usize) -> bool {
     const CURRENCY: &[char] = &['¥', '￥', '$', '€', '£', '＄'];
-    const UNIT: &[char] = &['元', '块', '圆', '折', '%', '％'];
+    const UNIT: &[char] = &['\u{5143}', '\u{5757}', '\u{5706}', '\u{6298}', '%', '％'];
     if start > 0 && CURRENCY.contains(&chars[start - 1]) {
         return true;
     }
@@ -472,19 +472,19 @@ mod tests {
 
     #[test]
     fn extracts_chinese_verification_code() {
-        let body = "【示例】您的验证码为 123456，5分钟内有效。";
+        let body = include_str!("../../resources/message_samples/sms_text_4d9bf1d820d1.txt");
         let result = analyze(body);
         assert_eq!(result.category, "verification");
         assert_eq!(result.otp.as_deref(), Some("123456"));
         assert!(result.is_otp);
-        let expected_start = utf16::utf16_len("【示例】您的验证码为 ") as u32;
+        let expected_start = utf16::utf16_len(include_str!("../../resources/message_samples/sms_text_524f8e588d32.txt")) as u32;
         assert_eq!(result.otp_start, expected_start);
         assert_eq!(result.otp_end, expected_start + 6);
     }
 
     #[test]
     fn otp_offsets_are_utf16_units() {
-        let result = analyze("🌿验证码：654321");
+        let result = analyze(include_str!("../../resources/message_samples/sms_text_e2d57d3e3db4.txt"));
         assert_eq!(result.otp.as_deref(), Some("654321"));
         assert_eq!(result.otp_start, 6);
         assert_eq!(result.otp_end, 12);
@@ -505,31 +505,31 @@ mod tests {
 
     #[test]
     fn ambiguous_candidates_are_rejected() {
-        assert!(analyze("验证码 123456，备用验证码 654321").otp.is_none());
-        let result = analyze("验证码 123456，订单号 765432");
+        assert!(analyze(include_str!("../../resources/message_samples/sms_text_c9c4594fa424.txt")).otp.is_none());
+        let result = analyze(include_str!("../../resources/message_samples/sms_text_494c8c88fee9.txt"));
         assert_eq!(result.otp.as_deref(), Some("123456"));
-        assert!(analyze("订单 123456").otp.is_none());
+        assert!(analyze(include_str!("../../resources/message_samples/sms_text_e65afd82b5b2.txt")).otp.is_none());
     }
 
     #[test]
     fn rejects_dates_amounts_phones_and_orders() {
-        assert!(analyze("验证码 20240501").otp.is_none());
-        assert!(analyze("验证码 2024").otp.is_none());
+        assert!(analyze(include_str!("../../resources/message_samples/sms_text_7128ba395c92.txt")).otp.is_none());
+        assert!(analyze(include_str!("../../resources/message_samples/sms_text_953bdb37e1ab.txt")).otp.is_none());
         assert_eq!(
-            analyze("2024年5月1日 验证码 123456").otp.as_deref(),
+            analyze(include_str!("../../resources/message_samples/sms_text_b67d763caa7f.txt")).otp.as_deref(),
             Some("123456")
         );
-        assert!(analyze("验证码 1000元").otp.is_none());
-        assert!(analyze("验证码 ¥1000").otp.is_none());
-        assert!(analyze("验证码 13800138000").otp.is_none());
+        assert!(analyze(include_str!("../../resources/message_samples/sms_text_b2a5664709f0.txt")).otp.is_none());
+        assert!(analyze(include_str!("../../resources/message_samples/sms_text_e7776e9d8109.txt")).otp.is_none());
+        assert!(analyze(include_str!("../../resources/message_samples/sms_text_162d7031d5a2.txt")).otp.is_none());
         assert_eq!(
-            analyze("客服 138-0013-8000 验证码 654321")
+            analyze(include_str!("../../resources/message_samples/sms_text_59fa6face80a.txt"))
                 .otp
                 .as_deref(),
             Some("654321")
         );
         assert_eq!(
-            analyze("订单号 88888888 验证码 246810")
+            analyze(include_str!("../../resources/message_samples/sms_text_6a64a85f8f27.txt"))
                 .otp
                 .as_deref(),
             Some("246810")
@@ -538,52 +538,52 @@ mod tests {
 
     #[test]
     fn rejects_repetitive_numbers() {
-        assert!(analyze("验证码 111111").otp.is_none());
-        assert!(analyze("验证码 0000").otp.is_none());
-        assert_eq!(analyze("验证码 1234").otp.as_deref(), Some("1234"));
+        assert!(analyze(include_str!("../../resources/message_samples/sms_text_1c04c540e99e.txt")).otp.is_none());
+        assert!(analyze(include_str!("../../resources/message_samples/sms_text_5099ff6a812a.txt")).otp.is_none());
+        assert_eq!(analyze(include_str!("../../resources/message_samples/sms_text_3c3e0572ee78.txt")).otp.as_deref(), Some("1234"));
     }
 
     #[test]
     fn rejects_alphanumeric_neighbours() {
-        assert!(analyze("验证码 A123456B").otp.is_none());
-        assert!(analyze("验证码 #123456").otp.as_deref() == Some("123456"));
-        assert!(analyze("验证码 123456789").otp.is_none());
+        assert!(analyze(include_str!("../../resources/message_samples/sms_text_07ee1bafc90c.txt")).otp.is_none());
+        assert!(analyze(include_str!("../../resources/message_samples/sms_text_b2954d235032.txt")).otp.as_deref() == Some("123456"));
+        assert!(analyze(include_str!("../../resources/message_samples/sms_text_0063b3a85f3a.txt")).otp.is_none());
     }
 
     #[test]
     fn extracts_first_link_with_bracket_truncation() {
         assert_eq!(
-            analyze("点击 https://example.com/a?b=1 领取").link.as_deref(),
+            analyze(include_str!("../../resources/message_samples/sms_text_4981096febb7.txt")).link.as_deref(),
             Some("https://example.com/a?b=1")
         );
         assert_eq!(
-            analyze("（https://x.cn/p)（更多）").link.as_deref(),
+            analyze(include_str!("../../resources/message_samples/sms_text_27f6406ed4e8.txt")).link.as_deref(),
             Some("https://x.cn/p")
         );
         assert_eq!(
             analyze("see HTTP://Example.COM/x。").link.as_deref(),
             Some("HTTP://Example.COM/x")
         );
-        assert!(analyze("没有链接").link.is_none());
+        assert!(analyze(include_str!("../../resources/message_samples/sms_text_3fed53d83d1d.txt")).link.is_none());
     }
 
     #[test]
     fn categories_cover_finance_and_promotion() {
         assert_eq!(
-            analyze("【招商银行】您尾号 1234 的账单已出").category,
+            analyze(include_str!("../../resources/message_samples/sms_text_6e1eff2245cc.txt")).category,
             "finance"
         );
-        assert_eq!(analyze("退订回T").category, "promotion");
-        assert_eq!(analyze("今晚一起吃饭吗").category, "personal");
-        assert_eq!(analyze("您的验证码已发送").category, "verification");
-        let delivery = analyze("您的快递已到菜鸟驿站，取件码 123456");
+        assert_eq!(analyze(include_str!("../../resources/message_samples/sms_text_ae5f66a6b0bb.txt")).category, "promotion");
+        assert_eq!(analyze(include_str!("../../resources/message_samples/sms_text_7c3462477cc5.txt")).category, "personal");
+        assert_eq!(analyze(include_str!("../../resources/message_samples/sms_text_2e84fdfaf1f0.txt")).category, "verification");
+        let delivery = analyze(include_str!("../../resources/message_samples/sms_text_36caea658472.txt"));
         assert_eq!(delivery.category, "personal");
         assert!(delivery.otp.is_none());
     }
 
     #[test]
     fn long_body_is_truncated_without_panic() {
-        let body = format!("验证码 123456 {}", "x".repeat(70_000));
+        let body = format!(include_str!("../../resources/message_samples/sms_text_fac2e0450da8.txt"), "x".repeat(70_000));
         let result = analyze(&body);
         assert_eq!(result.otp.as_deref(), Some("123456"));
         assert!(result.segments > 100);
@@ -597,7 +597,7 @@ mod tests {
         assert_eq!(gsm.segments, 1);
         assert_eq!(gsm.remaining, 149);
 
-        let ucs2 = analyze("你好世界");
+        let ucs2 = analyze(include_str!("../../resources/message_samples/sms_text_beca6335b20f.txt"));
         assert_eq!(ucs2.encoding, "UCS-2");
         assert_eq!(ucs2.remaining, 66);
     }

@@ -6,16 +6,15 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use aes_gcm::aead::generic_array::GenericArray;
 use aes_gcm::aead::{Aead, KeyInit};
-use aes_gcm::Aes256Gcm;
+use aes_gcm::{Aes256Gcm, Nonce};
 use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE_NO_PAD};
 use base64::Engine as _;
 use hkdf::Hkdf;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use rand::rngs::OsRng;
-use rand::RngCore;
+use rand::rngs::SysRng;
+use rand::TryRng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use x25519_dalek::{PublicKey, StaticSecret};
@@ -50,14 +49,16 @@ pub struct Identity {
 }
 
 impl Identity {
-    pub fn generate() -> Self {
-        let secret = StaticSecret::random_from_rng(OsRng);
+    pub fn generate() -> Option<Self> {
+        let secret = random_secret()?;
         let public = PublicKey::from(&secret);
-        Identity {
-            device_id: uuid::Uuid::new_v4().to_string(),
+        let mut device_id = [0u8; 16];
+        SysRng.try_fill_bytes(&mut device_id).ok()?;
+        Some(Identity {
+            device_id: uuid::Builder::from_random_bytes(device_id).into_uuid().to_string(),
             secret,
             public,
-        }
+        })
     }
 
     pub fn from_secret_bytes(device_id: &str, secret_bytes: [u8; PUBLIC_KEY_LEN]) -> Self {
@@ -115,8 +116,8 @@ pub fn open(
     }
     let key = derive_key(shared.as_bytes(), ephemeral_public_key, identity.public.as_bytes())?;
     let cipher = Aes256Gcm::new_from_slice(&key[..]).ok()?;
-    let nonce_array = GenericArray::from_slice(nonce);
-    let plaintext = cipher.decrypt(nonce_array, ciphertext).ok()?;
+    let nonce_array = Nonce::try_from(nonce).ok()?;
+    let plaintext = cipher.decrypt(&nonce_array, ciphertext).ok()?;
     String::from_utf8(plaintext).ok()
 }
 
@@ -128,7 +129,7 @@ pub fn seal(
         return None;
     }
     let recipient = PublicKey::from(*recipient_public_key);
-    let ephemeral_secret = StaticSecret::random_from_rng(OsRng);
+    let ephemeral_secret = random_secret()?;
     let ephemeral_public = PublicKey::from(&ephemeral_secret);
     let shared = ephemeral_secret.diffie_hellman(&recipient);
     if shared.as_bytes().iter().all(|&byte| byte == 0) {
@@ -140,15 +141,21 @@ pub fn seal(
         recipient_public_key,
     )?;
     let mut nonce_bytes = [0u8; NONCE_LEN];
-    OsRng.fill_bytes(&mut nonce_bytes);
+    SysRng.try_fill_bytes(&mut nonce_bytes).ok()?;
     let cipher = Aes256Gcm::new_from_slice(&key[..]).ok()?;
-    let nonce_array = GenericArray::from_slice(&nonce_bytes);
-    let ciphertext = cipher.encrypt(nonce_array, plaintext.as_bytes()).ok()?;
+    let nonce_array = Nonce::from(nonce_bytes);
+    let ciphertext = cipher.encrypt(&nonce_array, plaintext.as_bytes()).ok()?;
     Some(Envelope {
         ephemeral_public_key: URL_SAFE_NO_PAD.encode(ephemeral_public.as_bytes()),
         nonce: URL_SAFE_NO_PAD.encode(nonce_bytes),
         ciphertext: URL_SAFE_NO_PAD.encode(ciphertext),
     })
+}
+
+fn random_secret() -> Option<StaticSecret> {
+    let mut bytes = Zeroizing::new([0u8; KEY_LEN]);
+    SysRng.try_fill_bytes(&mut *bytes).ok()?;
+    Some(StaticSecret::from(*bytes))
 }
 
 fn derive_key(
@@ -227,7 +234,7 @@ pub fn load_or_create(dir: &Path) -> Option<Identity> {
     if fs::create_dir_all(dir).is_err() {
         return None;
     }
-    let identity = Identity::generate();
+    let identity = Identity::generate()?;
     if !persist(dir, &identity) {
         return None;
     }
@@ -360,6 +367,16 @@ pub fn sync_reset() -> bool {
 mod tests {
     use super::*;
 
+    #[test]
+    fn opens_envelopes_from_previous_crypto_dependencies() {
+        // Produced with aes-gcm 0.10, hkdf 0.12 and x25519-dalek 2.0.
+        let identity = Identity::from_secret_bytes("legacy-fixture", [17u8; 32]);
+        let public = decode_public_key("D6poTtKIZ7l_Smot7l34zpdOdrcBjj8iocTPJnhXDyA").unwrap();
+        let nonce = decode_base64("MzMzMzMzMzMzMzMz").unwrap();
+        let ciphertext = decode_base64("YXvyhf9MMbjMFtwIarpKbFmsmHERHUPdC_5PEdkZgiCgIOBg9TJLDw").unwrap();
+        assert_eq!(open(&identity, &public, &nonce, &ciphertext).as_deref(), Some("Existing device envelope"));
+    }
+
     fn temp_dir(tag: &str) -> PathBuf {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -377,12 +394,12 @@ mod tests {
 
     #[test]
     fn envelope_round_trip() {
-        let alice = Identity::generate();
-        let bob = Identity::generate();
-        let plaintext = "端到端同步 payload 🌿 with ASCII";
+        let alice = Identity::generate().unwrap();
+        let bob = Identity::generate().unwrap();
+        let plaintext = include_str!("../../resources/message_samples/sms_text_bbc19381eb22.txt");
         let envelope = seal(&bob.public_key_bytes(), plaintext).expect("seal");
         assert!(!envelope.ciphertext.is_empty());
-        assert!(!envelope.ciphertext.contains('='), "URL_SAFE_NO_PAD 无填充");
+        assert!(!envelope.ciphertext.contains('='), include_str!("../../resources/message_samples/sms_text_78fd227affe4.txt"));
         assert!(!envelope.ciphertext.contains('+'));
         assert!(!envelope.ciphertext.contains('/'));
 
@@ -396,8 +413,8 @@ mod tests {
 
     #[test]
     fn wrong_key_cannot_decrypt() {
-        let bob = Identity::generate();
-        let attacker = Identity::generate();
+        let bob = Identity::generate().unwrap();
+        let attacker = Identity::generate().unwrap();
         let envelope = seal(&bob.public_key_bytes(), "secret").expect("seal");
         let ephemeral = decode_public_key(&envelope.ephemeral_public_key).unwrap();
         let nonce = decode_base64(&envelope.nonce).unwrap();
@@ -407,7 +424,7 @@ mod tests {
 
     #[test]
     fn tampered_ciphertext_is_rejected() {
-        let bob = Identity::generate();
+        let bob = Identity::generate().unwrap();
         let envelope = seal(&bob.public_key_bytes(), "tamper me").expect("seal");
         let ephemeral = decode_public_key(&envelope.ephemeral_public_key).unwrap();
         let nonce = decode_base64(&envelope.nonce).unwrap();
@@ -426,8 +443,8 @@ mod tests {
 
     #[test]
     fn reject_invalid_public_keys_and_inputs() {
-        assert!(seal(&[0u8; 32], "x").is_none(), "低阶公钥应被拒绝");
-        assert!(seal(&[7u8; 32], "").is_none(), "空明文应被拒绝");
+        assert!(seal(&[0u8; 32], "x").is_none(), include_str!("../../resources/message_samples/sms_text_cd67b5f9498b.txt"));
+        assert!(seal(&[7u8; 32], "").is_none(), include_str!("../../resources/message_samples/sms_text_0c4de4d25c34.txt"));
         assert!(decode_public_key("not-base64!!").is_none());
         assert!(decode_public_key(&URL_SAFE_NO_PAD.encode([0u8; 31])).is_none());
 
@@ -439,9 +456,9 @@ mod tests {
 
     #[test]
     fn fingerprint_has_eight_groups() {
-        let identity = Identity::generate();
+        let identity = Identity::generate().unwrap();
         let fingerprint = identity.fingerprint();
-        assert_eq!(fingerprint.len(), 39, "8*4 hex + 7 个连字符");
+        assert_eq!(fingerprint.len(), 39, include_str!("../../resources/message_samples/sms_text_00ed175e19e8.txt"));
         let groups: Vec<&str> = fingerprint.split('-').collect();
         assert_eq!(groups.len(), 8);
         for group in groups {
@@ -449,7 +466,7 @@ mod tests {
             assert!(group.chars().all(|ch| ch.is_ascii_hexdigit() && !ch.is_ascii_lowercase()));
         }
         assert_eq!(fingerprint, format_fingerprint(&identity.public_key_bytes()));
-        assert_ne!(fingerprint, Identity::generate().fingerprint());
+        assert_ne!(fingerprint, Identity::generate().unwrap().fingerprint());
         assert_eq!(
             sync_fingerprint(&identity.public_key_base64()),
             fingerprint

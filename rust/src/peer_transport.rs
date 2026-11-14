@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn authenticates_and_encrypts_both_directions() {
         let (mut a, mut b) = pair();
-        assert_eq!(*b.decrypt(&a.encrypt("短信🌿".as_bytes()).unwrap()).unwrap(), "短信🌿".as_bytes());
+        assert_eq!(*b.decrypt(&a.encrypt(include_str!("../resources/message_samples/sms_text_d960b300fffd.txt").as_bytes()).unwrap()).unwrap(), include_str!("../resources/message_samples/sms_text_d960b300fffd.txt").as_bytes());
         assert_eq!(*a.decrypt(&b.encrypt(b"reply").unwrap()).unwrap(), b"reply");
     }
     #[test]

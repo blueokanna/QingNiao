@@ -17,9 +17,9 @@ fn analyze(body: &str) -> MessageInsight {
     }
     let lower = body.to_lowercase();
     let verification = [
-        "验证码",
-        "校验码",
-        "动态码",
+        include_str!("../../resources/message_samples/sms_text_bb015c60bafc.txt"),
+        include_str!("../../resources/message_samples/sms_text_b25b7420115a.txt"),
+        include_str!("../../resources/message_samples/sms_text_e465dbcbda1b.txt"),
         "verification code",
         "security code",
         "one-time",
@@ -55,7 +55,7 @@ fn analyze(body: &str) -> MessageInsight {
     };
     let category = if verification {
         "verification"
-    } else if ["退订", "优惠", "促销", "unsubscribe"]
+    } else if [include_str!("../../resources/message_samples/sms_text_660aa1f65abc.txt"), include_str!("../../resources/message_samples/sms_text_58aa6825b704.txt"), include_str!("../../resources/message_samples/sms_text_e008fed0fa3a.txt"), "unsubscribe"]
         .iter()
         .any(|word| lower.contains(word))
     {
@@ -80,16 +80,16 @@ mod tests {
     #[test]
     fn extracts_only_unambiguous_credentials() {
         assert_eq!(
-            analyze("验证码：123456，五分钟内有效")
+            analyze(include_str!("../../resources/message_samples/sms_text_dcbc7f9bfdd9.txt"))
                 .verification_code
                 .as_deref(),
             Some("123456")
         );
         assert_eq!(
-            analyze("验证码 123456，订单 765432").verification_code,
+            analyze(include_str!("../../resources/message_samples/sms_text_d48cf078d67e.txt")).verification_code,
             None
         );
-        assert_eq!(analyze("订单 123456").verification_code, None);
+        assert_eq!(analyze(include_str!("../../resources/message_samples/sms_text_e65afd82b5b2.txt")).verification_code, None);
         assert_eq!(analyze("OTP: 12345678901").verification_code, None);
         assert_eq!(analyze("OTP: A123456B").verification_code, None);
         assert_eq!(
@@ -100,8 +100,8 @@ mod tests {
     #[test]
     fn preserves_batch_order_and_unicode() {
         let result = analyze_messages(vec![
-            "退订回T".into(),
-            "你好🌿".into(),
+            include_str!("../../resources/message_samples/sms_text_ae5f66a6b0bb.txt").into(),
+            include_str!("../../resources/message_samples/sms_text_688338c104a1.txt").into(),
             "Security code 004321".into(),
         ]);
         assert_eq!(result[0].category, "promotion");

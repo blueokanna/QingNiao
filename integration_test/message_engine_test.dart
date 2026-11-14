@@ -10,7 +10,10 @@ void main() {
   ) async {
     await RustLib.init();
     final insights = await analyzeMessages(
-      bodies: ['验证码 004321，请勿转发', '明天见🌿'],
+      bodies: [
+        '\u9a8c\u8bc1\u7801 004321，\u8bf7\u52ff\u8f6c\u53d1',
+        '\u660e\u5929\u89c1🌿',
+      ],
     );
     expect(insights.first.verificationCode, '004321');
     expect(insights.last.category, 'personal');

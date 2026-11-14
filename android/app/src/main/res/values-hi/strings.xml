@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Qingniao</string>
+    <string name="push_title">सिंक के लिए नए संदेश उपलब्ध हैं</string>
+    <string name="push_body">सुरक्षित सिंक के लिए Qingniao खोलें।</string>
+    <string name="notification_reply">जवाब दें</string>
+    <string name="notification_messages">संदेश</string>
+    <string name="notification_new_message">नया संदेश</string>
+    <string name="notification_mark_read">पढ़ा हुआ चिह्नित करें</string>
+    <string name="notification_copy_code">कॉपी करें</string>
+    <string name="notification_code_copied">कॉपी किया गया</string>
+    <string name="notification_loading">लोड हो रहा है…</string>
+    <string name="notification_new_mms">नया MMS</string>
+    <string name="notification_failed">भेजना विफल</string>
+    <string name="notification_retry">कार्रवाई पूरी नहीं हुई। फिर कोशिश करें।</string>
+    <string name="notification_test_title">सूचना परीक्षण</string>
+    <string name="notification_test_body">परीक्षण कोड: 864213। कोई SMS नहीं भेजा गया।</string>
+</resources>

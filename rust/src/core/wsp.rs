@@ -329,7 +329,7 @@ mod tests {
         for length in [0u32, 1, 30] {
             let mut buffer = Vec::new();
             write_value_length(&mut buffer, length);
-            assert_eq!(buffer.len(), 1, "短长度单字节");
+            assert_eq!(buffer.len(), 1, include_str!("../../resources/message_samples/sms_text_a49a59658fab.txt"));
             let mut cursor = Cursor::new(&buffer);
             assert_eq!(cursor.value_length(), Some(length as usize));
         }
@@ -372,10 +372,10 @@ mod tests {
         assert_eq!(read_text_string(&mut cursor).as_deref(), Some("abc"));
 
         let mut buffer = Vec::new();
-        write_text_string(&mut buffer, "标题".as_bytes());
+        write_text_string(&mut buffer, include_str!("../../resources/message_samples/sms_text_c3405f8c7d9d.txt").as_bytes());
         assert_eq!(buffer[0], 0x7F);
         let mut cursor = Cursor::new(&buffer);
-        assert_eq!(read_text_string(&mut cursor).as_deref(), Some("标题"));
+        assert_eq!(read_text_string(&mut cursor).as_deref(), Some(include_str!("../../resources/message_samples/sms_text_c3405f8c7d9d.txt")));
 
         let mut buffer = Vec::new();
         write_text_string(&mut buffer, b"");
@@ -386,27 +386,27 @@ mod tests {
 
     #[test]
     fn decodes_text_encodings() {
-        assert_eq!(decode_text("你好".as_bytes(), Some(CHARSET_UTF8)), "你好");
+        assert_eq!(decode_text(include_str!("../../resources/message_samples/sms_text_670d9743542c.txt").as_bytes(), Some(CHARSET_UTF8)), include_str!("../../resources/message_samples/sms_text_670d9743542c.txt"));
         assert_eq!(decode_text("hello".as_bytes(), None), "hello");
         assert_eq!(decode_text(&[], None), "");
 
         let mut le = vec![0xFF, 0xFE];
-        for unit in "你好".encode_utf16() {
+        for unit in include_str!("../../resources/message_samples/sms_text_670d9743542c.txt").encode_utf16() {
             le.extend_from_slice(&unit.to_le_bytes());
         }
-        assert_eq!(decode_text(&le, Some(CHARSET_UTF16)), "你好");
+        assert_eq!(decode_text(&le, Some(CHARSET_UTF16)), include_str!("../../resources/message_samples/sms_text_670d9743542c.txt"));
 
         let mut be = vec![0xFE, 0xFF];
-        for unit in "彩信".encode_utf16() {
+        for unit in include_str!("../../resources/message_samples/sms_text_745d86093ac0.txt").encode_utf16() {
             be.extend_from_slice(&unit.to_be_bytes());
         }
-        assert_eq!(decode_text(&be, Some(CHARSET_UTF16)), "彩信");
+        assert_eq!(decode_text(&be, Some(CHARSET_UTF16)), include_str!("../../resources/message_samples/sms_text_745d86093ac0.txt"));
 
         let mut plain = Vec::new();
-        for unit in "测试".encode_utf16() {
+        for unit in include_str!("../../resources/message_samples/sms_text_6aa8f49cc992.txt").encode_utf16() {
             plain.extend_from_slice(&unit.to_le_bytes());
         }
-        assert_eq!(decode_text(&plain, Some(CHARSET_UTF16)), "测试");
+        assert_eq!(decode_text(&plain, Some(CHARSET_UTF16)), include_str!("../../resources/message_samples/sms_text_6aa8f49cc992.txt"));
 
         let gb = decode_text(&[0xC4, 0xE3, b'A', b'B'], Some(CHARSET_GB2312));
         assert!(gb.ends_with("AB"));

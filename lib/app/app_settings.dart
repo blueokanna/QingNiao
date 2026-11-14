@@ -1,3 +1,4 @@
+import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../aurora/aurora_engine.dart';
@@ -6,6 +7,16 @@ import '../messaging/message_repository.dart';
 import '../design/android_palette.dart';
 
 enum AuroraThemePreference { system, light, dark }
+
+enum ThreadSwipeAction { trash, read, archive, pin, none }
+
+String swipeActionLabel(ThreadSwipeAction action) => switch (action) {
+  ThreadSwipeAction.trash => tr('Move to trash'),
+  ThreadSwipeAction.read => tr('Mark as read'),
+  ThreadSwipeAction.archive => tr('Archive'),
+  ThreadSwipeAction.pin => tr('Pin conversation'),
+  ThreadSwipeAction.none => tr('Disabled'),
+};
 
 class AppSettings extends ChangeNotifier {
   AppSettings({MessageRepository? repository}) : _repository = repository;
@@ -16,7 +27,7 @@ class AppSettings extends ChangeNotifier {
   AuroraThemePreference themePreference = AuroraThemePreference.system;
   Color seed = AuroraPalettes.jade;
   Color? systemSeed;
-  bool useDynamic = true;
+  bool useDynamic = false;
   AuroraBubbleStyle bubbleStyle = AuroraBubbleStyle.soft;
   bool morphShapes = true;
   AuroraMotionLevel motionLevel = AuroraMotionLevel.full;
@@ -24,6 +35,7 @@ class AppSettings extends ChangeNotifier {
   bool deliveryReports = true;
   bool notifications = true;
   bool showPreview = true;
+  bool recycleReadCodes = true;
   String signature = '';
   int trashRetentionDays = 30;
   bool sendDelay = false;
@@ -31,7 +43,10 @@ class AppSettings extends ChangeNotifier {
   bool fluidCloud = true;
   bool amoled = false;
   String fontFamily = 'system';
+  String localeCode = 'system';
   String launcherIcon = 'bird';
+  ThreadSwipeAction swipeLeft = ThreadSwipeAction.trash;
+  ThreadSwipeAction swipeRight = ThreadSwipeAction.read;
   AndroidPalette? systemPalette;
 
   ThemeMode get themeMode => switch (themePreference) {
@@ -61,20 +76,32 @@ class AppSettings extends ChangeNotifier {
       settings.systemPalette = AndroidPalette.fromMap(
         await repository.invoke<Map>('systemPalette'),
       );
-    } catch (_) {
-    }
+    } catch (_) {}
     return settings;
   }
 
   void _apply(Map<String, String> values) {
+    swipeLeft =
+        ThreadSwipeAction.values
+            .where((v) => v.name == values['swipeLeft'])
+            .firstOrNull ??
+        ThreadSwipeAction.trash;
+    swipeRight =
+        ThreadSwipeAction.values
+            .where((v) => v.name == values['swipeRight'])
+            .firstOrNull ??
+        ThreadSwipeAction.read;
+    localeCode = AppStrings.languageCodes.contains(values['locale'])
+        ? values['locale']!
+        : 'system';
     themePreference = switch (values['themeMode']) {
       'light' => AuroraThemePreference.light,
       'dark' => AuroraThemePreference.dark,
       _ => AuroraThemePreference.system,
     };
-    final seedName = values['seed'];
+    final seedName = AppStrings.paletteKey(values['seed']);
     seed = AuroraPalettes.seeds[seedName] ?? AuroraPalettes.jade;
-    useDynamic = values['useDynamic'] != 'false';
+    useDynamic = values['useDynamic'] == 'true';
     bubbleStyle = switch (values['bubble']) {
       'capsule' => AuroraBubbleStyle.capsule,
       'cookie' => AuroraBubbleStyle.cookie,
@@ -91,6 +118,7 @@ class AppSettings extends ChangeNotifier {
     deliveryReports = values['delivery'] != 'false';
     notifications = values['notifications'] != 'false';
     showPreview = values['preview'] != 'false';
+    recycleReadCodes = values['recycleReadCodes'] != 'false';
     signature = values['signature'] ?? '';
     trashRetentionDays = int.tryParse(values['trashDays'] ?? '') ?? 30;
     sendDelay = values['sendDelay'] == 'true';
@@ -136,6 +164,15 @@ class AppSettings extends ChangeNotifier {
   void setTheme(AuroraThemePreference value) =>
       update(() => themePreference = value);
 
+  void setSwipe({required bool left, required ThreadSwipeAction action}) =>
+      update(() {
+        if (left) {
+          swipeLeft = action;
+        } else {
+          swipeRight = action;
+        }
+      });
+
   void setSeed(String name) =>
       update(() => seed = AuroraPalettes.seeds[name] ?? AuroraPalettes.jade);
 
@@ -153,6 +190,9 @@ class AppSettings extends ChangeNotifier {
   void setDelivery(bool value) => update(() => deliveryReports = value);
 
   void setNotifications(bool value) => update(() => notifications = value);
+
+  void setRecycleReadCodes(bool value) =>
+      update(() => recycleReadCodes = value);
 
   void setPreview(bool value) => update(() => showPreview = value);
 
@@ -174,6 +214,9 @@ class AppSettings extends ChangeNotifier {
         ? value
         : 'system',
   );
+  void setLocale(String value) => update(() {
+    localeCode = AppStrings.languageCodes.contains(value) ? value : 'system';
+  });
   Future<void> setLauncherIcon(String value) async {
     await _repository?.invoke('setLauncherIcon', {'icon': value});
     launcherIcon = value;
@@ -184,6 +227,9 @@ class AppSettings extends ChangeNotifier {
     final repository = _repository;
     if (repository == null) return;
     final values = <String, String>{
+      'swipeLeft': swipeLeft.name,
+      'swipeRight': swipeRight.name,
+      'locale': localeCode,
       'themeMode': switch (themePreference) {
         AuroraThemePreference.system => 'system',
         AuroraThemePreference.light => 'light',
@@ -192,7 +238,7 @@ class AppSettings extends ChangeNotifier {
       'seed': AuroraPalettes.seeds.entries
           .firstWhere(
             (entry) => entry.value == seed,
-            orElse: () => const MapEntry('青碧', AuroraPalettes.jade),
+            orElse: () => const MapEntry("PANTONE 3295 C", AuroraPalettes.jade),
           )
           .key,
       'useDynamic': '$useDynamic',
@@ -211,6 +257,7 @@ class AppSettings extends ChangeNotifier {
       'delivery': '$deliveryReports',
       'notifications': '$notifications',
       'preview': '$showPreview',
+      'recycleReadCodes': '$recycleReadCodes',
       'signature': signature,
       'trashDays': '$trashRetentionDays',
       'sendDelay': '$sendDelay',
@@ -234,7 +281,7 @@ class AppScope extends InheritedNotifier<AppSettings> {
 
   static AppSettings of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();
-    assert(scope != null, 'AppScope 未挂载');
+    assert(scope != null, tr("AppScope is not mounted"));
     return scope!.notifier!;
   }
 

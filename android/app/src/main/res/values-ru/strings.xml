@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Qingniao</string>
+    <string name="push_title">Есть сообщения для синхронизации</string>
+    <string name="push_body">Откройте Qingniao для безопасной синхронизации.</string>
+    <string name="notification_reply">Ответить</string>
+    <string name="notification_messages">Сообщения</string>
+    <string name="notification_new_message">Новое сообщение</string>
+    <string name="notification_mark_read">Отметить прочитанным</string>
+    <string name="notification_copy_code">Копировать</string>
+    <string name="notification_code_copied">Скопировано</string>
+    <string name="notification_loading">Загрузка…</string>
+    <string name="notification_new_mms">Новое MMS</string>
+    <string name="notification_failed">Не удалось отправить</string>
+    <string name="notification_retry">Не удалось выполнить действие. Повторите.</string>
+    <string name="notification_test_title">Тест уведомления</string>
+    <string name="notification_test_body">Тестовый код: 864213. SMS не отправлялось.</string>
+</resources>

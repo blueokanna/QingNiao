@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="verification_keywords" translatable="false">
+        <item>verification code</item>
+        <item>security code</item>
+        <item>one-time</item>
+        <item>otp</item>
+        <item>passcode</item>
+        <item>验证码</item>
+        <item>校验码</item>
+        <item>动态码</item>
+        <item>激活码</item>
+        <item>código de verificación</item>
+        <item>code de vérification</item>
+        <item>código de verificação</item>
+        <item>код подтверждения</item>
+        <item>رمز التحقق</item>
+        <item>सत्यापन कोड</item>
+        <item>যাচাইকরণ কোড</item>
+        <item>تصدیقی کوڈ</item>
+    </string-array>
+</resources>

@@ -13,9 +13,10 @@ import io.flutter.plugin.common.MethodChannel
 class AppearanceBridge(private val activity: Activity) {
     private val preferences = activity.getSharedPreferences("appearance", Activity.MODE_PRIVATE)
     private val choices = mapOf(
+        "locale" to setOf("system", "en", "zh", "hi", "es", "ar", "fr", "bn", "pt", "ru", "ur"),
         "themeMode" to setOf("system", "light", "dark", "amoled"),
         "fontFamily" to setOf("system", "harmony", "google"),
-        "seed" to setOf("青碧", "极光", "湖水", "晨曦", "梅子", "石墨"),
+        "seed" to setOf("PANTONE 3295 C", "PANTONE 2725 C", "PANTONE 3015 C", "PANTONE 1665 C", "PANTONE 2587 C", "PANTONE Cool Gray 11 C"),
         "motion" to setOf("full", "balanced", "reduced"),
         "bubble" to setOf("soft", "capsule", "cookie")
     )
@@ -42,9 +43,9 @@ class AppearanceBridge(private val activity: Activity) {
                     key == "signature" -> value.length <= 160
                     else -> false
                 }
-                if (!valid) result.error("invalid_setting", "设置值无效", null)
+                if (!valid) result.error("invalid_setting", "Invalid setting value", null)
                 else {
-                    // 布尔项写真正的 Boolean，避免 Kotlin getBoolean 与 Dart 字符串写入互相打架。
+
                     val editor = preferences.edit()
                     if (key in booleans) editor.putBoolean(key, value == "true") else editor.putString(key, value)
                     editor.apply()
@@ -73,7 +74,7 @@ class AppearanceBridge(private val activity: Activity) {
 
     private fun launch(intent: Intent, result: MethodChannel.Result) {
         try { activity.startActivity(intent); result.success(null) }
-        catch (_: android.content.ActivityNotFoundException) { result.error("unavailable", "系统没有提供此设置页面", null) }
+        catch (_: android.content.ActivityNotFoundException) { result.error("unavailable", "This settings page is unavailable", null) }
     }
 
     private fun palette(): Map<String, List<Int>> {

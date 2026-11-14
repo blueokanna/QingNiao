@@ -6,20 +6,20 @@ import '../design/android_palette.dart';
 import '../design/bundled_fonts.dart';
 
 abstract final class AuroraPalettes {
-  static const jade = Color(0xFF0E7C6B);
-  static const aurora = Color(0xFF5B6CFF);
-  static const lagoon = Color(0xFF1677A8);
-  static const dawn = Color(0xFFB45A34);
-  static const plum = Color(0xFF8E4EC6);
-  static const graphite = Color(0xFF4B5563);
+  static const jade = Color(0xFF00907F);
+  static const aurora = Color(0xFF4D5FAB);
+  static const lagoon = Color(0xFF007CB7);
+  static const dawn = Color(0xFFF37121);
+  static const plum = Color(0xFF6352A2);
+  static const graphite = Color(0xFF5A5B5E);
 
   static const seeds = <String, Color>{
-    '青碧': jade,
-    '极光': aurora,
-    '湖水': lagoon,
-    '晨曦': dawn,
-    '梅子': plum,
-    '石墨': graphite,
+    "PANTONE 3295 C": jade,
+    "PANTONE 2725 C": aurora,
+    "PANTONE 3015 C": lagoon,
+    "PANTONE 1665 C": dawn,
+    "PANTONE 2587 C": plum,
+    "PANTONE Cool Gray 11 C": graphite,
   };
 }
 
@@ -206,6 +206,15 @@ ThemeData buildAuroraTheme({
     dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
   );
   final dark = brightness == Brightness.dark;
+  if (!appearance.useDynamic) {
+    final luminance = seed.computeLuminance();
+    scheme = scheme.copyWith(
+      primary: seed,
+      onPrimary: (luminance + .05) / .05 >= 1.05 / (luminance + .05)
+          ? Colors.black
+          : Colors.white,
+    );
+  }
   if (appearance.useDynamic) {
     scheme = appearance.systemPalette?.applyTo(scheme) ?? scheme;
   }
@@ -225,62 +234,75 @@ ThemeData buildAuroraTheme({
   final baseText = dark
       ? Typography.material2021().white
       : Typography.material2021().black;
-  final textTheme = baseText.copyWith(
-    displayLarge: baseText.displayLarge?.copyWith(
-      fontWeight: FontWeight.w600,
-      letterSpacing: -1.6,
-      height: 1.04,
-    ),
-    displayMedium: baseText.displayMedium?.copyWith(
-      fontWeight: FontWeight.w600,
-      letterSpacing: -1.2,
-      height: 1.08,
-    ),
-    headlineLarge: baseText.headlineLarge?.copyWith(
-      fontWeight: FontWeight.w600,
-      letterSpacing: -.7,
-      height: 1.18,
-    ),
-    headlineMedium: baseText.headlineMedium?.copyWith(
-      fontWeight: FontWeight.w600,
-      letterSpacing: -.5,
-      height: 1.2,
-    ),
-    headlineSmall: baseText.headlineSmall?.copyWith(
-      fontWeight: FontWeight.w600,
-      letterSpacing: -.2,
-      height: 1.24,
-    ),
-    titleLarge: baseText.titleLarge?.copyWith(
-      fontWeight: FontWeight.w600,
-      letterSpacing: -.2,
-      height: 1.3,
-    ),
-    titleMedium: baseText.titleMedium?.copyWith(
-      fontWeight: FontWeight.w600,
-      letterSpacing: -.1,
-      height: 1.32,
-    ),
-    titleSmall: baseText.titleSmall?.copyWith(
-      fontWeight: FontWeight.w600,
-      letterSpacing: .1,
-    ),
-    bodyLarge: baseText.bodyLarge?.copyWith(height: 1.55, letterSpacing: .1),
-    bodyMedium: baseText.bodyMedium?.copyWith(height: 1.55, letterSpacing: .1),
-    bodySmall: baseText.bodySmall?.copyWith(height: 1.5, letterSpacing: .2),
-    labelLarge: baseText.labelLarge?.copyWith(
-      fontWeight: FontWeight.w600,
-      letterSpacing: .2,
-    ),
-    labelMedium: baseText.labelMedium?.copyWith(
-      fontWeight: FontWeight.w500,
-      letterSpacing: .3,
-    ),
-    labelSmall: baseText.labelSmall?.copyWith(
-      fontWeight: FontWeight.w500,
-      letterSpacing: .4,
-    ),
-  );
+  final textTheme = baseText
+      .copyWith(
+        displayLarge: baseText.displayLarge?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: -1.6,
+          height: 1.04,
+        ),
+        displayMedium: baseText.displayMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: -1.2,
+          height: 1.08,
+        ),
+        headlineLarge: baseText.headlineLarge?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: -.7,
+          height: 1.18,
+        ),
+        headlineMedium: baseText.headlineMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: -.5,
+          height: 1.2,
+        ),
+        headlineSmall: baseText.headlineSmall?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: -.2,
+          height: 1.24,
+        ),
+        titleLarge: baseText.titleLarge?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: -.2,
+          height: 1.3,
+        ),
+        titleMedium: baseText.titleMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: -.1,
+          height: 1.32,
+        ),
+        titleSmall: baseText.titleSmall?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: .1,
+        ),
+        bodyLarge: baseText.bodyLarge?.copyWith(
+          height: 1.55,
+          letterSpacing: .1,
+        ),
+        bodyMedium: baseText.bodyMedium?.copyWith(
+          height: 1.55,
+          letterSpacing: .1,
+        ),
+        bodySmall: baseText.bodySmall?.copyWith(height: 1.5, letterSpacing: .2),
+        labelLarge: baseText.labelLarge?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: .2,
+        ),
+        labelMedium: baseText.labelMedium?.copyWith(
+          fontWeight: FontWeight.w500,
+          letterSpacing: .3,
+        ),
+        labelSmall: baseText.labelSmall?.copyWith(
+          fontWeight: FontWeight.w500,
+          letterSpacing: .4,
+        ),
+      )
+      .apply(
+        fontFamily: BundledFonts.families[appearance.fontFamily],
+        fontFamilyFallback: appearance.fontFamily == 'system'
+            ? null
+            : const ['HarmonyOSSans'],
+      );
 
   final border = RoundedSuperellipseBorder(
     borderRadius: BorderRadius.circular(radius),
@@ -306,7 +328,6 @@ ThemeData buildAuroraTheme({
     scaffoldBackgroundColor: Colors.transparent,
     canvasColor: scheme.surface,
     dividerColor: aurora.hairline,
-    splashFactory: InkRipple.splashFactory,
     visualDensity: VisualDensity.standard,
     extensions: [aurora],
     pageTransitionsTheme: AuroraPageTransitionsTheme(),
@@ -492,6 +513,11 @@ ThemeData buildAuroraTheme({
       thumbIcon: const WidgetStatePropertyAll(null),
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(
+      // Flutter still exposes the pre-2024 indicator as an opt-out default.
+      // ignore: deprecated_member_use
+      year2023: false,
+      strokeCap: StrokeCap.round,
+      trackGap: 4,
       color: scheme.primary,
       linearTrackColor: aurora.glassStrong,
       circularTrackColor: aurora.glassStrong,
@@ -558,9 +584,7 @@ AuroraColors _auroraColors(ColorScheme scheme, bool dark) {
             Colors.white,
           ),
     incomingText: scheme.onSurface,
-    outgoingA: dark
-        ? _lift(scheme.primaryContainer, .04)
-        : scheme.primary,
+    outgoingA: dark ? _lift(scheme.primaryContainer, .04) : scheme.primary,
     outgoingB: dark
         ? _lift(
             Color.lerp(scheme.primaryContainer, scheme.secondaryContainer, .6)!,

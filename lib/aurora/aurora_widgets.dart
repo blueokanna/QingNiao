@@ -1,3 +1,5 @@
+import 'package:qingniao/l10n/app_strings.dart';
+
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -64,7 +66,8 @@ class _AuroraScaffoldState extends State<AuroraScaffold> {
       bottomNavigationBar: widget.bottomNavigationBar,
       body: Stack(
         children: [
-          const Positioned.fill(child: AuroraBackdrop()),
+          if (!AuroraBackdropScope.exists(context))
+            const Positioned.fill(child: AuroraBackdrop()),
           Positioned.fill(
             child: NotificationListener<ScrollNotification>(
               onNotification: _onScroll,
@@ -109,7 +112,9 @@ class AuroraGlass extends StatelessWidget {
   Widget build(BuildContext context) {
     final aurora = context.aurora;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final shape = RoundedSuperellipseBorder(borderRadius: BorderRadius.circular(radius));
+    final shape = RoundedSuperellipseBorder(
+      borderRadius: BorderRadius.circular(radius),
+    );
     return Container(
       width: width,
       height: height,
@@ -137,7 +142,9 @@ class AuroraGlass extends StatelessWidget {
       ),
       foregroundDecoration: border
           ? ShapeDecoration(
-              shape: shape.copyWith(side: BorderSide(color: aurora.hairline, width: 1)),
+              shape: shape.copyWith(
+                side: BorderSide(color: aurora.hairline, width: 1),
+              ),
             )
           : null,
       child: Padding(padding: padding ?? EdgeInsets.zero, child: child),
@@ -170,7 +177,10 @@ class AuroraPressable extends StatefulWidget {
 }
 
 class _AuroraPressableState extends State<AuroraPressable> {
-  late final AuroraSpring _spring = AuroraEngine.instance.spring(stiffness: 460, dampingRatio: .72);
+  late final AuroraSpring _spring = AuroraEngine.instance.spring(
+    stiffness: 460,
+    dampingRatio: .72,
+  );
 
   @override
   void dispose() {
@@ -246,7 +256,9 @@ class AuroraIconButton extends StatelessWidget {
         width: size,
         height: size,
         decoration: ShapeDecoration(
-          shape: RoundedSuperellipseBorder(borderRadius: BorderRadius.circular(size * .42)),
+          shape: RoundedSuperellipseBorder(
+            borderRadius: BorderRadius.circular(size * .42),
+          ),
           color: filled ? scheme.primary : aurora.glass,
         ),
         child: Icon(
@@ -263,7 +275,9 @@ class AuroraIconButton extends StatelessWidget {
             backgroundColor: scheme.error,
             child: button,
           );
-    return tooltip == null ? content : Tooltip(message: tooltip!, child: content);
+    return tooltip == null
+        ? content
+        : Tooltip(message: tooltip!, child: content);
   }
 }
 
@@ -312,7 +326,11 @@ class AuroraFilterItem {
 }
 
 class _FilterChip extends StatelessWidget {
-  const _FilterChip({required this.item, required this.selected, required this.onTap});
+  const _FilterChip({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
 
   final AuroraFilterItem item;
   final bool selected;
@@ -336,7 +354,12 @@ class _FilterChip extends StatelessWidget {
           ),
           color: selected ? null : aurora.glass,
           gradient: selected
-              ? LinearGradient(colors: [scheme.primary, Color.lerp(scheme.primary, scheme.tertiary, .5)!])
+              ? LinearGradient(
+                  colors: [
+                    scheme.primary,
+                    Color.lerp(scheme.primary, scheme.tertiary, .5)!,
+                  ],
+                )
               : null,
         ),
         child: Row(
@@ -411,7 +434,8 @@ class AuroraSearchField extends StatefulWidget {
 
 class _AuroraSearchFieldState extends State<AuroraSearchField> {
   late final FocusNode _focus = FocusNode();
-  late final TextEditingController _controller = widget.controller ?? TextEditingController();
+  late final TextEditingController _controller =
+      widget.controller ?? TextEditingController();
   bool _hasText = false;
 
   @override
@@ -447,20 +471,34 @@ class _AuroraSearchFieldState extends State<AuroraSearchField> {
         shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-            color: focused ? scheme.primary.withValues(alpha: .55) : aurora.hairline,
+            color: focused
+                ? scheme.primary.withValues(alpha: .55)
+                : aurora.hairline,
             width: focused ? 1.4 : 1,
           ),
         ),
         color: aurora.glassStrong,
         shadows: focused
-            ? [BoxShadow(color: scheme.primary.withValues(alpha: .12), blurRadius: 22, offset: const Offset(0, 8))]
+            ? [
+                BoxShadow(
+                  color: scheme.primary.withValues(alpha: .12),
+                  blurRadius: 22,
+                  offset: const Offset(0, 8),
+                ),
+              ]
             : null,
       ),
       child: Row(
         children: [
           Padding(
-            padding: const EdgeInsets.only(left: 16, right: 10),
-            child: widget.leading ?? Icon(Icons.search_rounded, size: 20, color: scheme.onSurfaceVariant),
+            padding: const EdgeInsetsDirectional.only(start: 16, end: 10),
+            child:
+                widget.leading ??
+                Icon(
+                  Icons.search_rounded,
+                  size: 20,
+                  color: scheme.onSurfaceVariant,
+                ),
           ),
           Expanded(
             child: TextField(
@@ -484,7 +522,7 @@ class _AuroraSearchFieldState extends State<AuroraSearchField> {
           ),
           if (_hasText)
             IconButton(
-              tooltip: '清除',
+              tooltip: tr("Clear"),
               icon: const Icon(Icons.close_rounded, size: 18),
               onPressed: () {
                 _controller.clear();
@@ -529,7 +567,7 @@ class AuroraTopBar extends StatelessWidget {
           if (showBack) ...[
             AuroraIconButton(
               icon: Icons.arrow_back_rounded,
-              tooltip: '返回',
+              tooltip: tr("Back"),
               onPressed: onBack ?? () => Navigator.of(context).maybePop(),
             ),
             const SizedBox(width: 10),
@@ -544,16 +582,20 @@ class AuroraTopBar extends StatelessWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: (compact ? context.texts.titleMedium : context.texts.titleLarge)?.copyWith(
-                    color: scheme.onSurface,
-                  ),
+                  style:
+                      (compact
+                              ? context.texts.titleMedium
+                              : context.texts.titleLarge)
+                          ?.copyWith(color: scheme.onSurface),
                 ),
                 if (subtitle != null)
                   Text(
                     subtitle!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: context.texts.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                    style: context.texts.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
               ],
             ),
@@ -606,13 +648,17 @@ class AuroraLargeHeader extends StatelessWidget {
                 ],
                 Text(
                   title,
-                  style: context.texts.headlineLarge?.copyWith(color: scheme.onSurface),
+                  style: context.texts.headlineLarge?.copyWith(
+                    color: scheme.onSurface,
+                  ),
                 ),
                 if (description != null) ...[
                   const SizedBox(height: 6),
                   Text(
                     description!,
-                    style: context.texts.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                    style: context.texts.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ],
@@ -667,9 +713,11 @@ class AuroraSheetSurface extends StatelessWidget {
     final aurora = context.aurora;
     final media = MediaQuery.of(context);
     return Padding(
-      padding: EdgeInsets.only(top: media.padding.top + 28),
+      padding: EdgeInsetsDirectional.only(top: media.padding.top + 28),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: media.size.height * maxHeightFactor),
+        constraints: BoxConstraints(
+          maxHeight: media.size.height * maxHeightFactor,
+        ),
         child: DecoratedBox(
           decoration: ShapeDecoration(
             shape: const RoundedSuperellipseBorder(
@@ -677,7 +725,11 @@ class AuroraSheetSurface extends StatelessWidget {
             ),
             color: scheme.surfaceContainerHigh,
             shadows: [
-              BoxShadow(color: Colors.black.withValues(alpha: .24), blurRadius: 40, offset: const Offset(0, -8)),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: .24),
+                blurRadius: 40,
+                offset: const Offset(0, -8),
+              ),
             ],
           ),
           child: SafeArea(
@@ -690,7 +742,7 @@ class AuroraSheetSurface extends StatelessWidget {
                   Container(
                     width: 38,
                     height: 4,
-                    margin: const EdgeInsets.only(bottom: 12),
+                    margin: const EdgeInsetsDirectional.only(bottom: 12),
                     decoration: BoxDecoration(
                       color: aurora.hairline,
                       borderRadius: BorderRadius.circular(99),
@@ -732,7 +784,9 @@ Future<T?> showAuroraDialog<T>({
             ),
             const SizedBox(height: 10),
             DefaultTextStyle.merge(
-              style: context.texts.bodyMedium?.copyWith(color: context.colors.onSurfaceVariant),
+              style: context.texts.bodyMedium?.copyWith(
+                color: context.colors.onSurfaceVariant,
+              ),
               child: content,
             ),
             if (actions.isNotEmpty) ...[
@@ -800,17 +854,24 @@ class AuroraEmpty extends StatelessWidget {
             alignment: Alignment.center,
             children: [
               AuroraBloom(size: size),
-              if (icon != null) Icon(icon, size: 30, color: scheme.onSurfaceVariant),
+              if (icon != null)
+                Icon(icon, size: 30, color: scheme.onSurfaceVariant),
             ],
           ),
           const SizedBox(height: 18),
-          Text(title, textAlign: TextAlign.center, style: context.texts.titleLarge),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: context.texts.titleLarge,
+          ),
           if (message != null) ...[
             const SizedBox(height: 8),
             Text(
               message!,
               textAlign: TextAlign.center,
-              style: context.texts.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+              style: context.texts.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
           ],
           if (action != null) ...[const SizedBox(height: 20), action!],
@@ -901,14 +962,21 @@ class AuroraSettingTile extends StatelessWidget {
                       width: 38,
                       height: 38,
                       decoration: ShapeDecoration(
-                        shape: RoundedSuperellipseBorder(borderRadius: BorderRadius.circular(14)),
-                        color: (destructive ? scheme.errorContainer : scheme.secondaryContainer)
-                            .withValues(alpha: .7),
+                        shape: RoundedSuperellipseBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        color:
+                            (destructive
+                                    ? scheme.errorContainer
+                                    : scheme.secondaryContainer)
+                                .withValues(alpha: .7),
                       ),
                       child: Icon(
                         icon,
                         size: 19,
-                        color: destructive ? scheme.onErrorContainer : scheme.onSecondaryContainer,
+                        color: destructive
+                            ? scheme.onErrorContainer
+                            : scheme.onSecondaryContainer,
                       ),
                     ),
                     const SizedBox(width: 14),
@@ -917,20 +985,33 @@ class AuroraSettingTile extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(title, style: context.texts.titleSmall?.copyWith(color: color)),
+                        Text(
+                          title,
+                          style: context.texts.titleSmall?.copyWith(
+                            color: color,
+                          ),
+                        ),
                         if (subtitle != null) ...[
                           const SizedBox(height: 2),
                           Text(
                             subtitle!,
-                            style: context.texts.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                            style: context.texts.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
                           ),
                         ],
                       ],
                     ),
                   ),
-                  if (trailing != null) ...[const SizedBox(width: 12), trailing!]
-                  else if (onTap != null)
-                    Icon(Icons.chevron_right_rounded, size: 20, color: scheme.onSurfaceVariant),
+                  if (trailing != null) ...[
+                    const SizedBox(width: 12),
+                    trailing!,
+                  ] else if (onTap != null)
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: scheme.onSurfaceVariant,
+                    ),
                 ],
               ),
             ),
@@ -938,7 +1019,7 @@ class AuroraSettingTile extends StatelessWidget {
         ),
         if (showDivider)
           Padding(
-            padding: const EdgeInsets.only(left: 68),
+            padding: const EdgeInsetsDirectional.only(start: 68),
             child: Divider(color: context.aurora.hairline, height: 1),
           ),
       ],
@@ -957,12 +1038,20 @@ class AuroraBadge extends StatelessWidget {
     final scheme = context.colors;
     if (count <= 0) return const SizedBox.shrink();
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: small ? 6 : 8, vertical: small ? 1 : 2),
+      padding: EdgeInsets.symmetric(
+        horizontal: small ? 6 : 8,
+        vertical: small ? 1 : 2,
+      ),
       constraints: BoxConstraints(minWidth: small ? 18 : 22),
       decoration: ShapeDecoration(
-        shape: RoundedSuperellipseBorder(borderRadius: BorderRadius.circular(99)),
+        shape: RoundedSuperellipseBorder(
+          borderRadius: BorderRadius.circular(99),
+        ),
         gradient: LinearGradient(
-          colors: [scheme.primary, Color.lerp(scheme.primary, scheme.tertiary, .6)!],
+          colors: [
+            scheme.primary,
+            Color.lerp(scheme.primary, scheme.tertiary, .6)!,
+          ],
         ),
       ),
       alignment: Alignment.center,
@@ -1016,7 +1105,10 @@ class _LoadingPainter extends CustomPainter {
       final phase = time * 2.2 - index * .55;
       final wave = (math.sin(phase) + 1) / 2;
       final lift = (math.sin(phase - .4) + 1) / 2;
-      final center = Offset(size.width * (.2 + index * .3), size.height * .5 - lift * size.height * .18);
+      final center = Offset(
+        size.width * (.2 + index * .3),
+        size.height * .5 - lift * size.height * .18,
+      );
       canvas.drawCircle(
         center,
         radius * (.72 + wave * .34),
@@ -1026,7 +1118,8 @@ class _LoadingPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _LoadingPainter old) => old.time != time || old.color != color;
+  bool shouldRepaint(covariant _LoadingPainter old) =>
+      old.time != time || old.color != color;
 }
 
 class AuroraErrorBanner extends StatelessWidget {
@@ -1045,19 +1138,27 @@ class AuroraErrorBanner extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
         child: Row(
           children: [
-            Icon(Icons.error_outline_rounded, size: 20, color: scheme.onErrorContainer),
+            Icon(
+              Icons.error_outline_rounded,
+              size: 20,
+              color: scheme.onErrorContainer,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 message,
-                style: context.texts.bodySmall?.copyWith(color: scheme.onErrorContainer),
+                style: context.texts.bodySmall?.copyWith(
+                  color: scheme.onErrorContainer,
+                ),
               ),
             ),
             if (onRetry != null)
               TextButton(
                 onPressed: onRetry,
-                style: TextButton.styleFrom(foregroundColor: scheme.onErrorContainer),
-                child: const Text('重试'),
+                style: TextButton.styleFrom(
+                  foregroundColor: scheme.onErrorContainer,
+                ),
+                child: Text(tr("Retry")),
               ),
           ],
         ),
@@ -1080,35 +1181,35 @@ class AuroraNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final aurora = context.aurora;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
-      child: DecoratedBox(
-        decoration: ShapeDecoration(
-          shape: RoundedSuperellipseBorder(borderRadius: BorderRadius.circular(28)),
-          color: aurora.navSurface,
-          shadows: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: .16),
-              blurRadius: 30,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-          child: Row(
-            children: [
-              for (var i = 0; i < destinations.length; i++)
-                Expanded(
-                  child: _NavItem(
-                    destination: destinations[i],
-                    selected: i == index,
-                    onTap: () => onSelected(i),
-                  ),
-                ),
-            ],
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: NavigationBar(
+          selectedIndex: index,
+          onDestinationSelected: onSelected,
+          animationDuration: AuroraMotion.base,
+          height: 72,
+          backgroundColor: context.colors.surfaceContainer,
+          indicatorShape: RoundedSuperellipseBorder(
+            borderRadius: BorderRadius.circular(18),
           ),
+          destinations: [
+            for (final destination in destinations)
+              NavigationDestination(
+                icon: Badge.count(
+                  count: destination.badge,
+                  isLabelVisible: destination.badge > 0,
+                  child: Icon(destination.icon),
+                ),
+                selectedIcon: Badge.count(
+                  count: destination.badge,
+                  isLabelVisible: destination.badge > 0,
+                  child: Icon(destination.selectedIcon),
+                ),
+                label: destination.label,
+              ),
+          ],
         ),
       ),
     );
@@ -1157,7 +1258,10 @@ class AuroraFab extends StatelessWidget {
         width: label == null ? size : null,
         height: size,
         padding: EdgeInsets.symmetric(horizontal: label == null ? 0 : 18),
-        gradient: [scheme.primary, Color.lerp(scheme.primary, scheme.tertiary, .7)!],
+        gradient: [
+          scheme.primary,
+          Color.lerp(scheme.primary, scheme.tertiary, .7)!,
+        ],
         glow: aurora.glow,
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1167,64 +1271,17 @@ class AuroraFab extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 label!,
-                style: context.texts.labelLarge?.copyWith(color: scheme.onPrimary),
+                style: context.texts.labelLarge?.copyWith(
+                  color: scheme.onPrimary,
+                ),
               ),
             ],
           ],
         ),
       ),
     );
-    return tooltip == null ? content : Tooltip(message: tooltip!, child: content);
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  const _NavItem({required this.destination, required this.selected, required this.onTap});
-
-  final AuroraNavDestination destination;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = context.colors;
-    return AuroraPressable(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: AnimatedContainer(
-        duration: AuroraMotion.base,
-        curve: AuroraMotion.emphasized,
-        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
-        decoration: ShapeDecoration(
-          shape: RoundedSuperellipseBorder(
-            borderRadius: BorderRadius.circular(selected ? 20 : 16),
-          ),
-          color: selected ? scheme.secondaryContainer.withValues(alpha: .8) : Colors.transparent,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Badge(
-              isLabelVisible: destination.badge > 0,
-              label: Text(destination.badge > 99 ? '99+' : '${destination.badge}'),
-              child: Icon(
-                selected ? destination.selectedIcon : destination.icon,
-                size: 23,
-                color: selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              destination.label,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected ? scheme.onSecondaryContainer : scheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return tooltip == null
+        ? content
+        : Tooltip(message: tooltip!, child: content);
   }
 }

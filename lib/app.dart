@@ -1,3 +1,4 @@
+import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -5,13 +6,11 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'app/app_settings.dart';
 import 'aurora/aurora_engine.dart';
 import 'aurora/aurora_shapes.dart';
+import 'aurora/aurora_backdrop.dart';
 import 'aurora/aurora_theme.dart';
-import 'aurora/aurora_widgets.dart';
 import 'messaging/home_shell.dart';
 import 'messaging/message_hub.dart';
 import 'messaging/message_repository.dart';
-import 'messaging/models.dart';
-import 'onboarding/onboarding_screen.dart';
 
 class QingniaoApp extends StatefulWidget {
   const QingniaoApp({
@@ -41,16 +40,20 @@ class _QingniaoAppState extends State<QingniaoApp>
 
   void _onSettings() => _applyMotion();
 
+  @override
+  void didHaveMemoryPressure() {
+    AuroraShapes.clearCache();
+    PaintingBinding.instance.imageCache.clear();
+  }
+
   void _applyMotion() {
     final settings = widget.settings;
     AuroraEngine.instance.configure(
-      motion: settings.lowPowerAurora
-          ? AuroraMotionLevel.reduced
-          : settings.motionLevel,
+      motion: settings.motionLevel,
       reduce:
           _systemReduceMotion ||
           settings.motionLevel == AuroraMotionLevel.reduced,
-      backdrop: !settings.amoled,
+      backdrop: !settings.amoled && !settings.lowPowerAurora,
     );
   }
 
@@ -81,11 +84,15 @@ class _QingniaoAppState extends State<QingniaoApp>
         return AppScope(
           settings: settings,
           child: MaterialApp(
-            title: '青鸟短信',
+            title: tr("Qingniao"),
             debugShowCheckedModeBanner: false,
-            locale: const Locale('zh', 'CN'),
-            supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
+            locale: settings.localeCode == 'system'
+                ? null
+                : Locale(settings.localeCode),
+            supportedLocales: AppStrings.locales,
+            localeListResolutionCallback: AppStrings.resolve,
             localizationsDelegates: const [
+              AppStringsDelegate(),
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
@@ -107,6 +114,9 @@ class _QingniaoAppState extends State<QingniaoApp>
                   if (mounted) _applyMotion();
                 });
               }
+              AuroraEngine.instance.setRefreshRate(
+                View.of(context).display.refreshRate,
+              );
               final media = MediaQuery.of(context);
               final brightness = Theme.of(context).brightness;
               return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -126,7 +136,15 @@ class _QingniaoAppState extends State<QingniaoApp>
                       settings.fontScale,
                     ),
                   ),
-                  child: child ?? const SizedBox.shrink(),
+                  child: AuroraBackdropScope(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        const AuroraBackdrop(),
+                        child ?? const SizedBox.shrink(),
+                      ],
+                    ),
+                  ),
                 ),
               );
             },
@@ -162,30 +180,6 @@ class RootGate extends StatefulWidget {
 
 class _RootGateState extends State<RootGate> {
   late final MessageHub _hub = MessageHub(widget.repository);
-  AccessState _access = const AccessState();
-  bool _loading = true;
-  bool _skipped = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _check();
-  }
-
-  Future<void> _check() async {
-    try {
-      final access = await widget.repository.access();
-      if (!mounted) return;
-      setState(() {
-        _access = access;
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _loading = false);
-    }
-  }
-
   @override
   void dispose() {
     _hub.dispose();
@@ -194,29 +188,6 @@ class _RootGateState extends State<RootGate> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return AuroraScaffold(
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const AuroraBloom(size: 132),
-              const SizedBox(height: 18),
-              Text('青鸟正在苏醒', style: context.texts.titleMedium),
-              const SizedBox(height: 10),
-              const AuroraLoading(),
-            ],
-          ),
-        ),
-      );
-    }
-    if (!_access.ready && !_skipped) {
-      return OnboardingScreen(
-        repository: widget.repository,
-        onReady: _check,
-        onSkip: () => setState(() => _skipped = true),
-      );
-    }
     return HomeShell(repository: widget.repository, hub: _hub);
   }
 }

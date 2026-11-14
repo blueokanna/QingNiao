@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">青鸟短信</string>
+    <string name="push_title">有可同步的新消息</string>
+    <string name="push_body">打开青鸟短信以安全同步。</string>
+    <string name="notification_reply">回复</string>
+    <string name="notification_messages">消息</string>
+    <string name="notification_new_message">新短信</string>
+    <string name="notification_mark_read">标为已读</string>
+    <string name="notification_copy_code">复制</string>
+    <string name="notification_code_copied">已复制</string>
+    <string name="notification_loading">正在加载…</string>
+    <string name="notification_new_mms">新的彩信</string>
+    <string name="notification_failed">发送失败</string>
+    <string name="notification_retry">操作未完成，请重试</string>
+    <string name="notification_test_title">通知测试</string>
+    <string name="notification_test_body">测试验证码：864213。未发送短信。</string>
+</resources>

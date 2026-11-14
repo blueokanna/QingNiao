@@ -16,7 +16,7 @@ class SmsRepository(private val context: Context, private val store: MessageStor
                 while (cursor.moveToNext() && size < limit) {
                     val id = cursor.getLong(0)
                     if ((id in hidden) != trash) continue
-                    add(mapOf("id" to id, "threadId" to cursor.getLong(1), "address" to (cursor.getString(2) ?: "未知号码"), "body" to (cursor.getString(3) ?: ""), "date" to cursor.getLong(4), "type" to cursor.getInt(5), "read" to (cursor.getInt(6) != 0), "subscriptionId" to cursor.getInt(7), "status" to cursor.getInt(8)))
+                    add(mapOf("id" to id, "threadId" to cursor.getLong(1), "address" to (cursor.getString(2) ?: "Unknown number"), "body" to (cursor.getString(3) ?: ""), "date" to cursor.getLong(4), "type" to cursor.getInt(5), "read" to (cursor.getInt(6) != 0), "subscriptionId" to cursor.getInt(7), "status" to cursor.getInt(8)))
                 }
             }
         } ?: emptyList()
@@ -30,7 +30,7 @@ class SmsRepository(private val context: Context, private val store: MessageStor
                 if (cursor.getLong(0) in hidden) continue
                 val thread = cursor.getLong(1)
                 if (query.isEmpty() || (cursor.getString(2) ?: "").contains(query, ignoreCase = true) || (cursor.getString(3) ?: "").contains(query, ignoreCase = true)) matches.add(thread)
-                val conversation = threads.getOrPut(thread) { mutableMapOf("threadId" to thread, "address" to (cursor.getString(2) ?: "未知号码"), "body" to (cursor.getString(3) ?: ""), "date" to cursor.getLong(4), "subscriptionId" to cursor.getInt(6), "unread" to 0) }
+                val conversation = threads.getOrPut(thread) { mutableMapOf("threadId" to thread, "address" to (cursor.getString(2) ?: "Unknown number"), "body" to (cursor.getString(3) ?: ""), "date" to cursor.getLong(4), "subscriptionId" to cursor.getInt(6), "unread" to 0) }
                 if (cursor.getInt(5) == 0) conversation["unread"] = (conversation["unread"] as Int) + 1
             }
         }

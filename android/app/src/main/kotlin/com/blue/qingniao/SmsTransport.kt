@@ -19,15 +19,15 @@ object MessageIo {
 
 object SmsTransport {
     fun send(context: Context, store: MessageStore, address: String, body: String, subscription: Int): Long {
-        require(address.matches(Regex("\\+?[0-9*#][0-9*# .()-]{0,39}"))) { "请输入有效的收件号码" }
-        require(body.isNotBlank() && body.length <= 10000) { "短信正文应为 1–10000 个字符" }
-        check(SmsAccess.isDefaultSmsApp(context)) { "请先设置为默认短信应用" }
+        require(address.matches(Regex("\\+?[0-9*#][0-9*# .()-]{0,39}"))) { "Enter a valid recipient number" }
+        require(body.isNotBlank() && body.length <= 10000) { "Message text must contain 1–10000 characters" }
+        check(SmsAccess.isDefaultSmsApp(context)) { "Set this app as the default SMS app" }
         val manager = context.getSystemService(SmsManager::class.java).createForSubscriptionId(subscription)
         val parts = manager.divideMessage(body)
-        require(parts.size <= 100) { "短信分段过多" }
+        require(parts.size <= 100) { "Too many message segments" }
         val uri = checkNotNull(context.contentResolver.insert(Telephony.Sms.Outbox.CONTENT_URI, ContentValues().apply {
             put("address", address); put("body", body); put("date", System.currentTimeMillis()); put("read", 1); put("sub_id", subscription); put("status", Telephony.Sms.STATUS_PENDING)
-        })) { "无法写入发件箱" }
+        })) { "Unable to write to the outbox" }
         val id = ContentUris.parseId(uri)
         android.util.Log.d("QingniaoSms", "outbox id=$id parts=${parts.size} sub=$subscription address=$address")
         try {
@@ -71,7 +71,7 @@ class SmsReceiptReceiver : BroadcastReceiver() {
                     context.contentResolver.update(ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, id), values, null, null)
                 }
             } catch (_: Exception) {
-                MessageNotifications.show(context, "", "短信状态更新失败，请检查系统消息记录", id.toInt())
+                MessageNotifications.show(context, "", "Unable to update message status. Check system messages.", id.toInt())
             } finally { pending.finish() }
         }
     }

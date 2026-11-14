@@ -1,3 +1,7 @@
+import '../messaging/sensitive_clipboard.dart';
+
+import 'package:qingniao/l10n/app_strings.dart';
+
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
@@ -21,6 +25,7 @@ class ConversationTile extends StatelessWidget {
     this.onLongPress,
     this.showSim = false,
     this.selected = false,
+    this.selectionMode = false,
   });
 
   final ThreadSummary thread;
@@ -28,22 +33,18 @@ class ConversationTile extends StatelessWidget {
   final VoidCallback? onLongPress;
   final bool showSim;
   final bool selected;
+  final bool selectionMode;
 
   @override
   Widget build(BuildContext context) {
     final scheme = context.colors;
-    final aurora = context.aurora;
     final unread = thread.unread;
     return RepaintBoundary(
       child: AuroraGlass(
         radius: 26,
-        gradient: unread > 0
-            ? [
-                Color.alphaBlend(scheme.primaryContainer.withValues(alpha: .5), aurora.glass),
-                aurora.glass,
-              ]
-            : null,
-        color: selected ? Color.alphaBlend(scheme.primary.withValues(alpha: .14), aurora.glass) : null,
+        color: selected
+            ? scheme.secondaryContainer
+            : scheme.surfaceContainerLow,
         child: AuroraPressable(
           onTap: onTap,
           onLongPress: onLongPress,
@@ -55,17 +56,29 @@ class ConversationTile extends StatelessWidget {
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    AuroraAvatar(
-                      seed: thread.address,
-                      size: 54,
-                      unread: unread > 0,
-                      label: thread.isGroup ? null : thread.title,
-                      icon: thread.isGroup ? Icons.groups_2_rounded : null,
-                      heroTag: 'thread-avatar-${thread.threadId}',
-                    ),
+                    if (selectionMode)
+                      SizedBox(
+                        width: 54,
+                        height: 54,
+                        child: Icon(
+                          selected
+                              ? Icons.check_circle_rounded
+                              : Icons.radio_button_unchecked_rounded,
+                          color: selected ? scheme.primary : scheme.outline,
+                        ),
+                      )
+                    else
+                      AuroraAvatar(
+                        seed: thread.address,
+                        size: 54,
+                        unread: unread > 0,
+                        label: thread.isGroup ? null : thread.title,
+                        icon: thread.isGroup ? Icons.groups_2_rounded : null,
+                        heroTag: 'thread-avatar-${thread.threadId}',
+                      ),
                     if (unread > 0)
-                      Positioned(
-                        right: -4,
+                      PositionedDirectional(
+                        end: -4,
                         top: -4,
                         child: AuroraBadge(count: unread, small: true),
                       ),
@@ -80,8 +93,12 @@ class ConversationTile extends StatelessWidget {
                         children: [
                           if (thread.pinned)
                             Padding(
-                              padding: const EdgeInsets.only(right: 4),
-                              child: Icon(Icons.push_pin_rounded, size: 13, color: scheme.primary),
+                              padding: const EdgeInsetsDirectional.only(end: 4),
+                              child: Icon(
+                                Icons.push_pin_rounded,
+                                size: 13,
+                                color: scheme.primary,
+                              ),
                             ),
                           Expanded(
                             child: Text(
@@ -89,7 +106,9 @@ class ConversationTile extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: context.texts.titleMedium?.copyWith(
-                                fontWeight: unread > 0 ? FontWeight.w700 : FontWeight.w600,
+                                fontWeight: unread > 0
+                                    ? FontWeight.w700
+                                    : FontWeight.w600,
                                 color: scheme.onSurface,
                               ),
                             ),
@@ -98,8 +117,12 @@ class ConversationTile extends StatelessWidget {
                           Text(
                             MessageFormat.inboxTime(thread.date),
                             style: context.texts.labelSmall?.copyWith(
-                              color: unread > 0 ? scheme.primary : scheme.onSurfaceVariant,
-                              fontWeight: unread > 0 ? FontWeight.w700 : FontWeight.w500,
+                              color: unread > 0
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant,
+                              fontWeight: unread > 0
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
                             ),
                           ),
                         ],
@@ -109,8 +132,12 @@ class ConversationTile extends StatelessWidget {
                         children: [
                           if (thread.hasMms)
                             Padding(
-                              padding: const EdgeInsets.only(right: 5),
-                              child: Icon(Icons.image_outlined, size: 14, color: scheme.onSurfaceVariant),
+                              padding: const EdgeInsetsDirectional.only(end: 5),
+                              child: Icon(
+                                Icons.image_outlined,
+                                size: 14,
+                                color: scheme.onSurfaceVariant,
+                              ),
                             ),
                           Expanded(
                             child: Text(
@@ -119,13 +146,15 @@ class ConversationTile extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: context.texts.bodyMedium?.copyWith(
                                 color: scheme.onSurfaceVariant,
-                                fontWeight: unread > 0 ? FontWeight.w500 : FontWeight.w400,
+                                fontWeight: unread > 0
+                                    ? FontWeight.w500
+                                    : FontWeight.w400,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      if (thread.hasOtp || showSim || thread.category != MessageCategory.personal) ...[
+                      if (thread.hasOtp || showSim) ...[
                         const SizedBox(height: 8),
                         Row(
                           children: [
@@ -133,19 +162,8 @@ class ConversationTile extends StatelessWidget {
                               OtpChip(code: thread.otp!, compact: true),
                               const SizedBox(width: 6),
                             ],
-                            if (thread.category != MessageCategory.personal) ...[
-                              CategoryTag(category: thread.category),
-                              const SizedBox(width: 6),
-                            ],
-                            if (showSim) SimBadge(subscriptionId: thread.subscriptionId),
-                            const Spacer(),
-                            if (thread.count > 0 && !thread.hasOtp)
-                              Text(
-                                '${thread.count} 条',
-                                style: context.texts.labelSmall?.copyWith(
-                                  color: scheme.onSurfaceVariant.withValues(alpha: .7),
-                                ),
-                              ),
+                            if (showSim)
+                              SimBadge(subscriptionId: thread.subscriptionId),
                           ],
                         ),
                       ],
@@ -164,7 +182,7 @@ class ConversationTile extends StatelessWidget {
     if (thread.hasOtp) {
       return thread.preview.replaceAll(thread.otp!, '•' * thread.otp!.length);
     }
-    return thread.preview.isEmpty ? '（空白消息）' : thread.preview;
+    return thread.preview.isEmpty ? tr("(Empty message)") : thread.preview;
   }
 }
 
@@ -181,7 +199,9 @@ class SimBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: ShapeDecoration(
         color: scheme.tertiaryContainer.withValues(alpha: .55),
-        shape: RoundedSuperellipseBorder(borderRadius: BorderRadius.circular(99)),
+        shape: RoundedSuperellipseBorder(
+          borderRadius: BorderRadius.circular(99),
+        ),
       ),
       child: Text(
         'SIM ${subscriptionId == 0 ? 1 : subscriptionId}',
@@ -203,10 +223,22 @@ class CategoryTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, icon) = switch (category) {
-      MessageCategory.verification => ('验证码', Icons.lock_outline_rounded),
-      MessageCategory.finance => ('账单', Icons.account_balance_outlined),
-      MessageCategory.promotion => ('推广', Icons.local_offer_outlined),
-      MessageCategory.personal => ('对话', Icons.chat_bubble_outline_rounded),
+      MessageCategory.verification => (
+        tr("Verification codes"),
+        Icons.lock_outline_rounded,
+      ),
+      MessageCategory.finance => (
+        tr("Finance"),
+        Icons.account_balance_outlined,
+      ),
+      MessageCategory.promotion => (
+        tr("Promotions"),
+        Icons.local_offer_outlined,
+      ),
+      MessageCategory.personal => (
+        tr("Personal"),
+        Icons.chat_bubble_outline_rounded,
+      ),
     };
     final scheme = context.colors;
     final color = switch (category) {
@@ -219,7 +251,9 @@ class CategoryTag extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: ShapeDecoration(
         color: color.withValues(alpha: .1),
-        shape: RoundedSuperellipseBorder(borderRadius: BorderRadius.circular(99)),
+        shape: RoundedSuperellipseBorder(
+          borderRadius: BorderRadius.circular(99),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -228,7 +262,11 @@ class CategoryTag extends StatelessWidget {
           const SizedBox(width: 3),
           Text(
             label,
-            style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: color),
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
           ),
         ],
       ),
@@ -243,12 +281,14 @@ class OtpChip extends StatefulWidget {
     this.compact = false,
     this.inverted = false,
     this.onCopied,
+    this.iconOnly = false,
   });
 
   final String code;
   final bool compact;
   final bool inverted;
   final VoidCallback? onCopied;
+  final bool iconOnly;
 
   @override
   State<OtpChip> createState() => _OtpChipState();
@@ -258,7 +298,7 @@ class _OtpChipState extends State<OtpChip> {
   bool _copied = false;
 
   Future<void> _copy() async {
-    await Clipboard.setData(ClipboardData(text: widget.code));
+    await SensitiveClipboard.copy(widget.code);
     HapticFeedback.mediumImpact();
     if (!mounted) return;
     setState(() => _copied = true);
@@ -270,13 +310,29 @@ class _OtpChipState extends State<OtpChip> {
   @override
   Widget build(BuildContext context) {
     final aurora = context.aurora;
+    if (widget.iconOnly) {
+      return IconButton.filledTonal(
+        tooltip: _copied ? tr('Copied') : tr('Copy'),
+        onPressed: _copy,
+        icon: AnimatedSwitcher(
+          duration: AuroraMotion.fast,
+          child: Icon(
+            _copied ? Icons.check_rounded : Icons.copy_rounded,
+            key: ValueKey(_copied),
+          ),
+        ),
+      );
+    }
     return AuroraPressable(
       onTap: _copy,
       pressedScale: .05,
       borderRadius: BorderRadius.circular(14),
       child: AnimatedContainer(
         duration: AuroraMotion.base,
-        padding: EdgeInsets.symmetric(horizontal: widget.compact ? 8 : 12, vertical: widget.compact ? 3 : 7),
+        padding: EdgeInsets.symmetric(
+          horizontal: widget.compact ? 8 : 12,
+          vertical: widget.compact ? 3 : 7,
+        ),
         decoration: ShapeDecoration(
           color: widget.inverted
               ? aurora.outgoingText.withValues(alpha: _copied ? .26 : .16)
@@ -329,6 +385,7 @@ class MessageBubble extends StatelessWidget {
     this.groupedBottom = false,
     this.selected = false,
     this.onLongPress,
+    this.onTap,
     this.onRetry,
     this.onOpenLink,
     this.onOpenAttachment,
@@ -340,6 +397,7 @@ class MessageBubble extends StatelessWidget {
   final bool groupedBottom;
   final bool selected;
   final VoidCallback? onLongPress;
+  final VoidCallback? onTap;
   final VoidCallback? onRetry;
   final ValueChanged<String>? onOpenLink;
   final ValueChanged<Attachment>? onOpenAttachment;
@@ -362,12 +420,18 @@ class MessageBubble extends StatelessWidget {
       borderRadius: BorderRadius.only(
         topLeft: Radius.circular(groupedTop && !outgoing ? small : radius),
         topRight: Radius.circular(groupedTop && outgoing ? small : radius),
-        bottomLeft: Radius.circular(groupedBottom && !outgoing ? small : (outgoing ? radius : small)),
-        bottomRight: Radius.circular(groupedBottom && outgoing ? small : (outgoing ? small : radius)),
+        bottomLeft: Radius.circular(
+          groupedBottom && !outgoing ? small : (outgoing ? radius : small),
+        ),
+        bottomRight: Radius.circular(
+          groupedBottom && outgoing ? small : (outgoing ? small : radius),
+        ),
       ),
       side: selected
           ? BorderSide(color: scheme.primary, width: 1.6)
-          : (outgoing ? BorderSide.none : BorderSide(color: aurora.hairline, width: 1)),
+          : (outgoing
+                ? BorderSide.none
+                : BorderSide(color: aurora.hairline, width: 1)),
     );
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -409,7 +473,9 @@ class MessageBubble extends StatelessWidget {
               Icon(
                 Icons.image_outlined,
                 size: 11,
-                color: outgoing ? context.aurora.outgoingText.withValues(alpha: .7) : scheme.onSurfaceVariant,
+                color: outgoing
+                    ? context.aurora.outgoingText.withValues(alpha: .7)
+                    : scheme.onSurfaceVariant,
               ),
             Text(
               MessageFormat.time(message.date),
@@ -433,34 +499,56 @@ class MessageBubble extends StatelessWidget {
         ),
         if (message.isFailed)
           Padding(
-            padding: const EdgeInsets.only(top: 2),
+            padding: const EdgeInsetsDirectional.only(top: 2),
             child: TextButton.icon(
               onPressed: onRetry,
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 minimumSize: const Size(0, 30),
-                foregroundColor: outgoing ? context.aurora.outgoingText : scheme.error,
-                textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                foregroundColor: outgoing
+                    ? context.aurora.outgoingText
+                    : scheme.error,
+                textStyle: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               icon: const Icon(Icons.refresh_rounded, size: 13),
-              label: const Text('重新发送'),
+              label: Text(tr("Resend")),
             ),
           ),
       ],
     );
 
     final bubble = Container(
-      constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * .78),
-      padding: EdgeInsets.fromLTRB(14, message.body.isEmpty && message.hasAttachments ? 8 : 11, 14, 9),
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width * .78,
+      ),
+      padding: EdgeInsets.fromLTRB(
+        14,
+        message.body.isEmpty && message.hasAttachments ? 8 : 11,
+        14,
+        9,
+      ),
       decoration: ShapeDecoration(
         shape: border,
         color: outgoing ? null : aurora.incomingBubble,
         gradient: outgoing ? aurora.outgoingGradient : null,
         shadows: outgoing
-            ? [BoxShadow(color: scheme.primary.withValues(alpha: .08), blurRadius: 18, offset: const Offset(0, 6))]
+            ? [
+                BoxShadow(
+                  color: scheme.primary.withValues(alpha: .08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ]
             : [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? .18 : .045),
+                  color: Colors.black.withValues(
+                    alpha: Theme.of(context).brightness == Brightness.dark
+                        ? .18
+                        : .045,
+                  ),
                   blurRadius: 14,
                   offset: const Offset(0, 5),
                 ),
@@ -479,17 +567,21 @@ class MessageBubble extends StatelessWidget {
       index: revealIndex,
       offset: outgoing ? 10 : 14,
       child: Padding(
-        padding: EdgeInsets.only(
-          left: outgoing ? 44 : 0,
-          right: outgoing ? 0 : 44,
+        padding: EdgeInsetsDirectional.only(
+          start: outgoing ? 44 : 0,
+          end: outgoing ? 0 : 44,
           top: groupedTop ? 2 : 7,
           bottom: groupedBottom ? 2 : 5,
         ),
         child: Align(
-          alignment: outgoing ? Alignment.centerRight : Alignment.centerLeft,
+          alignment: outgoing
+              ? AlignmentDirectional.centerEnd
+              : AlignmentDirectional.centerStart,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onLongPress: onLongPress,
+            onTap: onTap,
+
             child: RepaintBoundary(child: bubble),
           ),
         ),
@@ -499,7 +591,11 @@ class MessageBubble extends StatelessWidget {
 }
 
 class _MessageText extends StatelessWidget {
-  const _MessageText({required this.message, required this.outgoing, this.onOpenLink});
+  const _MessageText({
+    required this.message,
+    required this.outgoing,
+    this.onOpenLink,
+  });
 
   final SmsMessage message;
   final bool outgoing;
@@ -514,7 +610,9 @@ class _MessageText extends StatelessWidget {
     final matches = RegExp(r'https?://[^\s<>()（）]+').allMatches(body).toList();
     var cursor = 0;
     for (final match in matches) {
-      if (match.start > cursor) spans.add(TextSpan(text: body.substring(cursor, match.start)));
+      if (match.start > cursor) {
+        spans.add(TextSpan(text: body.substring(cursor, match.start)));
+      }
       var url = match.group(0)!;
       while (url.isNotEmpty && '.,;:!?，。；：！？'.contains(url[url.length - 1])) {
         url = url.substring(0, url.length - 1);
@@ -525,9 +623,12 @@ class _MessageText extends StatelessWidget {
           style: TextStyle(
             color: outgoing ? context.aurora.outgoingText : scheme.primary,
             decoration: TextDecoration.underline,
-            decorationColor: (outgoing ? context.aurora.outgoingText : scheme.primary).withValues(alpha: .5),
+            decorationColor:
+                (outgoing ? context.aurora.outgoingText : scheme.primary)
+                    .withValues(alpha: .5),
           ),
-          recognizer: TapGestureRecognizer()..onTap = () => onOpenLink?.call(url),
+          recognizer: TapGestureRecognizer()
+            ..onTap = () => onOpenLink?.call(url),
         ),
       );
       cursor = match.start + url.length;
@@ -549,13 +650,16 @@ class _MessageText extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.4,
-                  color: outgoing ? context.aurora.outgoingText : context.aurora.otp,
+                  color: outgoing
+                      ? context.aurora.outgoingText
+                      : context.aurora.otp,
                   backgroundColor: outgoing
                       ? context.aurora.outgoingText.withValues(alpha: .14)
                       : context.aurora.otpSoft,
                 ),
               ),
-              if (at + otp.length < text.length) TextSpan(text: text.substring(at + otp.length)),
+              if (at + otp.length < text.length)
+                TextSpan(text: text.substring(at + otp.length)),
             ],
             style: span.style,
           );
@@ -580,15 +684,22 @@ class _DeliveryMark extends StatelessWidget {
         ? context.colors.onPrimaryContainer.withValues(alpha: .62)
         : context.colors.onSurfaceVariant;
     final (icon, tooltip) = switch (state) {
-      DeliveryState.sending => (Icons.schedule_rounded, '正在发送'),
-      DeliveryState.sent => (Icons.done_rounded, '已发送'),
-      DeliveryState.delivered => (Icons.done_all_rounded, '已送达'),
-      DeliveryState.failed => (Icons.error_outline_rounded, '发送失败'),
-      DeliveryState.none => (Icons.done_rounded, '已发送'),
+      DeliveryState.sending => (Icons.schedule_rounded, tr("Sending")),
+      DeliveryState.sent => (Icons.done_rounded, tr("Sent")),
+      DeliveryState.delivered => (Icons.done_all_rounded, tr("Delivered")),
+      DeliveryState.failed => (
+        Icons.error_outline_rounded,
+        tr("Failed to send"),
+      ),
+      DeliveryState.none => (Icons.done_rounded, tr("Sent")),
     };
     return Tooltip(
       message: tooltip,
-      child: Icon(icon, size: 13, color: state == DeliveryState.failed ? context.colors.error : color),
+      child: Icon(
+        icon,
+        size: 13,
+        color: state == DeliveryState.failed ? context.colors.error : color,
+      ),
     );
   }
 }
@@ -624,7 +735,12 @@ class DayDivider extends StatelessWidget {
 }
 
 class AttachmentGrid extends StatelessWidget {
-  const AttachmentGrid({super.key, required this.attachments, this.onOpen, this.outgoing = false});
+  const AttachmentGrid({
+    super.key,
+    required this.attachments,
+    this.onOpen,
+    this.outgoing = false,
+  });
 
   final List<Attachment> attachments;
   final ValueChanged<Attachment>? onOpen;
@@ -639,7 +755,7 @@ class AttachmentGrid extends StatelessWidget {
       children: [
         if (images.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsetsDirectional.only(bottom: 6),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: SizedBox(
@@ -662,7 +778,8 @@ class AttachmentGrid extends StatelessWidget {
               ),
             ),
           ),
-        for (final file in files) AttachmentPreview(attachment: file, onTap: () => onOpen?.call(file)),
+        for (final file in files)
+          AttachmentPreview(attachment: file, onTap: () => onOpen?.call(file)),
       ],
     );
   }
@@ -679,7 +796,7 @@ class AttachmentPreview extends StatelessWidget {
     final scheme = context.colors;
     if (!attachment.isImage) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsetsDirectional.only(bottom: 4),
         child: AuroraGlass(
           radius: 12,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -708,7 +825,9 @@ class AttachmentPreview extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   MessageFormat.bytes(attachment.size),
-                  style: context.texts.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
+                  style: context.texts.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ],
@@ -722,8 +841,14 @@ class AttachmentPreview extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color.alphaBlend(scheme.primary.withValues(alpha: .34), scheme.surfaceContainerHigh),
-              Color.alphaBlend(scheme.tertiary.withValues(alpha: .26), scheme.surfaceContainerLow),
+              Color.alphaBlend(
+                scheme.primary.withValues(alpha: .34),
+                scheme.surfaceContainerHigh,
+              ),
+              Color.alphaBlend(
+                scheme.tertiary.withValues(alpha: .26),
+                scheme.surfaceContainerLow,
+              ),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -755,7 +880,7 @@ class MessageComposer extends StatelessWidget {
     this.onPickSim,
     this.simLabel,
     this.attachments = 0,
-    this.hintText = '写下消息…',
+    this.hintText = "Write a message\u2026",
     this.onChanged,
     this.showTools = true,
   });
@@ -794,14 +919,14 @@ class MessageComposer extends StatelessWidget {
                     if (onAttach != null)
                       _ToolIcon(
                         icon: Icons.add_photo_alternate_outlined,
-                        tooltip: '添加附件',
+                        tooltip: tr("Add attachment"),
                         onTap: enabled ? onAttach : null,
                         badge: attachments,
                       ),
                     if (onSchedule != null)
                       _ToolIcon(
                         icon: Icons.schedule_send_outlined,
-                        tooltip: '定时发送',
+                        tooltip: tr("Schedule message"),
                         onTap: enabled ? onSchedule : null,
                       ),
                     const Spacer(),
@@ -811,14 +936,23 @@ class MessageComposer extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                         child: AuroraGlass(
                           radius: 11,
-                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 5,
+                          ),
                           child: Row(
                             children: [
-                              Icon(Icons.sim_card_outlined, size: 12, color: scheme.onSurfaceVariant),
+                              Icon(
+                                Icons.sim_card_outlined,
+                                size: 12,
+                                color: scheme.onSurfaceVariant,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 simLabel!,
-                                style: context.texts.labelSmall?.copyWith(fontSize: 10.5),
+                                style: context.texts.labelSmall?.copyWith(
+                                  fontSize: 10.5,
+                                ),
                               ),
                             ],
                           ),
@@ -846,18 +980,26 @@ class MessageComposer extends StatelessWidget {
                       textCapitalization: TextCapitalization.sentences,
                       style: context.texts.bodyLarge,
                       decoration: InputDecoration(
-                        hintText: hintText,
+                        hintText: tr(hintText),
                         filled: false,
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
                         isDense: true,
-                        contentPadding: const EdgeInsets.fromLTRB(12, 11, 6, 11),
+                        contentPadding: const EdgeInsets.fromLTRB(
+                          12,
+                          11,
+                          6,
+                          11,
+                        ),
                       ),
                     ),
                   ),
                   _SendButton(
-                    enabled: enabled && !sending && controller.text.trim().isNotEmpty,
+                    enabled:
+                        enabled &&
+                        !sending &&
+                        controller.text.trim().isNotEmpty,
                     sending: sending,
                     onTap: onSend,
                   ),
@@ -876,7 +1018,9 @@ class MessageComposer extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: context.texts.labelSmall?.copyWith(
                         fontSize: 10,
-                        color: segment.segments > 1 ? scheme.tertiary : scheme.onSurfaceVariant,
+                        color: segment.segments > 1
+                            ? scheme.tertiary
+                            : scheme.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -884,7 +1028,9 @@ class MessageComposer extends StatelessWidget {
                   if (segment.segments > 1)
                     Flexible(
                       child: Text(
-                        '将拆分为 ${segment.segments} 条发送',
+                        tr("This message will be sent in {p0} segments", [
+                          segment.segments,
+                        ]),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.end,
@@ -905,7 +1051,12 @@ class MessageComposer extends StatelessWidget {
 }
 
 class _ToolIcon extends StatelessWidget {
-  const _ToolIcon({required this.icon, required this.tooltip, this.onTap, this.badge = 0});
+  const _ToolIcon({
+    required this.icon,
+    required this.tooltip,
+    this.onTap,
+    this.badge = 0,
+  });
 
   final IconData icon;
   final String tooltip;
@@ -933,7 +1084,10 @@ class _ToolIcon extends StatelessWidget {
                   child: Container(
                     width: 8,
                     height: 8,
-                    decoration: BoxDecoration(color: context.colors.tertiary, shape: BoxShape.circle),
+                    decoration: BoxDecoration(
+                      color: context.colors.tertiary,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                 ),
             ],
@@ -945,7 +1099,11 @@ class _ToolIcon extends StatelessWidget {
 }
 
 class _SendButton extends StatelessWidget {
-  const _SendButton({required this.enabled, required this.sending, required this.onTap});
+  const _SendButton({
+    required this.enabled,
+    required this.sending,
+    required this.onTap,
+  });
 
   final bool enabled;
   final bool sending;
@@ -969,15 +1127,26 @@ class _SendButton extends StatelessWidget {
             shape: BoxShape.circle,
             gradient: enabled
                 ? LinearGradient(
-                    colors: [scheme.primary, Color.lerp(scheme.primary, scheme.secondary, .65)!],
+                    colors: [
+                      scheme.primary,
+                      Color.lerp(scheme.primary, scheme.secondary, .65)!,
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   )
                 : null,
-            color: enabled ? null : scheme.surfaceContainerHighest.withValues(alpha: .6),
+            color: enabled
+                ? null
+                : scheme.surfaceContainerHighest.withValues(alpha: .6),
           ),
           child: sending
-              ? const Center(child: SizedBox(width: 20, height: 20, child: AuroraLoading(size: 18)))
+              ? const Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: AuroraLoading(size: 18),
+                  ),
+                )
               : AuroraShapeContainer(
                   shape: shape,
                   size: 46,
@@ -986,7 +1155,9 @@ class _SendButton extends StatelessWidget {
                   child: Icon(
                     Icons.arrow_upward_rounded,
                     size: 21,
-                    color: enabled ? scheme.onPrimary : scheme.onSurfaceVariant.withValues(alpha: .5),
+                    color: enabled
+                        ? scheme.onPrimary
+                        : scheme.onSurfaceVariant.withValues(alpha: .5),
                   ),
                 ),
         ),

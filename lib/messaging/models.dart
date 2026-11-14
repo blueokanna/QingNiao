@@ -1,3 +1,5 @@
+import 'package:qingniao/l10n/app_strings.dart';
+
 import 'dart:typed_data';
 
 enum MessageTransport { sms, mms }
@@ -62,7 +64,7 @@ class Attachment {
   factory Attachment.fromMap(Map<dynamic, dynamic> map) => Attachment(
     uri: _string(map['uri']),
     mime: _string(map['mime'], 'application/octet-stream'),
-    name: _string(map['name'], '附件'),
+    name: _string(map['name'], tr("Attachment")),
     size: _int(map['size']),
     id: _string(map['id']),
   );
@@ -142,7 +144,7 @@ class ThreadSummary {
 
   factory ThreadSummary.fromMap(Map<dynamic, dynamic> map) => ThreadSummary(
     threadId: _int(map['threadId']),
-    address: _string(map['address'], '未知号码'),
+    address: _string(map['address'], tr("Unknown number")),
     displayName: _string(map['displayName']),
     preview: _string(map['body']),
     date: _int(map['date']),
@@ -248,7 +250,7 @@ class SmsMessage {
     return SmsMessage(
       id: _int(map['id']),
       threadId: _int(map['threadId']),
-      address: _string(map['address'], '未知号码'),
+      address: _string(map['address'], tr("Unknown number")),
       body: _string(map['body']),
       date: _int(map['date']),
       type: _int(map['type'], 1),
@@ -291,7 +293,7 @@ class TrashItem {
   factory TrashItem.fromMap(Map<dynamic, dynamic> map) => TrashItem(
     id: _int(map['id']),
     threadId: _int(map['threadId']),
-    address: _string(map['address'], '未知号码'),
+    address: _string(map['address'], tr("Unknown number")),
     body: _string(map['body']),
     date: _int(map['date']),
     deletedAt: _int(map['deletedAt']),
@@ -399,7 +401,7 @@ class AttachmentChoice {
       AttachmentChoice(
         uri: _string(map['uri']),
         mime: _string(map['mime'], 'application/octet-stream'),
-        name: _string(map['name'], '附件'),
+        name: _string(map['name'], tr("Attachment")),
       );
 }
 

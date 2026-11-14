@@ -44,10 +44,10 @@ mod tests {
     #[test]
     fn counts_emoji_as_two_units() {
         assert_eq!(utf16_len(""), 0);
-        assert_eq!(utf16_len("验证码"), 3);
+        assert_eq!(utf16_len(include_str!("../../resources/message_samples/sms_text_bb015c60bafc.txt")), 3);
         assert_eq!(utf16_len("🌿"), 2);
         assert_eq!(utf16_len("a🌿b"), 4);
-        assert_eq!(utf16_len("𠮷"), 2);
+        assert_eq!(utf16_len("\u{20bb7}"), 2);
     }
 
     #[test]

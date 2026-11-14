@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Qingniao</string>
+    <string name="push_title">توجد رسائل متاحة للمزامنة</string>
+    <string name="push_body">افتح Qingniao للمزامنة بأمان.</string>
+    <string name="notification_reply">رد</string>
+    <string name="notification_messages">الرسائل</string>
+    <string name="notification_new_message">رسالة جديدة</string>
+    <string name="notification_mark_read">وضع علامة مقروءة</string>
+    <string name="notification_copy_code">نسخ</string>
+    <string name="notification_code_copied">تم النسخ</string>
+    <string name="notification_loading">جارٍ التحميل…</string>
+    <string name="notification_new_mms">MMS جديدة</string>
+    <string name="notification_failed">تعذر الإرسال</string>
+    <string name="notification_retry">تعذر إكمال الإجراء. أعد المحاولة.</string>
+    <string name="notification_test_title">اختبار الإشعار</string>
+    <string name="notification_test_body">رمز اختباري: 864213. لم ترسل أي SMS.</string>
+</resources>

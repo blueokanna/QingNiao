@@ -65,11 +65,15 @@ class AuroraPageTransitionsBuilder extends PageTransitionsBuilder {
       reverseCurve: AuroraMotion.standard,
     );
     return SlideTransition(
-      position: exit.drive(Tween(begin: Offset.zero, end: const Offset(-.12, 0))),
+      position: exit.drive(
+        Tween(begin: Offset.zero, end: const Offset(-.12, 0)),
+      ),
       child: FadeTransition(
         opacity: exit.drive(Tween(begin: 1, end: .6)),
         child: SlideTransition(
-          position: enter.drive(Tween(begin: const Offset(.14, 0), end: Offset.zero)),
+          position: enter.drive(
+            Tween(begin: const Offset(.14, 0), end: Offset.zero),
+          ),
           child: FadeTransition(
             opacity: enter.drive(Tween(begin: 0, end: 1)),
             child: ScaleTransition(
@@ -100,7 +104,9 @@ class AuroraSwitcher extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (MediaQuery.disableAnimationsOf(context)) return child;
-    final begin = axis == Axis.vertical ? const Offset(0, .035) : const Offset(.04, 0);
+    final begin = axis == Axis.vertical
+        ? const Offset(0, .035)
+        : const Offset(.04, 0);
     return AnimatedSwitcher(
       duration: duration,
       switchInCurve: AuroraMotion.decelerate,
@@ -180,7 +186,9 @@ class AuroraCounter extends StatelessWidget {
       curve: AuroraMotion.decelerate,
       builder: (context, animated, _) => Text(
         '${animated.round()}',
-        style: style?.copyWith(fontFeatures: const [FontFeature.tabularFigures()]),
+        style: style?.copyWith(
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
       ),
     );
   }
@@ -207,9 +215,13 @@ class AuroraParallax extends StatelessWidget {
       animation: controller,
       child: child,
       builder: (context, child) {
-        final offset =
-            controller.hasClients ? controller.offset.clamp(0.0, max ?? double.infinity) : 0.0;
-        return Transform.translate(offset: Offset(0, -offset * factor), child: child);
+        final offset = controller.hasClients
+            ? controller.offset.clamp(0.0, max ?? double.infinity)
+            : 0.0;
+        return Transform.translate(
+          offset: Offset(0, -offset * factor),
+          child: child,
+        );
       },
     );
   }

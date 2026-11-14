@@ -53,16 +53,15 @@ class AuroraBridge(private val activity: Activity) {
                 "openUrl" -> {
                     val raw = call.argument<String>("url") ?: return false
                     val uri = Uri.parse(raw)
-                    require(uri.scheme == "http" || uri.scheme == "https") { "只允许 http/https 链接" }
+                    require(uri.scheme == "http" || uri.scheme == "https") { "Only HTTP and HTTPS links are supported" }
                     activity.startActivity(Intent(Intent.ACTION_VIEW, uri))
                     result.success(null)
                 }
-                "stats" -> result.success(stats())
                 "testNotification" -> {
                     Notifications.showSms(
                         context,
-                        "青鸟小助手",
-                        "【青鸟】验证码 864213，5 分钟内有效。",
+                        LocalizedResources.text(context, R.string.notification_test_title),
+                        LocalizedResources.text(context, R.string.notification_test_body),
                         SubscriptionManager.getDefaultSmsSubscriptionId(),
                         -1L,
                     )
@@ -89,10 +88,9 @@ class AuroraBridge(private val activity: Activity) {
                     syncPrefs.edit().clear().apply()
                     result.success(null)
                 }
-                "exportBackup" -> result.success(exportBackup())
                 "importBackup" -> {
                     if (pendingImport != null) {
-                        result.error("busy", "正在选择备份文件", null)
+                        result.error("busy", "Choosing a backup file", null)
                     } else {
                         pendingImport = result
                         try {
@@ -104,7 +102,7 @@ class AuroraBridge(private val activity: Activity) {
                             )
                         } catch (error: Exception) {
                             pendingImport = null
-                            result.error("unavailable", "设备没有可用的文件选择器", null)
+                            result.error("unavailable", "No file picker is available", null)
                         }
                     }
                 }
@@ -115,10 +113,10 @@ class AuroraBridge(private val activity: Activity) {
                             handler.post { result.success(value) }
                         } catch (error: Exception) {
                             val message = when (error) {
-                                is SecurityException -> "短信权限已撤销，请重新授权"
+                                is SecurityException -> "SMS permission was revoked. Grant permission again."
                                 is IllegalArgumentException, is IllegalStateException ->
-                                    error.message ?: "操作无法完成"
-                                else -> "系统消息服务暂时不可用，请重试"
+                                    error.message ?: "Unable to complete the action"
+                                else -> "System messaging service unavailable. Try again."
                             }
                             handler.post {
                                 result.error("message_operation_failed", message, null)
@@ -130,9 +128,9 @@ class AuroraBridge(private val activity: Activity) {
             return true
         } catch (error: Exception) {
             val message = when (error) {
-                is SecurityException -> "短信权限已撤销，请重新授权"
-                is IllegalArgumentException, is IllegalStateException -> error.message ?: "操作无法完成"
-                else -> "系统消息服务暂时不可用，请重试"
+                is SecurityException -> "SMS permission was revoked. Grant permission again."
+                is IllegalArgumentException, is IllegalStateException -> error.message ?: "Unable to complete the action"
+                else -> "System messaging service unavailable. Try again."
             }
             result.error("message_operation_failed", message, null)
             return true
@@ -154,7 +152,7 @@ class AuroraBridge(private val activity: Activity) {
                 handler.post { result.success(imported) }
             } catch (error: Exception) {
                 handler.post {
-                    result.error("import_failed", error.message ?: "备份导入失败", null)
+                    result.error("import_failed", error.message ?: "Backup import failed", null)
                 }
             }
         }
@@ -162,7 +160,7 @@ class AuroraBridge(private val activity: Activity) {
     }
 
     fun cancelPending() {
-        pendingImport?.error("activity_closed", "导入已取消", null)
+        pendingImport?.error("activity_closed", "Import canceled", null)
         pendingImport = null
     }
 
@@ -170,6 +168,8 @@ class AuroraBridge(private val activity: Activity) {
         requireAccess()
         return AuroraStore(context).use { store ->
             when (call.method) {
+                "stats" -> stats()
+                "exportBackup" -> exportBackup()
                 "conversations" -> conversations(
                     store,
                     call.argument<String>("query")?.take(200) ?: "",
@@ -179,9 +179,25 @@ class AuroraBridge(private val activity: Activity) {
                     store,
                     requireNotNull(call.argument<Number>("threadId")).toLong(),
                     call.argument<Number>("before")?.toLong() ?: Long.MAX_VALUE,
+                    call.argument<Number>("beforeDate")?.toLong() ?: Long.MAX_VALUE,
                     (call.argument<Number>("limit")?.toInt() ?: 80).coerceIn(1, 300),
                 )
                 "searchCorpus" -> searchCorpus(store)
+                "markAllRead" -> ConversationOperations(context).markRead(null)
+                "markThreadsRead" -> ConversationOperations(context).markRead(ConversationOperations.threadIds(call.argument("threadIds")))
+                "trashThreads" -> ConversationOperations(context).moveToTrash(store, ConversationOperations.threadIds(call.argument("threadIds")))
+                "copyThreads" -> ConversationOperations(context).copyText(store, ConversationOperations.threadIds(call.argument("threadIds")))
+                "hideMessages" -> {
+                    val ids = requireNotNull(call.argument<List<Number>>("ids"))
+                    require(ids.isNotEmpty() && ids.size <= 10_000)
+                    val db = store.writableDatabase
+                    db.beginTransaction()
+                    try {
+                        ids.forEach { hideMessage(store, it.toLong()) }
+                        db.setTransactionSuccessful()
+                    } finally { db.endTransaction() }
+                    null
+                }
                 "markRead" -> {
                     markRead(requireNotNull(call.argument<Number>("threadId")).toLong())
                     null
@@ -278,12 +294,13 @@ class AuroraBridge(private val activity: Activity) {
                     requireNotNull(call.argument<Number>("date")).toLong(),
                     call.argument<Number>("subscriptionId")?.toInt() ?: -1,
                 )
-                else -> throw IllegalArgumentException("不支持的操作：${call.method}")
+                else -> throw IllegalArgumentException("Unsupported operation: ${call.method}")
             }
         }
     }
 
     private val methods = setOf(
+        "markAllRead", "markThreadsRead", "trashThreads", "copyThreads", "hideMessages",
         "conversations", "messages", "markRead", "hide", "restore", "delete",
         "searchCorpus", "trash", "trashRetention", "purgeTrash", "subscriptions", "draft", "saveDraft",
         "pin", "archive", "block", "unblock", "blocked", "attachmentData",
@@ -298,7 +315,7 @@ class AuroraBridge(private val activity: Activity) {
     private fun requireAccess() {
         val state = access()
         check(listOf("defaultApp", "readSms", "sendSms", "receiveSms").all { state[it] == true }) {
-            "请设置默认短信应用并授予短信权限"
+            "Set the default SMS role and grant SMS permissions"
         }
     }
 
@@ -333,7 +350,7 @@ class AuroraBridge(private val activity: Activity) {
                 val id = cursor.getLong(0)
                 if (id in hidden) continue
                 val threadId = cursor.getLong(1)
-                val address = cursor.getString(2) ?: "未知号码"
+                val address = cursor.getString(2) ?: "Unknown number"
                 val body = cursor.getString(3) ?: ""
                 val date = cursor.getLong(4)
                 val type = cursor.getInt(5)
@@ -351,21 +368,21 @@ class AuroraBridge(private val activity: Activity) {
 
         context.contentResolver.query(
             Telephony.Mms.CONTENT_URI,
-            arrayOf("_id", "thread_id", "date", "msg_box", "sub_id", "subject", "read"),
+            arrayOf("_id", "thread_id", "date", "msg_box", "sub_id", "sub", "read"),
             null,
             null,
             "date DESC",
         )?.use { cursor ->
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(0)
-                if (id in hidden) continue
+                if (MessageIdentity.mms(id) in hidden) continue
                 val threadId = cursor.getLong(1)
-                val date = cursor.getLong(2)
+                val date = cursor.getLong(2) * 1000
                 val box = cursor.getInt(3)
                 val subId = cursor.getInt(4)
                 val subject = cursor.getString(5) ?: ""
                 val read = cursor.getInt(6) != 0
-                val address = mmsAddress(id) ?: "未知号码"
+                val address = mmsAddress(id) ?: "Unknown number"
                 if (normalize(address) in blocked) continue
                 val conversation = threads.getOrPut(threadId) {
                     Conversation(threadId, address, subId, date, subject, typeForBox(box), true)
@@ -456,8 +473,8 @@ class AuroraBridge(private val activity: Activity) {
     )
 
     private fun normalize(value: String): String {
-        val digits = value.filter { it.isDigit() }
-        return if (digits.length > 11 && digits.startsWith("86")) digits.substring(2) else digits.takeLast(11)
+        val number = android.telephony.PhoneNumberUtils.normalizeNumber(value)
+        return if (number.startsWith("00")) "+${number.substring(2)}" else number
     }
 
     private fun contacts(): Map<String, String> {
@@ -485,25 +502,26 @@ class AuroraBridge(private val activity: Activity) {
     }
 
 
-    private fun messages(store: AuroraStore, threadId: Long, before: Long, limit: Int): List<Map<String, Any?>> {
+    private fun messages(store: AuroraStore, threadId: Long, before: Long, beforeDate: Long, limit: Int): List<Map<String, Any?>> {
         val hidden = store.hiddenIds()
+        val page = MessagePageCursor(beforeDate, before)
         val rows = mutableListOf<Map<String, Any?>>()
 
         context.contentResolver.query(
             Telephony.Sms.CONTENT_URI,
             arrayOf("_id", "thread_id", "address", "body", "date", "type", "read", "sub_id", "status"),
-            "thread_id=? AND _id<?",
-            arrayOf(threadId.toString(), before.toString()),
-            "_id DESC",
+            "thread_id=? AND date<=?",
+            arrayOf(threadId.toString(), beforeDate.toString()),
+            "date DESC, _id DESC",
         )?.use { cursor ->
             while (cursor.moveToNext() && rows.size < limit) {
                 val id = cursor.getLong(0)
-                if (id in hidden) continue
+                if (id in hidden || !page.includes(cursor.getLong(4), id)) continue
                 rows.add(
                     mapOf(
                         "id" to id,
                         "threadId" to cursor.getLong(1),
-                        "address" to (cursor.getString(2) ?: "未知号码"),
+                        "address" to (cursor.getString(2) ?: "Unknown number"),
                         "body" to (cursor.getString(3) ?: ""),
                         "date" to cursor.getLong(4),
                         "type" to cursor.getInt(5),
@@ -520,24 +538,27 @@ class AuroraBridge(private val activity: Activity) {
             }
         }
 
+        var mmsCount = 0
         context.contentResolver.query(
             Telephony.Mms.CONTENT_URI,
-            arrayOf("_id", "thread_id", "date", "msg_box", "sub_id", "subject", "read"),
-            "thread_id=?",
-            arrayOf(threadId.toString()),
-            "date DESC",
+            arrayOf("_id", "thread_id", "date", "msg_box", "sub_id", "sub", "read"),
+            "thread_id=? AND date<=?",
+            arrayOf(threadId.toString(), (beforeDate / 1000).toString()),
+            "date DESC, _id ASC",
         )?.use { cursor ->
-            while (cursor.moveToNext() && rows.size < limit) {
+            while (cursor.moveToNext() && mmsCount < limit) {
                 val id = cursor.getLong(0)
-                if (id in hidden) continue
-                val date = cursor.getLong(2)
+                if (MessageIdentity.mms(id) in hidden) continue
+                val date = cursor.getLong(2) * 1000
+                if (!page.includes(date, MessageIdentity.mms(id))) continue
+                mmsCount++
                 val box = cursor.getInt(3)
                 val parts = mmsParts(id)
                 rows.add(
                     mapOf(
-                        "id" to id,
+                        "id" to MessageIdentity.mms(id),
                         "threadId" to cursor.getLong(1),
-                        "address" to (mmsAddress(id) ?: "未知号码"),
+                        "address" to (mmsAddress(id) ?: "Unknown number"),
                         "body" to parts.text,
                         "date" to date,
                         "type" to typeForBox(box),
@@ -554,7 +575,7 @@ class AuroraBridge(private val activity: Activity) {
             }
         }
 
-        rows.sortBy { (it["date"] as? Long) ?: 0L }
+        rows.sortWith(compareBy<Map<String, Any?>> { it["date"] as Long }.thenBy { it["id"] as Long })
         return if (rows.size <= limit) rows else rows.takeLast(limit)
     }
 
@@ -589,7 +610,7 @@ class AuroraBridge(private val activity: Activity) {
                             "id" to partId.toString(),
                             "uri" to ContentUris.withAppendedId(Uri.parse("content://mms/part"), partId).toString(),
                             "mime" to type,
-                            "name" to name.ifBlank { "附件" },
+                            "name" to name.ifBlank { "Attachment" },
                             "size" to 0,
                         ),
                     )
@@ -668,58 +689,31 @@ class AuroraBridge(private val activity: Activity) {
         }
     }
 
-    private fun hideMessage(store: AuroraStore, id: Long) {
-        val cursor = context.contentResolver.query(
-            Telephony.Sms.CONTENT_URI,
-            arrayOf("_id", "thread_id", "address", "body", "date"),
-            "_id=?",
-            arrayOf(id.toString()),
-            null,
-        ) ?: return
-        cursor.use {
-            if (it.moveToFirst()) {
-                store.hide(
-                    AuroraStore.Trash(
-                        it.getLong(0),
-                        it.getLong(1),
-                        it.getString(2) ?: "未知号码",
-                        it.getString(3) ?: "",
-                        it.getLong(4),
-                        System.currentTimeMillis(),
-                        0,
-                    ),
-                )
-            } else {
-                val mms = context.contentResolver.query(
-                    Telephony.Mms.CONTENT_URI,
-                    arrayOf("_id", "thread_id", "date", "subject"),
-                    "_id=?",
-                    arrayOf(id.toString()),
-                    null,
-                )
-                mms?.use { row ->
-                    if (row.moveToFirst()) {
-                        store.hide(
-                            AuroraStore.Trash(
-                                row.getLong(0),
-                                row.getLong(1),
-                                mmsAddress(id) ?: "未知号码",
-                                row.getString(3) ?: "",
-                                row.getLong(2),
-                                System.currentTimeMillis(),
-                                1,
-                            ),
-                        )
-                    }
-                }
-            }
+    private fun hideMessage(store: AuroraStore, key: Long) {
+        val id = MessageIdentity.providerId(key)
+        val mms = key < 0
+        val uri = if (mms) Telephony.Mms.CONTENT_URI else Telephony.Sms.CONTENT_URI
+        val columns = if (mms) arrayOf("_id", "thread_id", "sub", "date")
+            else arrayOf("_id", "thread_id", "address", "body", "date")
+        context.contentResolver.query(uri, columns, "_id=?", arrayOf(id.toString()), null)?.use { row ->
+            if (row.moveToFirst()) store.hide(AuroraStore.Trash(key, row.getLong(1),
+                if (mms) mmsAddress(id).orEmpty() else row.getString(2).orEmpty(),
+                row.getString(if (mms) 2 else 3).orEmpty(),
+                row.getLong(if (mms) 3 else 4) * (if (mms) 1000 else 1),
+                System.currentTimeMillis(), if (mms) 1 else 0))
         }
     }
 
     private fun deleteForever(store: AuroraStore, id: Long) {
         val item = store.trash(id) ?: return
         val uri = if (item.kind == 1) Telephony.Mms.CONTENT_URI else Telephony.Sms.CONTENT_URI
-        context.contentResolver.delete(ContentUris.withAppendedId(uri, id), null, null)
+        val itemUri = ContentUris.withAppendedId(uri, MessageIdentity.providerId(id))
+        val removed = context.contentResolver.delete(itemUri, null, null)
+        if (removed == 0) {
+            val remains = context.contentResolver.query(itemUri, arrayOf("_id"), null, null, null)
+                ?.use { it.moveToFirst() } ?: throw IllegalStateException("Unable to verify message deletion")
+            check(!remains) { "The messaging provider did not delete this message" }
+        }
         store.unhide(id)
     }
 
@@ -756,50 +750,26 @@ class AuroraBridge(private val activity: Activity) {
     private fun attachmentData(uri: String): ByteArray {
         val parsed = Uri.parse(uri)
         return context.contentResolver.openInputStream(parsed)?.use { stream ->
-            val buffer = ByteArray(8 * 1024 * 1024)
-            var read = 0
-            while (read < buffer.size) {
-                val count = stream.read(buffer, read, buffer.size - read)
-                if (count <= 0) break
-                read += count
-            }
-            buffer.copyOf(read)
-        } ?: throw IllegalArgumentException("无法读取附件")
+            BoundedAttachmentReader.read(stream)
+        } ?: throw IllegalArgumentException("Unable to read attachment")
     }
 
     private fun schedule(store: AuroraStore, address: String, body: String, at: Long, subId: Int): Long {
-        require(address.isNotBlank()) { "收件号码不能为空" }
-        require(body.isNotBlank()) { "短信正文不能为空" }
-        require(at > System.currentTimeMillis()) { "定时时间必须在未来" }
+        require(address.isNotBlank()) { "Recipient number is required" }
+        require(body.isNotBlank()) { "Message text is required" }
+        require(at > System.currentTimeMillis()) { "Scheduled time must be in the future" }
         val id = store.schedule(address, body, at, subId)
-        val alarm = context.getSystemService(AlarmManager::class.java)
-        val pending = PendingIntent.getBroadcast(
-            context,
-            id.toInt(),
-            Intent(context, ScheduledSendReceiver::class.java).putExtra("id", id),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
         try {
-            if (Build.VERSION.SDK_INT >= 31 && !alarm.canScheduleExactAlarms()) {
-                alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
-            } else {
-                alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
-            }
-        } catch (_: SecurityException) {
-            alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
+            ScheduledMessageAlarms.arm(context, id, at)
+        } catch (error: Exception) {
+            store.cancelScheduled(id)
+            throw error
         }
         return id
     }
 
     private fun cancelAlarm(id: Long) {
-        val alarm = context.getSystemService(AlarmManager::class.java)
-        val pending = PendingIntent.getBroadcast(
-            context,
-            id.toInt(),
-            Intent(context, ScheduledSendReceiver::class.java).putExtra("id", id),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        alarm.cancel(pending)
+        ScheduledMessageAlarms.cancel(context, id)
     }
 
     private fun stats(): Map<String, Any?> {
@@ -836,7 +806,7 @@ class AuroraBridge(private val activity: Activity) {
 
     private fun importBackup(uri: Uri): Boolean {
         check(SmsAccess.isDefaultSmsApp(context)) {
-            "请先设为默认短信应用再恢复备份"
+            "Set this app as default before restoring a backup"
         }
         val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
             val output = java.io.ByteArrayOutputStream()
@@ -846,7 +816,7 @@ class AuroraBridge(private val activity: Activity) {
                 val read = input.read(buffer)
                 if (read <= 0) break
                 total += read
-                require(total <= 32 * 1024 * 1024) { "备份文件超过 32 MB" }
+                require(total <= 32 * 1024 * 1024) { "Backup exceeds 32 MB" }
                 output.write(buffer, 0, read)
             }
             output.toByteArray()
@@ -897,7 +867,7 @@ class AuroraBridge(private val activity: Activity) {
                             inserted += 1
                         }
                     } catch (_: Exception) {
-                        // 某条损坏不影响其余记录。
+
                     }
                 }
             }
@@ -1025,7 +995,7 @@ class AuroraBridge(private val activity: Activity) {
         return true
     }
 
-    /** 供 Rust 建索引的全量短信/彩信文本；限制 50k + 5k，避免大库一次性占满内存。 */
+    
     private fun searchCorpus(store: AuroraStore): List<Map<String, Any?>> {
         val hidden = store.hiddenIds()
         val rows = mutableListOf<Map<String, Any?>>()
@@ -1056,17 +1026,17 @@ class AuroraBridge(private val activity: Activity) {
         var mms = 0
         context.contentResolver.query(
             Telephony.Mms.CONTENT_URI,
-            arrayOf("_id", "thread_id", "date", "subject", "read"),
+            arrayOf("_id", "thread_id", "date", "sub", "read"),
             null,
             null,
             "date DESC",
         )?.use { cursor ->
             while (cursor.moveToNext() && mms < 5_000) {
                 val id = cursor.getLong(0)
-                if (id in hidden) continue
+                if (MessageIdentity.mms(id) in hidden) continue
                 val subject = cursor.getString(3) ?: ""
                 if (subject.isEmpty()) continue
-                val address = "彩信"
+                val address = "MMS"
                 rows.add(
                     mapOf(
                         "id" to -id,
@@ -1103,7 +1073,7 @@ class AuroraBridge(private val activity: Activity) {
                     mapOf(
                         "id" to id,
                         "threadId" to cursor.getLong(1),
-                        "address" to (cursor.getString(2) ?: "未知号码"),
+                        "address" to (cursor.getString(2) ?: "Unknown number"),
                         "body" to body,
                         "date" to cursor.getLong(4),
                         "type" to cursor.getInt(5),
@@ -1116,8 +1086,8 @@ class AuroraBridge(private val activity: Activity) {
     }
 
     private fun insertRemoteMessage(address: String, body: String, date: Long, subId: Int): Long {
-        require(address.isNotBlank()) { "远端消息缺少号码" }
-        require(body.isNotBlank()) { "远端消息缺少正文" }
+        require(address.isNotBlank()) { "Remote message is missing a number" }
+        require(body.isNotBlank()) { "Remote message is missing text" }
         val values = ContentValues().apply {
             put("address", address)
             put("body", body)
@@ -1129,7 +1099,7 @@ class AuroraBridge(private val activity: Activity) {
             if (subId >= 0) put("sub_id", subId)
         }
         val uri = context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, values)
-            ?: throw IllegalArgumentException("无法写入系统短信库")
+            ?: throw IllegalArgumentException("Unable to write to the system message store")
         val id = ContentUris.parseId(uri)
         AuroraStore(context).use { it.markRemote(id) }
         return id
@@ -1166,10 +1136,7 @@ class AuroraBridge(private val activity: Activity) {
         }
     }
 
-    /**
-     * ColorOS / OxygenOS 没有公开的“自启动”标准入口，这里按机型依次尝试；
-     * 全部失败时退回应用详情页，用户仍可手动找到“自启动/后台管理”。
-     */
+    
     private fun openAutoStartSettings(): Boolean {
         val candidates = listOf(
             "com.coloros.safecenter/com.coloros.safecenter.permission.startup.StartupAppListActivity",
@@ -1184,7 +1151,6 @@ class AuroraBridge(private val activity: Activity) {
                 activity.startActivity(Intent().setComponent(component))
                 return true
             } catch (_: Exception) {
-                // 尝试下一个 OEM 页面。
             }
         }
         return try {
@@ -1201,7 +1167,7 @@ class AuroraBridge(private val activity: Activity) {
     }
 
     private fun syncStatus(): Map<String, Any?> = mapOf(
-        "enabled" to syncPrefs.getBoolean("enabled", false),
+        "enabled" to syncPrefs.readFlag("enabled", false),
         "serverUrl" to (syncPrefs.getString("serverUrl", "") ?: ""),
         "deviceName" to (syncPrefs.getString("deviceName", Build.MODEL) ?: Build.MODEL),
         "fingerprint" to (syncPrefs.getString("fingerprint", "") ?: ""),

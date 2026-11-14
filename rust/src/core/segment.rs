@@ -53,13 +53,13 @@ fn build(encoding: &str, units: u32, single: u32, multi: u32) -> Segmentation {
             max_chars: single,
         };
     }
-    let segments = (units + multi - 1) / multi;
+    let segments = units.div_ceil(multi);
     let used = units % multi;
     Segmentation {
         encoding: encoding.to_owned(),
         segments,
         length: units,
-        remaining: if used == 0 { multi } else { multi - used },
+        remaining: if used == 0 { 0 } else { multi - used },
         max_chars: multi,
     }
 }
@@ -119,7 +119,7 @@ mod tests {
 
         let exact_multi = segmentation(&"a".repeat(306));
         assert_eq!(exact_multi.segments, 2);
-        assert_eq!(exact_multi.remaining, 153);
+        assert_eq!(exact_multi.remaining, 0);
     }
 
     #[test]
@@ -153,13 +153,13 @@ mod tests {
 
     #[test]
     fn chinese_uses_ucs2_with_utf16_lengths() {
-        let single = segmentation(&"中".repeat(70));
+        let single = segmentation(&include_str!("../../resources/message_samples/sms_text_a567bdaa1136.txt").repeat(70));
         assert_eq!(single.encoding, "UCS-2");
         assert_eq!(single.segments, 1);
         assert_eq!(single.remaining, 0);
         assert_eq!(single.max_chars, 70);
 
-        let multi = segmentation(&"中".repeat(71));
+        let multi = segmentation(&include_str!("../../resources/message_samples/sms_text_a567bdaa1136.txt").repeat(71));
         assert_eq!(multi.segments, 2);
         assert_eq!(multi.max_chars, 67);
         assert_eq!(multi.remaining, 63);
@@ -178,7 +178,7 @@ mod tests {
         assert_eq!(over.segments, 2);
         assert_eq!(over.remaining, 62);
 
-        let mixed = segmentation("你好, world");
+        let mixed = segmentation(include_str!("../../resources/message_samples/sms_text_a6304616688a.txt"));
         assert_eq!(mixed.encoding, "UCS-2");
         assert_eq!(mixed.length, 9);
     }

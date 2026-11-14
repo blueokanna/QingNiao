@@ -1,3 +1,4 @@
+import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../app/app_settings.dart';
@@ -21,7 +22,35 @@ class AppearanceScreen extends StatelessWidget {
           physics: const BouncingScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
-              child: AuroraTopBar(title: '外观', subtitle: '改动即时生效'),
+              child: AuroraTopBar(
+                title: tr("Appearance"),
+                subtitle: tr("Changes apply immediately"),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: DropdownMenu<String>(
+                  expandedInsets: EdgeInsets.zero,
+                  requestFocusOnTap: false,
+                  initialSelection: settings.localeCode,
+                  label: Text(tr('Language')),
+                  dropdownMenuEntries: [
+                    DropdownMenuEntry(
+                      value: 'system',
+                      label: tr('System default'),
+                    ),
+                    for (final code in AppStrings.languageCodes)
+                      DropdownMenuEntry(
+                        value: code,
+                        label: AppStrings.languageNames[code]!,
+                      ),
+                  ],
+                  onSelected: (value) {
+                    if (value != null) settings.setLocale(value);
+                  },
+                ),
+              ),
             ),
             SliverToBoxAdapter(
               child: Padding(
@@ -33,7 +62,7 @@ class AppearanceScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '实时预览',
+                        tr("Preview"),
                         style: context.texts.labelSmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                           letterSpacing: .8,
@@ -42,9 +71,12 @@ class AppearanceScreen extends StatelessWidget {
                       const SizedBox(height: 8),
                       _PreviewBubble(
                         outgoing: false,
-                        text: '今晚的极光，像一条慢慢展开的短信。',
+                        text: tr("Are we still meeting tonight?"),
                       ),
-                      _PreviewBubble(outgoing: true, text: '那就把这条留在青鸟里。'),
+                      _PreviewBubble(
+                        outgoing: true,
+                        text: tr("Yes, see you there."),
+                      ),
                     ],
                   ),
                 ),
@@ -52,11 +84,13 @@ class AppearanceScreen extends StatelessWidget {
             ),
             SliverToBoxAdapter(
               child: AuroraSection(
-                title: '主题',
+                title: tr("Theme"),
                 children: [
                   AuroraSettingTile(
-                    title: 'AMOLED 纯黑',
-                    subtitle: '启用深色与纯黑背景，关闭背景光效',
+                    title: tr("AMOLED black"),
+                    subtitle: tr(
+                      "Use dark mode with a black background and no background glow",
+                    ),
                     icon: Icons.nightlight_outlined,
                     trailing: Switch(
                       value: settings.amoled,
@@ -68,21 +102,26 @@ class AppearanceScreen extends StatelessWidget {
                       horizontal: 16,
                       vertical: 8,
                     ),
-                    child: DropdownButtonFormField<String>(
-                      initialValue: settings.fontFamily,
-                      decoration: const InputDecoration(labelText: '界面字体'),
-                      items: const [
-                        DropdownMenuItem(value: 'system', child: Text('系统字体')),
-                        DropdownMenuItem(
-                          value: 'harmony',
-                          child: Text('HarmonyOS Sans · 鸿蒙'),
+                    child: DropdownMenu<String>(
+                      expandedInsets: EdgeInsets.zero,
+                      requestFocusOnTap: false,
+                      initialSelection: settings.fontFamily,
+                      label: Text(tr("Font")),
+                      dropdownMenuEntries: [
+                        DropdownMenuEntry(
+                          value: 'system',
+                          label: tr("System font"),
                         ),
-                        DropdownMenuItem(
+                        DropdownMenuEntry(
+                          value: 'harmony',
+                          label: tr("HarmonyOS Sans"),
+                        ),
+                        DropdownMenuEntry(
                           value: 'google',
-                          child: Text('Google Sans'),
+                          label: 'Google Sans',
                         ),
                       ],
-                      onChanged: (value) {
+                      onSelected: (value) {
                         if (value != null) settings.setFontFamily(value);
                       },
                     ),
@@ -90,35 +129,45 @@ class AppearanceScreen extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      '内置 HarmonyOS Sans 与 Google Sans；Google Sans 的中文使用鸿蒙字体回退。',
+                      tr(
+                        "Includes HarmonyOS Sans and Google Sans. Other scripts use system font fallback.",
+                      ),
                       style: context.texts.bodySmall,
                     ),
                   ),
                   TextButton(
                     onPressed: () => showLicensePage(
                       context: context,
-                      applicationName: '青鸟短信',
+                      applicationName: tr("Qingniao"),
                     ),
-                    child: const Text('字体许可与开源声明'),
+                    child: Text(tr("Font licenses")),
                   ),
                   Padding(
                     padding: const EdgeInsets.all(16),
-                    child: DropdownButtonFormField<String>(
-                      initialValue: settings.launcherIcon,
-                      decoration: const InputDecoration(labelText: '桌面图标'),
-                      items: const [
-                        DropdownMenuItem(value: 'bird', child: Text('青鸟')),
-                        DropdownMenuItem(value: 'leaf', child: Text('新叶')),
-                        DropdownMenuItem(value: 'chat', child: Text('对话')),
+                    child: DropdownMenu<String>(
+                      expandedInsets: EdgeInsets.zero,
+                      requestFocusOnTap: false,
+                      initialSelection: settings.launcherIcon,
+                      label: Text(tr("App icon")),
+                      dropdownMenuEntries: [
+                        DropdownMenuEntry(value: 'bird', label: tr("Bird")),
+                        DropdownMenuEntry(value: 'leaf', label: tr("Leaf")),
+                        DropdownMenuEntry(value: 'chat', label: tr("Personal")),
                       ],
-                      onChanged: (value) async {
+                      onSelected: (value) async {
                         if (value == null) return;
                         try {
                           await settings.setLauncherIcon(value);
                         } catch (_) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('桌面图标切换失败，请重试')),
+                              SnackBar(
+                                content: Text(
+                                  tr(
+                                    "Unable to change the app icon. Try again.",
+                                  ),
+                                ),
+                              ),
                             );
                           }
                         }
@@ -138,20 +187,20 @@ class AppearanceScreen extends StatelessWidget {
                         'dark' => AuroraThemePreference.dark,
                         _ => AuroraThemePreference.system,
                       }),
-                      items: const [
-                        AuroraFilterItem('system', '跟随系统'),
-                        AuroraFilterItem('light', '浅色'),
-                        AuroraFilterItem('dark', '深色'),
+                      items: [
+                        AuroraFilterItem('system', tr("System default")),
+                        AuroraFilterItem('light', tr("Light")),
+                        AuroraFilterItem('dark', tr("Dark")),
                       ],
                     ),
                   ),
                   AuroraSettingTile(
-                    title: 'Material You 动态取色',
+                    title: tr("Wallpaper colors"),
                     subtitle: settings.systemSeed == null
-                        ? '当前设备未提供系统强调色'
+                        ? tr("System accent colors are unavailable")
                         : settings.useDynamic
-                        ? '已跟随壁纸'
-                        : '使用品牌色',
+                        ? tr("Using wallpaper colors")
+                        : tr("Using reference palette"),
                     icon: Icons.colorize_outlined,
                     trailing: Switch(
                       value: settings.useDynamic,
@@ -165,7 +214,7 @@ class AppearanceScreen extends StatelessWidget {
             ),
             SliverToBoxAdapter(
               child: AuroraSection(
-                title: '色板',
+                title: tr("Reference palette"),
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
@@ -193,7 +242,7 @@ class AppearanceScreen extends StatelessWidget {
             ),
             SliverToBoxAdapter(
               child: AuroraSection(
-                title: '气泡与形状',
+                title: tr("Bubbles and shapes"),
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
@@ -208,16 +257,18 @@ class AppearanceScreen extends StatelessWidget {
                         'cookie' => AuroraBubbleStyle.cookie,
                         _ => AuroraBubbleStyle.soft,
                       }),
-                      items: const [
-                        AuroraFilterItem('soft', '柔和'),
-                        AuroraFilterItem('capsule', '胶囊'),
-                        AuroraFilterItem('cookie', '饼干'),
+                      items: [
+                        AuroraFilterItem('soft', tr("Soft")),
+                        AuroraFilterItem('capsule', tr("Capsule")),
+                        AuroraFilterItem('cookie', tr("Cookie")),
                       ],
                     ),
                   ),
                   AuroraSettingTile(
-                    title: '形状形变',
-                    subtitle: '头像与指示器在状态变化时连续形变',
+                    title: tr("Shape transitions"),
+                    subtitle: tr(
+                      "Avatars and indicators change shape with their state",
+                    ),
                     icon: Icons.auto_awesome_mosaic_outlined,
                     trailing: Switch(
                       value: settings.morphShapes,
@@ -229,7 +280,7 @@ class AppearanceScreen extends StatelessWidget {
             ),
             SliverToBoxAdapter(
               child: AuroraSection(
-                title: '动效与排版',
+                title: tr("Motion and typography"),
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
@@ -244,15 +295,15 @@ class AppearanceScreen extends StatelessWidget {
                         'reduced' => AuroraMotionLevel.reduced,
                         _ => AuroraMotionLevel.full,
                       }),
-                      items: const [
-                        AuroraFilterItem('full', '全速'),
-                        AuroraFilterItem('balanced', '平衡'),
-                        AuroraFilterItem('reduced', '省电'),
+                      items: [
+                        AuroraFilterItem('full', tr("Full")),
+                        AuroraFilterItem('balanced', tr("Balanced")),
+                        AuroraFilterItem('reduced', tr("Reduced")),
                       ],
                     ),
                   ),
                   AuroraSettingTile(
-                    title: '字体大小',
+                    title: tr("Text size"),
                     subtitle: '${(settings.fontScale * 100).round()}%',
                     icon: Icons.text_fields_rounded,
                     trailing: SizedBox(
@@ -267,20 +318,12 @@ class AppearanceScreen extends StatelessWidget {
                     ),
                   ),
                   AuroraSettingTile(
-                    title: '省电极光',
-                    subtitle: '限制背景光团数量与帧率',
+                    title: tr("Reduce background effects"),
+                    subtitle: tr("Pause ambient motion to save power"),
                     icon: Icons.battery_saver_outlined,
                     trailing: Switch(
                       value: settings.lowPowerAurora,
-                      onChanged: (value) {
-                        settings.setLowPower(value);
-                        AuroraEngine.instance.configure(
-                          motion: value
-                              ? AuroraMotionLevel.reduced
-                              : AuroraMotionLevel.full,
-                          reduce: false,
-                        );
-                      },
+                      onChanged: settings.setLowPower,
                     ),
                   ),
                 ],
@@ -347,11 +390,7 @@ class _SeedSwatch extends StatelessWidget {
             height: 52,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [color, Color.lerp(color, Colors.white, .3)!],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: color,
               border: Border.all(
                 color: selected ? scheme.onSurface : Colors.transparent,
                 width: 2,
@@ -366,12 +405,18 @@ class _SeedSwatch extends StatelessWidget {
                   : null,
             ),
             child: selected
-                ? Icon(Icons.check_rounded, color: Colors.white, size: 22)
+                ? Icon(
+                    Icons.check_rounded,
+                    color: color.computeLuminance() > .179
+                        ? Colors.black
+                        : Colors.white,
+                    size: 22,
+                  )
                 : null,
           ),
           const SizedBox(height: 6),
           Text(
-            name,
+            name.replaceFirst('PANTONE ', ''),
             style: context.texts.labelSmall?.copyWith(
               color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,

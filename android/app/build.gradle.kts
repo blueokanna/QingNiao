@@ -3,6 +3,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val benchmarkBuild = providers.gradleProperty("qingniaoBenchmark").orNull == "true"
 val releaseCredentials = listOf(
     "QINGNIAO_KEYSTORE_PATH", "QINGNIAO_STORE_PASSWORD",
     "QINGNIAO_KEY_ALIAS", "QINGNIAO_KEY_PASSWORD"
@@ -10,6 +11,7 @@ val releaseCredentials = listOf(
 val hasReleaseCredentials = releaseCredentials.values.all { !it.isNullOrBlank() }
 val verifyReleaseSigning by tasks.registering {
     doLast {
+        check(!benchmarkBuild) { "Benchmark builds cannot be production releases." }
         check(hasReleaseCredentials) { "Release signing requires QINGNIAO_KEYSTORE_PATH, QINGNIAO_STORE_PASSWORD, QINGNIAO_KEY_ALIAS and QINGNIAO_KEY_PASSWORD." }
         check(file(releaseCredentials.getValue("QINGNIAO_KEYSTORE_PATH")!!).isFile) { "Release keystore does not exist." }
     }
@@ -31,7 +33,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.blue.qingniao"
+        applicationId = if (benchmarkBuild) "com.blue.qingniao.benchmark" else "com.blue.qingniao"
         minSdk = 31
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -67,6 +69,9 @@ flutter {
 }
 
 dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:35.2.0"))
+    implementation("com.google.firebase:firebase-messaging")
+    testImplementation("junit:junit:4.13.2")
     implementation("com.klinkerapps:android-smsmms:5.2.6") { isTransitive = false }
     implementation("com.klinkerapps:logger:1.0.3")
 }

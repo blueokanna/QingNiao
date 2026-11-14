@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../aurora/aurora_widgets.dart';
+import '../aurora/aurora_tab_transition.dart';
 import '../messaging/inbox_screen.dart';
 import '../messaging/message_hub.dart';
 import '../messaging/message_repository.dart';
@@ -23,32 +25,45 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _index = 0;
-  late final PageController _pages = PageController();
   late final SyncEngine _sync = SyncEngine(widget.repository);
   Timer? _syncTimer;
   bool _syncing = false;
+  int _syncTick = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    widget.hub.addListener(_onHubChanged);
     widget.hub.start();
+    _startForegroundSync();
+  }
+
+  void _onHubChanged() {
+    if (_syncTick == widget.hub.syncTick) return;
+    _syncTick = widget.hub.syncTick;
+    _sync.invalidateState();
     _startForegroundSync();
   }
 
   Future<void> _startForegroundSync() async {
     try {
       final status = await _sync.status(refresh: false);
-      if (status['enabled'] != true) return;
+      if (!mounted) return;
       _syncTimer?.cancel();
+      _syncTimer = null;
+      if (status['enabled'] != true ||
+          (WidgetsBinding.instance.lifecycleState != null &&
+              WidgetsBinding.instance.lifecycleState !=
+                  AppLifecycleState.resumed)) {
+        return;
+      }
       _syncTimer = Timer.periodic(
         const Duration(minutes: 2),
         (_) => _syncNow(),
       );
       await _syncNow();
-    } catch (_) {
-      // 同步未配置或服务器不可达时保持静默，不影响本地短信。
-    }
+    } catch (_) {}
   }
 
   Future<void> _syncNow() async {
@@ -58,7 +73,6 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       await _sync.syncNow();
       await widget.hub.refresh(silent: true);
     } catch (_) {
-      // 后台自动同步失败不打断收件箱。
     } finally {
       _syncing = false;
     }
@@ -66,34 +80,34 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _syncTimer != null) {
-      _syncNow();
+    if (state == AppLifecycleState.resumed) {
+      _sync.invalidateState();
+      _startForegroundSync();
+    } else {
+      _syncTimer?.cancel();
+      _syncTimer = null;
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    widget.hub.removeListener(_onHubChanged);
     _syncTimer?.cancel();
     _sync.dispose();
-    _pages.dispose();
     super.dispose();
   }
 
   void _select(int index) {
     if (_index == index) return;
     setState(() => _index = index);
-    _pages.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 420),
-      curve: Curves.easeOutQuint,
-    );
   }
 
   Future<void> _compose() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ComposeScreen(repository: widget.repository, hub: widget.hub),
+        builder: (_) =>
+            ComposeScreen(repository: widget.repository, hub: widget.hub),
       ),
     );
     widget.hub.refresh(silent: true);
@@ -109,10 +123,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           resizeToAvoidBottomInset: false,
           floatingActionButton: _index == 0
               ? Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
+                  padding: const EdgeInsetsDirectional.only(bottom: 4),
                   child: AuroraFab(
                     icon: Icons.edit_rounded,
-                    tooltip: '写短信',
+                    tooltip: tr("Compose"),
                     onTap: _compose,
                   ),
                 )
@@ -128,27 +142,25 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                 AuroraNavDestination(
                   icon: Icons.forum_outlined,
                   selectedIcon: Icons.forum_rounded,
-                  label: '消息',
+                  label: tr("Messages"),
                   badge: hub.unread,
                 ),
                 AuroraNavDestination(
                   icon: Icons.shield_outlined,
                   selectedIcon: Icons.shield_rounded,
-                  label: '验证码',
+                  label: tr("Verification codes"),
                   badge: hub.otpCount,
                 ),
-                const AuroraNavDestination(
+                AuroraNavDestination(
                   icon: Icons.tune_rounded,
                   selectedIcon: Icons.tune_rounded,
-                  label: '设置',
+                  label: tr("Settings"),
                 ),
               ],
             ),
           ),
-          body: PageView(
-            controller: _pages,
-            onPageChanged: (index) => setState(() => _index = index),
-            physics: const BouncingScrollPhysics(),
+          body: AuroraTabTransition(
+            index: _index,
             children: [
               InboxScreen(repository: widget.repository, hub: hub),
               OtpScreen(repository: widget.repository, hub: hub),

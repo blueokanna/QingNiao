@@ -17,6 +17,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private val cadence by lazy { DisplayCadence(this) }
     private val appearance by lazy { AppearanceBridge(this) }
     private val aurora by lazy { AuroraBridge(this) }
     private val handler = Handler(Looper.getMainLooper())
@@ -29,8 +30,14 @@ class MainActivity : FlutterActivity() {
     }
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        // 设备重启会丢失发送看门狗闹钟；启动时把长时间停在发件箱的消息标为失败。
-        MessageIo.executor.execute { SmsSendWatchdog.sweep(this) }
+        PushGateway.onSignal = { events?.success("sync") }
+
+        val appContext = applicationContext
+        MessageIo.executor.execute {
+            SmsSendWatchdog.sweep(appContext)
+            try { ScheduledMessageAlarms.restore(appContext) }
+            catch (_: Exception) { android.util.Log.w("ScheduleRecovery", "Unable to restore scheduled alarms") }
+        }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.blue.qingniao/messages").setMethodCallHandler(::handle)
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, "com.blue.qingniao/changes").setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, sink: EventChannel.EventSink) { events = sink }
@@ -50,29 +57,44 @@ class MainActivity : FlutterActivity() {
     )
     private fun requireAccess() {
         val state = access()
-        check(listOf("defaultApp", "readSms", "sendSms", "receiveSms").all { state[it] == true }) { "请设置默认短信应用并授予短信权限" }
+        check(listOf("defaultApp", "readSms", "sendSms", "receiveSms").all { state[it] == true }) { "Set the default SMS role and grant SMS permissions" }
     }
     private fun handle(call: MethodCall, result: MethodChannel.Result) {
         try {
+            if (PushGateway.handle(this, call, result)) return
             if (appearance.handle(call, result)) return
         } catch (_: Exception) {
-            result.error("appearance_unavailable", "无法读取系统外观设置", null)
+            result.error("appearance_unavailable", "Unable to read appearance settings", null)
             return
         }
         if (aurora.handle(call, result)) return
         when (call.method) {
+            "copySensitive" -> {
+                val text = call.argument<String>("text")
+                if (text == null || text.length > 120_000) {
+                    result.error("clipboard_limit", "Selection is too large to copy", null)
+                    return
+                }
+                val clip = android.content.ClipData.newPlainText("Qingniao", text)
+                clip.description.extras = android.os.PersistableBundle().apply {
+                    putBoolean("android.content.extra.IS_SENSITIVE", true)
+                }
+                getSystemService(android.content.ClipboardManager::class.java).setPrimaryClip(clip)
+                result.success(null)
+                return
+            }
             "pickContact", "pickAttachment" -> {
-                if (pendingSelection != null) { result.error("busy", "选择器已打开", null); return }
+                if (pendingSelection != null) { result.error("busy", "A picker is already open", null); return }
                 pendingSelection = result
                 val selection = if (call.method == "pickContact") Intent(Intent.ACTION_PICK, android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI)
                     else Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*").putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "audio/*", "video/*"))
                 try { startActivityForResult(selection, if (call.method == "pickContact") 73 else 74) }
-                catch (_: android.content.ActivityNotFoundException) { pendingSelection = null; result.error("unavailable", "设备没有可用的选择器", null) }
+                catch (_: android.content.ActivityNotFoundException) { pendingSelection = null; result.error("unavailable", "No picker is available", null) }
                 return
             }
             "access" -> { result.success(access()); return }
             "requestAccess" -> {
-                if (pendingAccess != null) { result.error("busy", "权限申请正在进行", null); return }
+                if (pendingAccess != null) { result.error("busy", "A permission request is already in progress", null); return }
                 pendingAccess = result
                 val roles = getSystemService(RoleManager::class.java)
                 if (!roles.isRoleAvailable(RoleManager.ROLE_SMS)) { requestMessagePermissions(); return }
@@ -83,7 +105,7 @@ class MainActivity : FlutterActivity() {
             "launchIntent" -> {
                 val address = intent.getStringExtra("address") ?: intent.data?.takeIf { it.scheme in setOf("sms", "smsto", "mms", "mmsto") }?.schemeSpecificPart?.substringBefore('?')
                 result.success(mapOf("address" to address, "body" to intent.getStringExtra("sms_body")))
-                // 从通知进入即视为已查看，撤掉仍在进行中的流体云胶囊，避免常驻。
+
                 if (!address.isNullOrBlank()) Notifications.cancel(this, address.hashCode())
                 intent = Intent(this, MainActivity::class.java)
                 return
@@ -113,12 +135,12 @@ class MainActivity : FlutterActivity() {
                             if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) emptyList<Map<String, Any>>()
                             else getSystemService(SubscriptionManager::class.java).activeSubscriptionInfoList.orEmpty().map { mapOf("id" to it.subscriptionId, "name" to it.displayName.toString(), "slot" to it.simSlotIndex + 1) }
                         }
-                        else -> throw IllegalArgumentException("不支持的操作")
+                        else -> throw IllegalArgumentException("Unsupported operation")
                     }
                 }
                 handler.post { result.success(value) }
             } catch (error: Exception) {
-                val message = when (error) { is SecurityException -> "短信权限已撤销，请重新授权"; is IllegalArgumentException, is IllegalStateException -> error.message ?: "操作无法完成"; else -> "系统消息服务暂时不可用，请重试" }
+                val message = when (error) { is SecurityException -> "SMS permission was revoked. Grant permission again."; is IllegalArgumentException, is IllegalStateException -> error.message ?: "Unable to complete the action"; else -> "System messaging service unavailable. Try again." }
                 handler.post { result.error("message_operation_failed", message, null) }
             }
         }
@@ -147,13 +169,13 @@ class MainActivity : FlutterActivity() {
                         mapOf("uri" to selected.toString(), "type" to type)
                     }
                     handler.post { result.success(value) }
-                } catch (_: Exception) { handler.post { result.error("selection_failed", "无法读取所选内容", null) } }
+                } catch (_: Exception) { handler.post { result.error("selection_failed", "Unable to read the selected content", null) } }
             }
             return
         }
         if (requestCode == 71) {
-            // 即使用户拒绝默认短信角色，也申请短信权限：
-            // 非默认应用仍可通过 SMS_RECEIVED 收到并提醒新短信。
+
+
             requestMessagePermissions()
         }
     }
@@ -161,15 +183,22 @@ class MainActivity : FlutterActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == 72) { pendingAccess?.success(access()); pendingAccess = null }
     }
-    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); events?.success("intent") }
+    override fun onResume() { super.onResume(); cadence.resume() }
+    override fun onPause() { cadence.pause(); super.onPause() }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent); setIntent(intent)
+        events?.success(if (intent.getBooleanExtra("remoteSync", false)) "sync" else "intent")
+    }
     override fun onDestroy() {
+        cadence.pause()
+        PushGateway.onSignal = null
         contentResolver.unregisterContentObserver(observer)
         handler.removeCallbacks(changed)
         aurora.cancelPending()
         events = null
-        pendingAccess?.error("activity_closed", "权限申请已结束，请重试", null)
+        pendingAccess?.error("activity_closed", "Permission request ended. Try again.", null)
         pendingAccess = null
-        pendingSelection?.error("activity_closed", "选择已取消", null)
+        pendingSelection?.error("activity_closed", "Selection canceled", null)
         pendingSelection = null
         super.onDestroy()
     }

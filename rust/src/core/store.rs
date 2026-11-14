@@ -328,15 +328,15 @@ mod tests {
         let dir = temp_dir("trash");
         let mut store = Store::new();
         assert!(store.init(dir.to_str().unwrap()));
-        assert!(store.trash_add(entry(1, "第一条")));
-        assert!(store.trash_add(entry(2, "第二条")));
-        assert!(store.trash_add(entry(1, "覆盖后的第一条")));
+        assert!(store.trash_add(entry(1, include_str!("../../resources/message_samples/sms_text_039321239145.txt"))));
+        assert!(store.trash_add(entry(2, include_str!("../../resources/message_samples/sms_text_09aa890b58c6.txt"))));
+        assert!(store.trash_add(entry(1, include_str!("../../resources/message_samples/sms_text_97776cc21527.txt"))));
         let entries = store.trash_entries();
         assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0].id, 2, "新加入的排在最前");
+        assert_eq!(entries[0].id, 2, include_str!("../../resources/message_samples/sms_text_707eadc16af7.txt"));
         assert_eq!(
-            entries[1].body, "覆盖后的第一条",
-            "同 id 就地覆盖，位置不变"
+            entries[1].body, include_str!("../../resources/message_samples/sms_text_97776cc21527.txt"),
+            include_str!("../../resources/message_samples/sms_text_df77a0a7ff04.txt")
         );
         assert!(entries[1].deleted_at > 0);
 
@@ -353,8 +353,8 @@ mod tests {
         let dir = temp_dir("restore");
         let mut store = Store::new();
         store.init(dir.to_str().unwrap());
-        store.trash_add(entry(7, "待恢复"));
-        store.trash_add(entry(8, "待删除"));
+        store.trash_add(entry(7, include_str!("../../resources/message_samples/sms_text_e84957b09097.txt")));
+        store.trash_add(entry(8, include_str!("../../resources/message_samples/sms_text_ee96dc1ebe96.txt")));
 
         assert!(store.trash_restore(7));
         assert!(!store.trash_restore(7));
@@ -372,8 +372,8 @@ mod tests {
         let dir = temp_dir("purge");
         let mut store = Store::new();
         store.init(dir.to_str().unwrap());
-        store.trash_add(entry(1, "旧"));
-        store.trash_add(entry(2, "新"));
+        store.trash_add(entry(1, include_str!("../../resources/message_samples/sms_text_4fbc8134f6d0.txt")));
+        store.trash_add(entry(2, include_str!("../../resources/message_samples/sms_text_3cc493bc5b3b.txt")));
 
         let now = now_ms();
         assert_eq!(store.trash_purge_at(now + 10 * 86_400_000, 0), 0);
@@ -394,7 +394,7 @@ mod tests {
         let dir = temp_dir("fresh");
         let mut store = Store::new();
         store.init(dir.to_str().unwrap());
-        store.trash_add(entry(1, "刚刚删除"));
+        store.trash_add(entry(1, include_str!("../../resources/message_samples/sms_text_73adf901e386.txt")));
         assert_eq!(store.trash_purge(1), 0);
         assert_eq!(store.trash_entries().len(), 1);
         let _ = fs::remove_dir_all(&dir);
@@ -425,12 +425,12 @@ mod tests {
     fn settings_round_trip() {
         let dir = temp_dir("settings");
         let mut store = Store::new();
-        assert!(!store.settings_set("k", "v"), "未初始化时不写入");
+        assert!(!store.settings_set("k", "v"), include_str!("../../resources/message_samples/sms_text_682195db4eb5.txt"));
         assert!(store.init(dir.to_str().unwrap()));
         assert!(store.settings_set("retention_days", "30"));
-        assert!(store.settings_set("中文键", "值🌿"));
+        assert!(store.settings_set(include_str!("../../resources/message_samples/sms_text_9d8ee900094d.txt"), include_str!("../../resources/message_samples/sms_text_b165a0390452.txt")));
         assert_eq!(store.settings_get("retention_days").as_deref(), Some("30"));
-        assert_eq!(store.settings_get("中文键").as_deref(), Some("值🌿"));
+        assert_eq!(store.settings_get(include_str!("../../resources/message_samples/sms_text_9d8ee900094d.txt")).as_deref(), Some(include_str!("../../resources/message_samples/sms_text_b165a0390452.txt")));
         assert!(store.settings_get("missing").is_none());
         assert!(!store.settings_set("", "x"));
 

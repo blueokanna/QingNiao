@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Qingniao</string>
+    <string name="push_title">Des messages sont à synchroniser</string>
+    <string name="push_body">Ouvrez Qingniao pour synchroniser en toute sécurité.</string>
+    <string name="notification_reply">Répondre</string>
+    <string name="notification_messages">Messages</string>
+    <string name="notification_new_message">Nouveau message</string>
+    <string name="notification_mark_read">Marquer comme lu</string>
+    <string name="notification_copy_code">Copier</string>
+    <string name="notification_code_copied">Copié</string>
+    <string name="notification_loading">Chargement…</string>
+    <string name="notification_new_mms">Nouveau MMS</string>
+    <string name="notification_failed">Échec de l’envoi</string>
+    <string name="notification_retry">Action impossible. Réessayez.</string>
+    <string name="notification_test_title">Test de notification</string>
+    <string name="notification_test_body">Code de test : 864213. Aucun SMS n’a été envoyé.</string>
+</resources>

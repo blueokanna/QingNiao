@@ -15,24 +15,31 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- 默认短信应用会由系统自动授予该运行时权限；声明后 OEM 的 SmsApplication
-         才能完成授权（否则 ColorOS 会反复记录 lost android:read_cell_broadcasts）。 -->
+    <!-- Required by some OEM default-SMS permission grants. -->
     <uses-permission android:name="android.permission.READ_CELL_BROADCASTS" />
     <uses-feature android:name="android.hardware.telephony" android:required="true" />
-    <application android:label="青鸟短信" android:name="${applicationName}" android:icon="@mipmap/ic_launcher" android:allowBackup="false" android:enableOnBackInvokedCallback="true" android:dataExtractionRules="@xml/message_data_extraction_rules" android:usesCleartextTraffic="false">
-        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:taskAffinity="" android:theme="@style/LaunchTheme" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" android:hardwareAccelerated="true" android:windowSoftInputMode="adjustResize">
+    <queries><intent><action android:name="android.intent.action.SENDTO" /><data android:scheme="smsto" /></intent></queries>
+    <application android:supportsRtl="true" android:localeConfig="@xml/locales_config" android:label="@string/app_name" android:name="${applicationName}" android:icon="@mipmap/ic_launcher" android:allowBackup="false" android:enableOnBackInvokedCallback="true" android:dataExtractionRules="@xml/message_data_extraction_rules" android:usesCleartextTraffic="false">
+        <activity android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:taskAffinity="" android:theme="@style/LaunchTheme" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" android:hardwareAccelerated="true" android:windowSoftInputMode="adjustResize">
             <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme" />
             <intent-filter><action android:name="android.intent.action.SENDTO" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" /><data android:scheme="sms" /><data android:scheme="smsto" /><data android:scheme="mms" /><data android:scheme="mmsto" /></intent-filter>
         </activity>
-        <activity-alias android:name=".LauncherBird" android:targetActivity=".MainActivity" android:enabled="true" android:exported="true" android:icon="@mipmap/ic_launcher" android:label="青鸟短信"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity-alias>
-        <activity-alias android:name=".LauncherLeaf" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_leaf" android:label="青鸟短信"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity-alias>
-        <activity-alias android:name=".LauncherChat" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_chat" android:label="青鸟短信"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity-alias>
+        <activity-alias android:name=".LauncherBird" android:targetActivity=".MainActivity" android:enabled="true" android:exported="true" android:icon="@mipmap/ic_launcher" android:label="@string/app_name"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity-alias>
+        <activity-alias android:name=".LauncherLeaf" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_leaf" android:label="@string/app_name"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity-alias>
+        <activity-alias android:name=".LauncherChat" android:targetActivity=".MainActivity" android:enabled="false" android:exported="true" android:icon="@mipmap/ic_launcher_chat" android:label="@string/app_name"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity-alias>
         <receiver android:name=".IncomingSmsReceiver" android:exported="true" android:permission="android.permission.BROADCAST_SMS"><intent-filter><action android:name="android.provider.Telephony.SMS_DELIVER" /></intent-filter></receiver>
-        <receiver android:name=".SmsReceivedReceiver" android:exported="true"><intent-filter android:priority="999"><action android:name="android.provider.Telephony.SMS_RECEIVED" /></intent-filter></receiver>
+        <receiver android:name=".SmsReceivedReceiver" android:exported="true" android:permission="android.permission.BROADCAST_SMS"><intent-filter android:priority="999"><action android:name="android.provider.Telephony.SMS_RECEIVED" /></intent-filter></receiver>
         <receiver android:name=".IncomingMmsReceiver" android:exported="true" android:permission="android.permission.BROADCAST_WAP_PUSH"><intent-filter><action android:name="android.provider.Telephony.WAP_PUSH_DELIVER" /><data android:mimeType="application/vnd.wap.mms-message" /></intent-filter></receiver>
         <receiver android:name=".SmsReceiptReceiver" android:exported="false" />
         <receiver android:name=".MmsResultReceiver" android:exported="false" />
         <receiver android:name=".ScheduledSendReceiver" android:exported="false" />
+        <receiver android:name=".ScheduleRecoveryReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
         <receiver android:name=".ReplyReceiver" android:exported="false" />
         <receiver android:name=".MarkReadReceiver" android:exported="false" />
         <receiver android:name=".CopyOtpReceiver" android:exported="false" />
@@ -41,6 +48,12 @@
         <service android:name=".RespondViaMessageService" android:exported="true" android:permission="android.permission.SEND_RESPOND_VIA_MESSAGE"><intent-filter><action android:name="android.intent.action.RESPOND_VIA_MESSAGE" /><category android:name="android.intent.category.DEFAULT" /><data android:scheme="sms" /><data android:scheme="smsto" /><data android:scheme="mms" /><data android:scheme="mmsto" /></intent-filter></service>
         <provider android:name=".MmsTransferProvider" android:authorities="${applicationId}.transfers" android:exported="false" android:grantUriPermissions="true" />
         <provider android:name="com.klinker.android.send_message.MmsFileProvider" android:authorities="${applicationId}.MmsFileProvider" tools:node="remove" />
+        <service android:name=".NetworkPushService" android:exported="false">
+            <intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter>
+        </service>
+        <meta-data android:name="firebase_messaging_installation_id_enabled" android:value="true" />
+        <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false" />
+        <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
         <meta-data android:name="flutterEmbedding" android:value="2" />
     </application>
 </manifest>
