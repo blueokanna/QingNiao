@@ -1,144 +1,208 @@
-# 青鸟短信 · Qingniao
+<p align="center">
+  <img src="android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="112" height="112" alt="青鸟应用图标">
+</p>
 
-面向 Android 的本地优先短信与彩信客户端。Flutter 构建 Material 3 界面，Kotlin 对接系统通信能力，Rust 负责文本分析、搜索与密码学模块。
+<h1 align="center">青鸟 · Qingniao</h1>
 
-**简体中文** · [English](README_EN.md)
+<p align="center">青鸟衔星至，尺素寄心间</p>
+<p align="center">本地优先的 Android 短信与彩信客户端</p>
+<p align="center"><strong>简体中文</strong> · <a href="README_EN.md">English</a></p>
 
-包名 `com.blue.qingniao`，最低 Android 12（API 31）。只维护 Android 应用；桌面构建脚本用于交叉编译，不代表提供桌面客户端。
+青鸟使用 Flutter 构建 Material 3 Expressive 界面，通过 Kotlin 接入 Android 通信能力，以 Rust 实现消息分析、搜索、星空参数生成与密码学模块。短信管理和验证码识别在本机完成；自建同步与网络推送均为可选功能，默认关闭。
+
+| 项目 | 说明 |
+| --- | --- |
+| 支持平台 | Android 12 及以上（API 31+） |
+| 应用包名 | `com.blue.qingniao` |
+| 技术栈 | Flutter / Dart · Kotlin · Rust |
+| 设计 | Material 3 组件、Expressive 形状与 Aurora 动效 |
+| 许可证 | [PolyForm Small Business License 1.0.0](LICENSE) |
+
+**导航：** [功能](#功能) · [设计与渲染](#设计与渲染) · [开始使用](#开始使用) · [开发与构建](#开发与构建) · [可选联网功能](#可选联网功能) · [安全与兼容性](#安全与兼容性)
 
 ## 功能
 
-| 模块 | 当前实现 |
+| 模块 | 能力 |
 | --- | --- |
-| 短信 | 默认短信角色、双卡、长短信分段、发送与送达状态、草稿、搜索、分页 |
-| 会话 | 多选、复制、全部已读、置顶、归档、黑名单；左右滑可配置，默认左滑回收、右滑已读 |
-| 验证码 | 本机识别、一键复制、敏感剪贴板、可关闭的阅后回收 |
-| 回收站 | 恢复、永久删除、保留期限；无法确认系统删除时保留本地记录 |
-| 定时发送 | 持久化任务、系统闹钟、启动及重启恢复；缺少精确闹钟权限时降级调度 |
-| 彩信 | 混合 SMS/MMS 会话、群组收件人、附件预览与系统传输；需逐运营商验证 |
-| 通知 | 回复、已读、复制验证码；系统支持时请求 promoted notification，展示由系统决定 |
-| 外观 | Material 3 组件与 Expressive Shape、Monet、六套参考色、深色与 AMOLED、三种自适应图标 |
-| 字体 | 系统字体、HarmonyOS Sans、Google Sans；中文使用 HarmonyOS Sans 回退 |
-| 语言 | 中、英、印地、西班牙、阿拉伯、法、孟加拉、葡萄牙、俄、乌尔都语；支持 RTL |
-| 可选联网 | 自建加密同步与 FCM 同步提示，默认关闭，需自行配置 |
+| 短信与彩信 | 默认短信角色、双卡、长短信分段、发送与送达状态、混合 SMS/MMS 会话、群组收件人与附件预览 |
+| 会话管理 | 搜索、分页、草稿、多选、置顶、归档、黑名单与可配置滑动操作 |
+| 未读管理 | 长按底部「消息」将所有消息标为已读；长按「验证码」仅处理验证码会话；验证码导航角标显示未读数量 |
+| 验证码 | 本机提取、一键复制、敏感剪贴板标记与可关闭的阅后回收 |
+| 回收站 | 恢复、永久删除与保留期限；无法确认系统删除时保留本地记录 |
+| 定时发送 | 持久化任务、系统闹钟、启动及重启恢复；缺少精确闹钟权限时使用降级调度 |
+| 通知 | 快捷回复、标为已读、复制验证码；增强通知的最终展示由系统决定 |
+| 个性化 | 系统动态取色、六套参考色、深浅主题、AMOLED、导航模糊调节、三种自适应图标与字体选择 |
+| 语言与无障碍 | 十种语言资源、RTL、系统字体缩放与减少动态效果支持 |
 
-阅后回收针对本次加载时未读、在前台会话完整显示约两秒的验证码。滚动、进入后台或多选会打断计时，批量已读不会触发回收。通知到期消失与短信正文回收是独立行为。错过发送时间的任务保留待确认，不会在重启后集中补发。
+阅后回收只处理加载时未读、在前台会话中完整显示约两秒的验证码；滚动、切到后台或进入多选会打断计时。批量已读不触发回收，通知到期也不等于删除消息。错过发送时间的定时任务保留待确认，不会在重启后集中补发。
 
-## Aurora 动效与渲染
+## 设计与渲染
 
-Aurora 是应用层调度器，运行在 Flutter 帧调度与 GPU 渲染管线上，没有修改 Android 系统合成器或驱动。
+### Material 3 Expressive
 
-- 自定义弹簧和背景共享一个 VSync Ticker，只推进活跃弹簧；集合变化时才重建遍历快照。Material 组件及路由保留 Flutter 自身的动画生命周期。
-- 弹簧使用解析积分，快速反向保留位置与速度，长帧按真实经过时间推进。恢复前台时重置时间基准，不把后台停留时间计入过渡。
-- 全局星点使用 `FragmentProgram` 片元着色器，一次绘制完成底色与星点合成。每个像素仅计算所在网格，不逐帧遍历粒子或上传位图。Android 启用 Impeller，由引擎选择设备支持的 GPU 后端；着色器加载失败时保留 Canvas 回退。标签页退出动画结束后释放页面及监听器，搜索内容保存在消息状态中。
-- Rust 根据安装时保存的随机种子生成 32×32 RGBA 参数图（原始数据 4 KiB），确定星点的位置、远近、亮度、色温与独立变化尺度。参数图和着色器在首帧前准备好，整个运行期间共享，不逐帧调用 Rust。GPU 使用五次插值噪声让变化在节点处保持连续：亮度以 64–160 秒为基础尺度，漂移以 240–600 秒为基础尺度，单轴偏移不超过 1.2 个逻辑像素；不再按 12 秒回绕。大部分空白像素跳过噪声计算。省电与减少动态效果冻结当前状态，恢复时接着演化。
-- 底部胶囊使用裁剪范围内的实时高斯背景模糊，叠加 Material 3 色调表面。在「外观 → 导航栏外观」调节强度 0–32、表面不透明度 55%–95%，拖动时预览，松手后保存；强度 0 关闭模糊。滚动内容与星点更新直接参与合成，不缓存背景截图，也不额外创建动画时钟；高对比度模式提高遮罩浓度。
-- 星点与头像变形共用环境时钟，最多每秒更新 30 次；头像完整往返约 14 秒。交互弹簧和系统路由仍按屏幕刷新率推进。
-- Shape 缓存最多 64 组；系统内存压力清理形状及可驱逐的图片缓存。附件按需读取，超限明确报错，不静默截断。
-- 尊重系统减少动态效果：环境图形静止，星点仍保留。AMOLED 使用纯黑底，仅绘制低亮度星点，不绘制全屏色晕。
+界面以 Material 3 组件、色调表面和 Expressive 形状为基础，头像使用缓慢的形状过渡。系统动态取色读取 Android 色阶，在 HCT 色彩空间将彩度调整为原值的 80%，尽量保留色相与明度；最终显示受色域约束。手动参考色板独立于此调整。
 
-以上机制不等于已证明降低功耗或稳定输出 120 FPS。性能结论需要 profile 模式真机数据。
+底部胶囊使用裁剪范围内的实时高斯背景模糊，直接参与当前画面的合成，不使用背景截图。在「外观 → 导航栏外观」中可设置模糊强度 **0–32**、表面不透明度 **55%–95%**；拖动时预览，松手后保存，强度为 0 时关闭模糊。高对比度模式提高表面遮罩浓度。
 
-## 颜色与资源
+### Rust 与 GPU 星空
 
-参考色来自提供的涂布纸色卡 PDF 中的 CMYK 模拟色块：[色板来源与转换结果](assets/palettes/coated_reference.json)。六色为 3295 C `#00907F`、2725 C `#4D5FAB`、3015 C `#007CB7`、1665 C `#F37121`、2587 C `#6352A2`、Cool Gray 11 C `#5A5B5E`。表面及状态色由参考色派生，Monet 使用系统色阶。RGB 显示不是经认证的实体潘通专色匹配。
+Rust 根据持久化的安装随机种子生成 **32 × 32 RGBA 参数图**，原始数据为 **4 KiB**，描述星点的位置、远近、亮度、色温与变化尺度。参数图与着色器共享复用，不逐帧调用 Rust。
 
-字体来源与散列见 [字体清单](assets/fonts/manifest.json)，许可见 [assets/licenses](assets/licenses)。翻译位于 `assets/l10n`；应用代码使用英文注释。`rust/resources` 的 121 个 TXT 共 1,958 字节，全部有引用：37 个运行时关键词，其余为测试资源。文本通过 `include_str!` 在编译时嵌入，不在动画过程中逐文件读取，不能直接删除。
+Flutter `FragmentProgram` 在 GPU 上合成背景与星点。亮度以 64–160 秒、漂移以 240–600 秒为基础时间尺度连续演变，单轴位移不超过 1.2 个逻辑像素，形成细微、缓慢且各不相同的变化。Android 启用 Impeller，由引擎选择设备可用的 GPU 后端；资源加载失败时保留静态 Canvas 回退。
+
+Aurora 将星点与头像的环境更新限制为每秒最多 30 次，交互弹簧仍跟随显示 VSync。省电或减少动态效果时冻结当前星空；AMOLED 保留纯黑底与低亮度星点。退出的标签页在过渡后释放，形状缓存有数量上限，内存压力下清理可释放缓存。
+
+这些是实现机制，并非功耗或帧率的测量结论。性能评估应使用目标设备上的 profile 构建。
+
+## 开始使用
+
+1. 安装与设备架构匹配的 APK。升级已有安装时，必须使用相同签名证书和更高的版本代码。
+2. 打开青鸟，通过应用内入口申请系统默认短信角色，并按需授予短信、联系人及通知权限。
+3. 在设置中选择 SIM、通知和外观偏好；仅在需要跨设备同步时配置联网功能。
+
+部分 OnePlus / ColorOS 系统版本的默认短信选择器会过滤第三方应用，列表可能为空，即使青鸟已经持有短信角色。可在「设置 → 设备诊断」核对实际角色状态；尚未取得角色时使用应用内的系统申请入口。不要通过卸载或清除数据刷新该列表。
 
 ## 工程结构
 
-| 目录 | 职责 |
+| 路径 | 职责 |
 | --- | --- |
-| `lib/aurora` | 帧调度、弹簧、形状、主题、公共组件 |
-| `lib/messaging` | 会话、验证码、撰写、彩信、回收站与状态 |
-| `lib/settings`、`lib/sync` | 设置与同步客户端 |
-| `android/app/src/main/kotlin` | 默认角色、Telephony、通知、双卡、权限及调度 |
-| `rust/src` | 分段、分析、搜索、MMS 编解码、加密与桥接 |
-| `server-rs` | 可选同步服务 |
-| `test`、`integration_test`、`tool` | 回归测试、真机性能测试、构建与校验 |
+| [`lib/aurora`](lib/aurora) | 主题、公共组件、弹簧、形状与环境动效调度 |
+| [`lib/messaging`](lib/messaging) | 会话、验证码、编辑器、彩信与回收站 |
+| [`lib/settings`](lib/settings)、[`lib/sync`](lib/sync) | 设置与同步客户端 |
+| [`android/app/src/main/kotlin`](android/app/src/main/kotlin) | 默认角色、Telephony、双卡、通知、权限与任务调度 |
+| [`rust/src`](rust/src) | 消息分析、搜索、MMS 编解码、星空参数与密码学模块 |
+| [`shaders`](shaders) | GPU 星空着色器 |
+| [`server-rs`](server-rs) | 可选的自建同步服务 |
+| [`test`](test)、[`integration_test`](integration_test)、[`tool`](tool) | 回归测试、设备测试与构建校验工具 |
 
-业务代码使用 Dart、Kotlin、Rust；Flutter 生成的 Java 插件注册文件属于工具链产物。系统 Provider 保存真实 SMS/MMS，应用侧存储保存归档、回收站与调度状态。内部 SMS/MMS ID 分别为正、负值，访问 Provider 时恢复原始 ID。
+系统 SMS/MMS Provider 保存运营商消息；应用存储保存归档、回收站和调度等状态。Android 是唯一维护的应用目标，桌面构建文件用于工具链及宿主机测试，不代表提供桌面客户端。
 
-## 构建与校验
+## 开发与构建
 
-当前固定环境：Flutter 3.47.9 / Dart 3.13.7、JDK 17、Android SDK 36、Rust 1.99.1、FRB 2.13.0。NDK 由 Flutter Gradle 配置选择，CI 版本见 [Android 工作流](.github/workflows/android-delivery.yml)。先安装 SDK/NDK 和 Rust Android targets；首次解析依赖需要网络。
+### 环境准备
+
+仓库 [CI 工作流](.github/workflows/android-delivery.yml) 固定 Flutter **3.47.9**、Dart **3.13.7**、Rust **1.99.1** 与 JDK **17**；Android 编译 SDK 为 **36**，CI 安装 NDK **28.2.13676358**，本地 Gradle 使用 Flutter 提供的 NDK 版本。`flutter_rust_bridge` 与代码生成器版本均为 **2.13.0**。校验脚本还需要 Python 3。
+
+安装对应工具链、Android SDK/NDK 并接受 SDK 许可；确保 `flutter`、`dart`、`cargo`、`rustup` 与 `python` 可用。以下命令从仓库根目录执行，使用 PowerShell 语法；其他系统可将 `python` 替换为 `python3`。
 
 ```powershell
+rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+flutter doctor -v
 flutter pub get --enforce-lockfile
+flutter build apk --debug
+```
+
+Debug APK 位于 `build/app/outputs/flutter-apk/app-debug.apk`。性能分析使用 `flutter build apk --profile`，输出为同目录的 `app-profile.apk`；两者均不是正式发布签名。
+
+依赖以仓库锁文件为准。CI 使用固定 Flutter 提交及完整标签历史，通过 [`tool/check_flutter_sdk.py`](tool/check_flutter_sdk.py) 校验 SDK 身份；若出现 `0.0.0-unknown`，应修复 SDK 检出状态与标签，而不是伪造版本或删除依赖约束。
+
+### 检查与测试
+
+```powershell
 flutter analyze
 flutter test
 dart run tool/check_localization.dart
 python tool/generate_android_strings.py --check
 python tool/check_sms_contract.py
+python -m unittest discover -s tool/tests -p 'test_*.py'
 cargo test --locked --manifest-path rust/Cargo.toml
 cargo test --locked --manifest-path server-rs/Cargo.toml
-flutter build apk --profile
-python tool/verify_android_pages.py build/app/outputs/flutter-apk/app-profile.apk
 ```
 
-原生检查在 `android` 中运行 `./gradlew testDebugUnitTest lintDebug`，Windows 使用 `gradlew.bat`。若 Windows lint 报 `PropertyEscape`，检查生成的 `local.properties`：盘符冒号写作 `C\:`，反斜杠写作 `\\`，修正后重新执行受影响的 lint 任务。
+Android 单元测试与 lint 在 `android` 目录执行 `./gradlew testDebugUnitTest lintDebug`；Windows 使用 `gradlew.bat`。APK 原生库对齐检查：
 
-GitHub Actions 使用 `tool/setup_android_sdk.sh` 从 `ANDROID_HOME`（或 `ANDROID_SDK_ROOT`）定位命令行工具，以绝对路径调用 `sdkmanager` 并安装固定 SDK/NDK，避免依赖 runner 的默认 PATH。SDK 根目录须包含 `cmdline-tools/latest/bin/sdkmanager`。失败时的测试与 lint 报告会作为独立 artifact 保留；工具链安装前失败则可能尚无报告。
+```powershell
+python tool/verify_android_pages.py build/app/outputs/flutter-apk/app-debug.apk
+```
 
-Flutter SDK 按固定提交检出，并使用 `fetch-depth: 0` 保留版本标签与历史。依赖解析前，`tool/check_flutter_sdk.py` 核验 HEAD、发布标签、Flutter/Dart 版本和机器可读元数据。若出现 `0.0.0-unknown`，应修复 SDK 标签或检出状态，不应伪造版本文件、移除依赖约束或盲目升级。实际 SDK 元数据保存在验证 artifact 中。
+对齐检查不代替 16 KB 页大小设备上的运行验证。十种语言的资源检查覆盖键名与占位符一致性，不代表所有翻译均已完成；部分新增配置文案在中英文以外使用英文回退。
 
-Profile 产物位于 `build/app/outputs/flutter-apk/app-profile.apk`，使用开发签名。Debug 使用 `flutter build apk --debug`。只有修改 Rust 桥接接口后才需要重新运行 `flutter_rust_bridge_codegen generate`。
+修改 Rust 桥接接口后，使用仓库的 Android 生成入口更新绑定：
 
-### 真机性能与兼容性
+```powershell
+cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
+dart run tool/generate_android_bridge.dart
+```
+
+### 真机性能测试
 
 ```powershell
 $env:ORG_GRADLE_PROJECT_qingniaoBenchmark = 'true'
-flutter drive --profile --driver=test_driver/interface_cadence_driver.dart --target=integration_test/interface_cadence_test.dart -d DEVICE_ID
-Remove-Item Env:ORG_GRADLE_PROJECT_qingniaoBenchmark
+try {
+    flutter drive --profile --driver=test_driver/interface_cadence_driver.dart --target=integration_test/interface_cadence_test.dart -d DEVICE_ID
+} finally {
+    Remove-Item Env:ORG_GRADLE_PROJECT_qingniaoBenchmark
+}
 ```
 
-测试使用独立包 `com.blue.qingniao.benchmark` 和固定数据，不申请短信权限。结果写入 `build/verification/device-interface-cadence.json`。测试会覆盖默认 profile 输出，交付普通应用前需重新构建。
+将 `DEVICE_ID` 替换为 `flutter devices` 中的设备标识。测试使用独立包名 `com.blue.qingniao.benchmark` 和固定测试数据，不申请短信权限；报告写入 `build/verification/device-interface-cadence.json`。它会覆盖默认 profile 输出，交付普通应用前需重新构建。
 
-16 KB 工具检查 ARM64/x86-64 ELF 段与 APK 库对齐，另可运行 Android SDK 的 `zipalign -c -P 16 4 APK_PATH`。对齐通过不代表完成 16 KB 系统运行验证。
+### 正式签名与发布
 
-真机验收覆盖默认角色、双卡、长短信回执、运营商 MMS、重启及后台限制、定时发送、删除恢复、RTL/大字体与减少动态效果。历史 OnePlus 结果不代表所有 OPPO、小米或 ROM 兼容。实际帧耗时、16 KB 运行与完整运营商矩阵仍需验证。
+将密钥保存在仓库之外，通过受控环境注入以下变量：
 
-### 正式签名
+| 环境变量 | 用途 |
+| --- | --- |
+| `QINGNIAO_KEYSTORE_PATH` | 发布密钥库路径 |
+| `QINGNIAO_STORE_PASSWORD` | 密钥库密码 |
+| `QINGNIAO_KEY_ALIAS` | 签名密钥别名 |
+| `QINGNIAO_KEY_PASSWORD` | 签名密钥密码 |
 
-密钥保存在仓库之外，通过安全环境注入 `QINGNIAO_KEYSTORE_PATH`、`QINGNIAO_STORE_PASSWORD`、`QINGNIAO_KEY_ALIAS`、`QINGNIAO_KEY_PASSWORD`。缺少凭据时正式构建失败，不使用 debug 签名替代。
+Windows 发布入口会检查凭据、处理残留插件注册文件并输出产物散列：
 
 ```powershell
-flutter build apk --release
-flutter build appbundle --release
+powershell -File tool/build-release.ps1
+# 按架构拆分 APK
+powershell -File tool/build-release.ps1 -SplitAbi
+# 生成 Android App Bundle
+powershell -File tool/build-release.ps1 -Bundle
 ```
 
-发布前递增 `pubspec.yaml` 版本代码，核验证书、SHA-256 和最终产物。签名不一致或降级会阻止覆盖安装；不要通过卸载绕过并丢失应用状态。CI 支持验证产物及手动 Release 草稿，具体配置见工作流。固定依赖不等于已证明逐字节可复现。
+缺少签名凭据时发布构建失败，不回退到开发签名。发布前更新 `pubspec.yaml` 的版本代码，并核对最终证书、SHA-256 与产物。不要并行运行会更新插件注册文件的测试和发布构建。CI 可生成验证产物，并通过手动工作流创建 Release 草稿；具体参数以工作流为准。
 
-## 可选同步与 FCM
+## 可选联网功能
 
-构建服务端：`cargo build --release --locked --manifest-path server-rs/Cargo.toml`。运行 `qingniao-sync --bind 127.0.0.1:8787 --data /path/to/data.json`，在前面部署 HTTPS 反向代理并限制注册入口。路由见 [服务端源码](server-rs/src/main.rs)，客户端见 [同步引擎](lib/sync/sync_engine.dart)。设备令牌是访问凭据，不得写入日志或公开配置。
+### 自建同步
 
-同步在前台启动、恢复及周期检查时执行，当前不包含 MMS 附件。服务器可见设备、公钥、路由、密文大小与时间。v1 信封使用 X25519、HKDF-SHA256、AES-256-GCM，但没有独立发送者认证，私钥尚未由 Android Keystore 包装，公钥信任绑定仍需验收。不能宣称已完整抵御恶意服务器身份伪造或达到已审计通信产品的安全等级。
+```powershell
+cargo build --release --locked --manifest-path server-rs/Cargo.toml
+```
 
-Rust P2P 模块提供基于 Noise 的认证会话层，需要可信渠道绑定对端公钥；尚未接入设备发现、Wi-Fi Direct 或用户可用的发送流程。普通 SMS/MMS 不会自动获得端到端加密。RCS、小布 AI/NPU 没有接入。
+启动生成的服务程序时传入 `--bind 127.0.0.1:8787 --data /path/to/data.json`，将数据路径替换为实际位置，并在前方配置 HTTPS 反向代理及注册访问限制。接口与客户端实现见 [服务端源码](server-rs/src/main.rs) 和 [同步引擎](lib/sync/sync_engine.dart)。设备令牌属于访问凭据，不应写入日志或公开配置。
 
-FCM 配置步骤：
+同步在前台启动、恢复和周期检查时执行，当前不包含 MMS 附件。部署前请阅读下方的安全边界。
 
-1. 为 `com.blue.qingniao` 注册真实 Firebase 应用，取得 `google-services.json`。
-2. 在「设置 → 网络推送」导入该文件，核对项目并保存；也可填写项目 ID、项目编号、Android 应用 ID 和公开 API 密钥。导入校验包名、项目编号与应用 ID 的一致性，文件上限为 128 KiB，拒绝服务账号私钥。首次配置可立即初始化；切换已有项目需先关闭推送，保存后在应用信息中强行停止并重新打开，以释放 SDK 旧实例。发布者也可继续用 `python tool/configure_firebase.py android/app/google-services.json` 生成内置配置后重建。
-3. 设备具备 Google Play services 且能访问 Firebase 后，在设置中开启网络推送、配对同步、复制 FID 推送标识。
-4. 可信发送端安装 `google-auth`、`requests`，配置具有 FCM 发送权限的 Application Default Credentials，运行 `tool/send_sync_push.py --project PROJECT_ID --space-id SPACE_ID --installation-id-file PRIVATE_FILE`。
+### Firebase 网络推送
 
-保存配置仅验证格式，不代表 Firebase 项目已连通。只有 SDK 注册成功后才保存启用状态；本地关闭不依赖 Google Play 服务可用。项目配置保存在应用私有目录，应用备份关闭，服务端私钥不得导入客户端。新增配置文案提供中文与英文，其他语言暂用英文回退。
+网络推送用于通知客户端有同步更新，不代替运营商短信传输，需要自行配置真实 Firebase 项目。
 
-载荷只允许 `type=sync_available` 和匹配的 `spaceId`，不携带短信正文。前台触发同步；后台显示通用通知，打开应用后同步。服务端不自动登记 FID，标识变化需更新。实际注册与投递需真实 Firebase 项目验证，代理网络不会将运营商短信自动转成 FCM 消息。
+1. 在 Firebase 项目中注册 Android 应用 `com.blue.qingniao`，取得 `google-services.json`。
+2. 在「设置 → 网络推送」导入配置，核对后保存；也可手动填写项目 ID、项目编号、Android 应用 ID 与公开 API 密钥。导入文件须匹配应用包名，上限为 128 KiB，不接受服务账号私钥。
+3. 设备具备 Google Play services 且可连接 Firebase 后，启用推送、配对同步并复制 FID 推送标识。切换已初始化的 Firebase 项目时，先关闭推送，保存新配置，再从系统应用信息强行停止并重新打开青鸟。
+4. 在可信发送端安装 `google-auth`、`requests`，配置具有 FCM 发送权限的 Application Default Credentials，再使用 [`tool/send_sync_push.py`](tool/send_sync_push.py)：
 
-## 维护与许可
+   ```powershell
+   python tool/send_sync_push.py --project PROJECT_ID --space-id SPACE_ID --installation-id-file PRIVATE_FILE
+   ```
 
-本地测试和构建证据位于 `build/verification`，仅对应当时的源码与产物。功能实现、设备验证与安全审计是不同层次的证据，不承诺零缺陷或所有设备兼容。
+上述参数分别替换为实际项目 ID、同步空间 ID，以及保存 FID 的私有文件路径。发布者也可通过 `python tool/configure_firebase.py android/app/google-services.json` 生成内置配置后重新构建。
 
-项目采用 [PolyForm Small Business License 1.0.0](LICENSE)。字体与依赖保留各自许可证，重新分发前应核对相应条款。
+推送仅携带 `type=sync_available` 和匹配的 `spaceId`，不携带短信正文。前台收到后触发同步；后台显示通用通知，打开应用后同步。服务端不自动登记 FID，标识变化后需更新。保存配置只验证格式，SDK 注册成功后才保存启用状态；实际投递仍须在自己的 Firebase 项目中验证。
 
+## 安全与兼容性
 
-### OnePlus / ColorOS 默认短信列表
+- **运营商通信：** 普通 SMS/MMS 不具有端到端加密。双卡、MMS、送达回执、后台限制和定时发送均需按设备、ROM 与运营商验证。
+- **同步加密：** v1 信封使用 X25519、HKDF-SHA256 与 AES-256-GCM；服务器仍可见设备、公钥、路由、密文大小及时间。当前缺少独立发送者认证，私钥尚未由 Android Keystore 包装，公钥信任绑定仍需验收，不能视为已经安全审计的通信协议。
+- **功能边界：** Rust P2P 模块提供 Noise 会话层，但尚未接入设备发现、Wi-Fi Direct 或用户可用的发送流程；RCS 未接入。
+- **配置保护：** Firebase 配置存于应用私有目录，应用备份关闭；服务端私钥不得导入客户端或提交仓库。
+- **验证范围：** 自动化检查、真机运行与安全审计是不同层次的验证。局部设备结果不代表全机型兼容，固定依赖也不等于逐字节可复现构建。
 
-部分系统版本会在 PermissionController 的短信选择器中隐藏第三方应用，因此列表可能为空，即使应用已经持有 `android.app.role.SMS`。本次在连接设备上确认青鸟持有该角色，四类短信处理组件均可解析；设备的选择器另有厂商包名过滤。应用不能通过增加权限或修改自身主题取消这个系统过滤。
+反馈问题时，请附应用版本、Android/ROM 版本、设备型号、复现步骤及脱敏日志；涉及界面问题可附截图。请移除短信正文、电话号码、验证码、令牌和签名凭据。
 
-在「设置 → 设备诊断」查看默认短信角色状态。尚未成为默认应用时，通过应用内的标准角色申请入口设置。不要为了刷新系统列表卸载应用或清除短信数据。
+## 资源与许可证
 
-发布签名配置不进入仓库。覆盖安装必须沿用原证书，并使用递增的构建号；以 `pubspec.yaml` 中的版本为准。
+字体支持系统字体、HarmonyOS Sans 与 Google Sans，中文使用 HarmonyOS Sans 回退。来源和散列见 [字体清单](assets/fonts/manifest.json)，第三方许可见 [assets/licenses](assets/licenses)。十种语言资源位于 [assets/l10n](assets/l10n)。
+
+六套参考色的来源及转换记录见 [色板清单](assets/palettes/coated_reference.json)；屏幕 RGB 色彩不代表经认证的实体 Pantone 专色匹配。
+
+本项目采用 [PolyForm Small Business License 1.0.0](LICENSE)。使用与再分发应遵守该许可证；字体及第三方依赖保留各自的许可条款。
