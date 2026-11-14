@@ -24,6 +24,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
+      FLUTTER_VERSION: 3.47.9
+      FLUTTER_REVISION: c197ca5199e9ee5661e865596c9c07294dfab51c
+      DART_VERSION: 3.13.7
       CARGOKIT_RUST_TOOLCHAIN: 1.99.1
       RUSTUP_TOOLCHAIN: 1.99.1
     steps:
@@ -38,7 +41,8 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           repository: flutter/flutter
-          ref: c197ca5199e9ee5661e865596c9c07294dfab51c
+          ref: ${{ env.FLUTTER_REVISION }}
+          fetch-depth: 0
           path: .toolchains/flutter
           persist-credentials: false
       - name: Initialize Android SDK and install pinned packages
@@ -51,16 +55,23 @@ jobs:
           echo "FLUTTER_ROOT=$GITHUB_WORKSPACE/.toolchains/flutter" >> "$GITHUB_ENV"
           rustup toolchain install 1.99.1 --profile minimal
           rustup target add --toolchain 1.99.1 aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+      - name: Verify Flutter SDK identity
+        shell: bash
+        run: |
+          python3 tool/check_flutter_sdk.py --sdk-root "$FLUTTER_ROOT" --version "$FLUTTER_VERSION" --revision "$FLUTTER_REVISION"
+          flutter config --no-analytics
+          flutter config --android-sdk "$ANDROID_HOME"
+          mkdir -p build/verification
+          flutter --version --machine > build/verification/ci-flutter-version.json
+          python3 tool/check_flutter_sdk.py --sdk-root "$FLUTTER_ROOT" --version "$FLUTTER_VERSION" --revision "$FLUTTER_REVISION" --metadata build/verification/ci-flutter-version.json --dart-version "$DART_VERSION"
       - name: Validate source
         shell: bash
         run: |
-          flutter config --no-analytics
-          flutter config --android-sdk "$ANDROID_HOME"
           flutter pub get --enforce-lockfile
           dart run tool/check_localization.dart
           python3 tool/generate_android_strings.py --check
           python3 tool/check_sms_contract.py
-          python3 -m unittest discover -s tool/tests -p 'test_android_ci.py'
+          python3 -m unittest discover -s tool/tests -p 'test_*.py'
           flutter analyze
           flutter test
           cargo test --locked --manifest-path rust/Cargo.toml
@@ -110,6 +121,7 @@ jobs:
             build/app/test-results/
             build/reports/
             build/native-pages.json
+            build/verification/ci-flutter-version.json
           if-no-files-found: ignore
           retention-days: 14
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

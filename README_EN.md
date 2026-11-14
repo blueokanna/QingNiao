@@ -78,6 +78,8 @@ Run `./gradlew testDebugUnitTest lintDebug` from `android` for native checks; us
 
 GitHub Actions uses `tool/setup_android_sdk.sh` to locate command-line tools through `ANDROID_HOME` (or `ANDROID_SDK_ROOT`), invoke `sdkmanager` by absolute path and install pinned SDK/NDK packages. It does not rely on the runner's default PATH. The SDK must contain `cmdline-tools/latest/bin/sdkmanager`. Test and lint reports are preserved as a separate artifact on failure; early toolchain failures may not produce reports yet.
 
+Flutter is checked out at a pinned commit with `fetch-depth: 0` to retain release tags and history. Before dependency resolution, `tool/check_flutter_sdk.py` verifies HEAD, the release tag and machine-readable Flutter/Dart versions. Resolve `0.0.0-unknown` by repairing SDK tags or checkout state, rather than fabricating version files, removing constraints or blindly upgrading dependencies. Actual SDK metadata is retained in the validation artifact.
+
 Profile output is `build/app/outputs/flutter-apk/app-profile.apk`, signed with a development key. Use `flutter build apk --debug` for debugging. Run `flutter_rust_bridge_codegen generate` after bridge interface changes, not on every build.
 
 ### Device performance and compatibility

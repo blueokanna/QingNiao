@@ -78,6 +78,8 @@ python tool/verify_android_pages.py build/app/outputs/flutter-apk/app-profile.ap
 
 GitHub Actions 使用 `tool/setup_android_sdk.sh` 从 `ANDROID_HOME`（或 `ANDROID_SDK_ROOT`）定位命令行工具，以绝对路径调用 `sdkmanager` 并安装固定 SDK/NDK，避免依赖 runner 的默认 PATH。SDK 根目录须包含 `cmdline-tools/latest/bin/sdkmanager`。失败时的测试与 lint 报告会作为独立 artifact 保留；工具链安装前失败则可能尚无报告。
 
+Flutter SDK 按固定提交检出，并使用 `fetch-depth: 0` 保留版本标签与历史。依赖解析前，`tool/check_flutter_sdk.py` 核验 HEAD、发布标签、Flutter/Dart 版本和机器可读元数据。若出现 `0.0.0-unknown`，应修复 SDK 标签或检出状态，不应伪造版本文件、移除依赖约束或盲目升级。实际 SDK 元数据保存在验证 artifact 中。
+
 Profile 产物位于 `build/app/outputs/flutter-apk/app-profile.apk`，使用开发签名。Debug 使用 `flutter build apk --debug`。只有修改 Rust 桥接接口后才需要重新运行 `flutter_rust_bridge_codegen generate`。
 
 ### 真机性能与兼容性
