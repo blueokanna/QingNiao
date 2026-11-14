@@ -1,0 +1,347 @@
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+
+import '../design/message_theme.dart';
+import 'message_repository.dart';
+
+class MmsScreen extends StatefulWidget {
+  const MmsScreen({super.key, required this.repository});
+  final MessageRepository repository;
+  @override
+  State<MmsScreen> createState() => _MmsScreenState();
+}
+
+class _MmsScreenState extends State<MmsScreen> {
+  List<MessageRecord> _messages = [];
+  StreamSubscription<String>? _changes;
+  String? _error;
+  bool _busy = false, _more = false;
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _changes = widget.repository.changes.listen(
+      (_) => _load(),
+      onError: (Object error) {
+        if (mounted) setState(() => _error = messageError(error));
+      },
+    );
+  }
+
+  Future<void> _load({bool older = false}) async {
+    try {
+      final rows = await widget.repository.records('mmsMessages', {
+        if (older && _messages.isNotEmpty) 'before': _messages.last['id'],
+      });
+      if (mounted) {
+        setState(() {
+          _messages = older ? [..._messages, ...rows] : rows;
+          _more = rows.length == 50;
+          _error = null;
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = messageError(error));
+    }
+  }
+
+  Future<void> _preview(Map attachment) async {
+    try {
+      final bytes = await widget.repository.invoke<Uint8List>('mmsImage', {
+        'id': int.parse(attachment['id'] as String),
+      });
+      if (!mounted || bytes == null) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => Dialog(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: InteractiveViewer(
+                  child: Image.memory(
+                    bytes,
+                    cacheWidth: 1440,
+                    errorBuilder: (_, _, _) => const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text('无法解码图片'),
+                    ),
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('关闭'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (error) {
+      if (mounted) setState(() => _error = messageError(error));
+    }
+  }
+
+  Future<void> _compose() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MmsComposer(repository: widget.repository),
+      ),
+    );
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _changes?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('彩信'),
+      actions: [
+        IconButton(
+          tooltip: '重试未完成的下载',
+          onPressed: _busy
+              ? null
+              : () async {
+                  setState(() => _busy = true);
+                  try {
+                    await widget.repository.invoke('retryMms');
+                    await _load();
+                  } catch (error) {
+                    if (mounted) setState(() => _error = messageError(error));
+                  } finally {
+                    if (mounted) setState(() => _busy = false);
+                  }
+                },
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
+    ),
+    floatingActionButton: FloatingActionButton.extended(
+      onPressed: _compose,
+      label: const Text('写彩信'),
+      icon: const Icon(Icons.edit_outlined),
+    ),
+    body: Column(
+      children: [
+        if (_error != null)
+          Padding(padding: const EdgeInsets.all(16), child: Text(_error!)),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+              itemCount: _messages.length + 1,
+              itemBuilder: (context, index) {
+                if (index == _messages.length) {
+                  return Center(
+                    child: _more
+                        ? TextButton(
+                            onPressed: () => _load(older: true),
+                            child: const Text('加载更多'),
+                          )
+                        : Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Text(_messages.isEmpty ? '暂无彩信' : '已显示全部'),
+                          ),
+                  );
+                }
+                final message = _messages[index];
+                final attachments = message['attachments'] as List;
+                return Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          message['address'] as String,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        if ((message['subject'] as String).isNotEmpty)
+                          Text(message['subject'] as String),
+                        SelectableText(message['body'] as String),
+                        if (message['pending'] == true)
+                          const Text('等待下载，可点右上角重试'),
+                        Wrap(
+                          spacing: 8,
+                          children: attachments.map((item) {
+                            final attachment = item as Map;
+                            return ActionChip(
+                              avatar: const Icon(Icons.attachment, size: 18),
+                              label: Text(attachment['name'] as String),
+                              onPressed: () => _preview(attachment),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${messageTime(message['date'] as int)} · ${switch (message['type']) {
+                            1 => '收到',
+                            2 => '已发送',
+                            5 => '发送失败',
+                            _ => '正在发送',
+                          }}',
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class MmsComposer extends StatefulWidget {
+  const MmsComposer({super.key, required this.repository});
+  final MessageRepository repository;
+  @override
+  State<MmsComposer> createState() => _MmsComposerState();
+}
+
+class _MmsComposerState extends State<MmsComposer> {
+  final _recipients = TextEditingController(), _body = TextEditingController();
+  List<MessageRecord> _sims = [];
+  int? _sim;
+  String? _error;
+  bool _sending = false;
+  Map? _attachment;
+  @override
+  void initState() {
+    super.initState();
+    _loadSims();
+  }
+
+  Future<void> _loadSims() async {
+    try {
+      final sims = await widget.repository.records('subscriptions');
+      if (mounted) {
+        setState(() {
+          _sims = sims;
+          if (sims.length == 1) _sim = sims.first['id'] as int;
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = messageError(error));
+    }
+  }
+
+  Future<void> _send() async {
+    if (_sending) return;
+    if (_sims.length > 1 && _sim == null) {
+      setState(() => _error = '请选择 SIM 卡');
+      return;
+    }
+    setState(() => _sending = true);
+    try {
+      await widget.repository.invoke('sendMms', {
+        'recipients': _recipients.text
+            .split(RegExp('[,，;；]'))
+            .map((value) => value.trim())
+            .where((value) => value.isNotEmpty)
+            .toSet()
+            .toList(),
+        'body': _body.text,
+        'subscriptionId': _sim,
+        'attachment': _attachment?['uri'],
+      });
+      if (mounted) Navigator.pop(context);
+    } catch (error) {
+      if (mounted) setState(() => _error = messageError(error));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _recipients.dispose();
+    _body.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('新的彩信')),
+    body: ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        const Text('支持多收件人。彩信由运营商发送，可能产生费用；请保持移动数据可用。'),
+        const SizedBox(height: 20),
+        TextField(
+          controller: _recipients,
+          enabled: !_sending,
+          decoration: const InputDecoration(labelText: '收件号码，以逗号分隔'),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _body,
+          enabled: !_sending,
+          minLines: 4,
+          maxLines: 12,
+          maxLength: 10000,
+          decoration: const InputDecoration(labelText: '彩信正文'),
+        ),
+        DropdownButton<int>(
+          isExpanded: true,
+          value: _sim,
+          hint: const Text('选择 SIM 卡'),
+          items: _sims
+              .map(
+                (sim) => DropdownMenuItem<int>(
+                  value: sim['id'] as int,
+                  child: Text('SIM ${sim['slot']} · ${sim['name']}'),
+                ),
+              )
+              .toList(),
+          onChanged: _sending ? null : (value) => setState(() => _sim = value),
+        ),
+        OutlinedButton.icon(
+          onPressed: _sending
+              ? null
+              : () async {
+                  try {
+                    final attachment = await widget.repository.invoke<Map>(
+                      'pickAttachment',
+                    );
+                    if (mounted && attachment != null)
+                      setState(() => _attachment = attachment);
+                  } catch (error) {
+                    if (mounted) setState(() => _error = messageError(error));
+                  }
+                },
+          icon: const Icon(Icons.attach_file),
+          label: Text(
+            _attachment == null ? '添加图片、音频或视频' : '已选择 ${_attachment!['type']}',
+          ),
+        ),
+        if (_attachment != null)
+          TextButton(
+            onPressed: _sending
+                ? null
+                : () => setState(() => _attachment = null),
+            child: const Text('移除附件'),
+          ),
+        if (_error != null) Text(_error!),
+        const SizedBox(height: 24),
+        FilledButton.icon(
+          onPressed: _sending ? null : _send,
+          icon: const Icon(Icons.send_outlined),
+          label: Text(_sending ? '正在提交…' : '发送彩信'),
+        ),
+      ],
+    ),
+  );
+}
