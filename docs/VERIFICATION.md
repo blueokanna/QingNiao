@@ -190,7 +190,7 @@ powershell -File tool\build-release.ps1
 
 | 项目 | 值 |
 |---|---|
-| 产物 | `build/app/outputs/flutter-apk/app-release.apk` |
+| 产物 | `build/verification/qingniao-release-test.apk`（构建时位于 worktree 的 `build/app/outputs/flutter-apk/app-release.apk`） |
 | 大小 | 76.9 MiB（80,648,910 字节） |
 | SHA-256 | `BC3D3013C466FB3BB6DA9A29B3B3E4B9AA2779C4E838C94828EBC856C596F520` |
 | 签名 | APK Signature Scheme v2，测试证书 `CN=Qingniao Test` |
