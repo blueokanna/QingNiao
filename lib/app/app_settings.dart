@@ -1,6 +1,8 @@
 import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
+import 'dart:math' as math;
+
 import '../aurora/aurora_engine.dart';
 import '../aurora/aurora_theme.dart';
 import '../messaging/message_repository.dart';
@@ -23,6 +25,8 @@ class AppSettings extends ChangeNotifier {
 
   final MessageRepository? _repository;
   bool _disposed = false;
+  int _starfieldSeed = math.Random.secure().nextInt(0x100000000);
+  int get starfieldSeed => _starfieldSeed;
 
   AuroraThemePreference themePreference = AuroraThemePreference.system;
   Color seed = AuroraPalettes.jade;
@@ -42,6 +46,8 @@ class AppSettings extends ChangeNotifier {
   bool lowPowerAurora = false;
   bool fluidCloud = true;
   bool amoled = false;
+  double navigationBlur = 18;
+  double navigationOpacity = .78;
   String fontFamily = 'system';
   String localeCode = 'system';
   String launcherIcon = 'bird';
@@ -71,6 +77,11 @@ class AppSettings extends ChangeNotifier {
     try {
       final values = await repository.settingsAll();
       settings._apply(values);
+      if (values['starfieldSeed'] != '${settings.starfieldSeed}') {
+        await repository
+            .settingsSet('starfieldSeed', '${settings.starfieldSeed}')
+            .catchError((_) {});
+      }
       final seedHex = await repository.systemSeed();
       settings.systemSeed = _colorFromHex(seedHex);
       settings.systemPalette = AndroidPalette.fromMap(
@@ -81,6 +92,10 @@ class AppSettings extends ChangeNotifier {
   }
 
   void _apply(Map<String, String> values) {
+    final savedSeed = int.tryParse(values['starfieldSeed'] ?? '');
+    if (savedSeed != null && savedSeed >= 0 && savedSeed <= 0xffffffff) {
+      _starfieldSeed = savedSeed;
+    }
     swipeLeft =
         ThreadSwipeAction.values
             .where((v) => v.name == values['swipeLeft'])
@@ -125,6 +140,13 @@ class AppSettings extends ChangeNotifier {
     lowPowerAurora = values['lowPowerAurora'] == 'true';
     fluidCloud = values['fluidCloud'] != 'false';
     amoled = values['amoled'] == 'true';
+    navigationBlur = _boundedNumber(values['navigationBlur'], 18, 0, 32);
+    navigationOpacity = _boundedNumber(
+      values['navigationOpacity'],
+      .78,
+      .55,
+      .95,
+    );
     launcherIcon =
         const ['bird', 'leaf', 'chat'].contains(values['launcherIcon'])
         ? values['launcherIcon']!
@@ -178,6 +200,24 @@ class AppSettings extends ChangeNotifier {
 
   void setDynamic(bool value) => update(() => useDynamic = value);
 
+  static double _boundedNumber(
+    String? raw,
+    double fallback,
+    double min,
+    double max,
+  ) {
+    final value = double.tryParse(raw ?? '');
+    return value != null && value.isFinite ? value.clamp(min, max) : fallback;
+  }
+
+  void setNavigationBlur(double value) {
+    if (value.isFinite) update(() => navigationBlur = value.clamp(0, 32));
+  }
+
+  void setNavigationOpacity(double value) {
+    if (value.isFinite) update(() => navigationOpacity = value.clamp(.55, .95));
+  }
+
   void setBubble(AuroraBubbleStyle value) => update(() => bubbleStyle = value);
 
   void setMorph(bool value) => update(() => morphShapes = value);
@@ -227,6 +267,7 @@ class AppSettings extends ChangeNotifier {
     final repository = _repository;
     if (repository == null) return;
     final values = <String, String>{
+      'starfieldSeed': '$starfieldSeed',
       'swipeLeft': swipeLeft.name,
       'swipeRight': swipeRight.name,
       'locale': localeCode,
@@ -264,6 +305,8 @@ class AppSettings extends ChangeNotifier {
       'lowPowerAurora': '$lowPowerAurora',
       'fluidCloud': '$fluidCloud',
       'amoled': '$amoled',
+      'navigationBlur': '$navigationBlur',
+      'navigationOpacity': '$navigationOpacity',
       'fontFamily': fontFamily,
     };
     for (final entry in values.entries) {

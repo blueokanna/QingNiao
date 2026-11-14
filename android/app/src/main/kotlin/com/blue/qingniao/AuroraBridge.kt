@@ -351,7 +351,6 @@ class AuroraBridge(private val activity: Activity) {
                 if (id in hidden) continue
                 val threadId = cursor.getLong(1)
                 val address = cursor.getString(2) ?: "Unknown number"
-                val body = cursor.getString(3) ?: ""
                 val date = cursor.getLong(4)
                 val type = cursor.getInt(5)
                 val read = cursor.getInt(6) != 0
@@ -359,7 +358,7 @@ class AuroraBridge(private val activity: Activity) {
                 val key = normalize(address)
                 if (key in blocked) continue
                 val conversation = threads.getOrPut(threadId) {
-                    Conversation(threadId, address, subId, date, body, type)
+                    Conversation(threadId, address, subId, date, cursor.getString(3).orEmpty(), type)
                 }
                 conversation.count += 1
                 if (!read && type == 1) conversation.unread += 1
@@ -424,6 +423,7 @@ class AuroraBridge(private val activity: Activity) {
                 when (filter) {
                     "unread" -> item.unread > 0 && !archived
                     "pinned" -> state?.pinned == true && !archived
+                    "everything" -> true
                     "archived" -> archived
                     else -> !archived
                 }
@@ -456,7 +456,6 @@ class AuroraBridge(private val activity: Activity) {
                 )
             }
             .sortedWith(compareByDescending<Map<String, Any?>> { it["pinned"] == true }.thenByDescending { it["date"] as Long })
-            .take(500)
             .toList()
     }
 

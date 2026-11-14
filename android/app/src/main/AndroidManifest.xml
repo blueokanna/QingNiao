@@ -19,8 +19,14 @@
     <uses-permission android:name="android.permission.READ_CELL_BROADCASTS" />
     <uses-feature android:name="android.hardware.telephony" android:required="true" />
     <queries><intent><action android:name="android.intent.action.SENDTO" /><data android:scheme="smsto" /></intent></queries>
-    <application android:supportsRtl="true" android:localeConfig="@xml/locales_config" android:label="@string/app_name" android:name="${applicationName}" android:icon="@mipmap/ic_launcher" android:allowBackup="false" android:enableOnBackInvokedCallback="true" android:dataExtractionRules="@xml/message_data_extraction_rules" android:usesCleartextTraffic="false">
+    <application android:supportsRtl="true" android:localeConfig="@xml/locales_config" android:label="@string/app_name" android:name=".QingniaoApplication" android:icon="@mipmap/ic_launcher" android:allowBackup="false" android:enableOnBackInvokedCallback="true" android:dataExtractionRules="@xml/message_data_extraction_rules" android:usesCleartextTraffic="false">
         <activity android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:taskAffinity="" android:theme="@style/LaunchTheme" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" android:hardwareAccelerated="true" android:windowSoftInputMode="adjustResize">
+            <!-- Messaging-category discovery is used by OEM app pickers as well as launchers. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.APP_MESSAGING" />
+            </intent-filter>
             <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme" />
             <intent-filter><action android:name="android.intent.action.SENDTO" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" /><data android:scheme="sms" /><data android:scheme="smsto" /><data android:scheme="mms" /><data android:scheme="mmsto" /></intent-filter>
         </activity>
@@ -51,9 +57,11 @@
         <service android:name=".NetworkPushService" android:exported="false">
             <intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter>
         </service>
+        <provider android:name="com.google.firebase.provider.FirebaseInitProvider" android:authorities="${applicationId}.firebaseinitprovider" tools:node="remove" />
         <meta-data android:name="firebase_messaging_installation_id_enabled" android:value="true" />
         <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false" />
         <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
         <meta-data android:name="flutterEmbedding" android:value="2" />
+        <meta-data android:name="io.flutter.embedding.android.EnableImpeller" android:value="true" />
     </application>
 </manifest>

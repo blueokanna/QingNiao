@@ -1,6 +1,6 @@
 [package]
 name = "qingniao-sync"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license-file = "../LICENSE"
 description = "Bluebird SMS Minimalist End-to-End Encrypted Synchronization Service: Storing Only Encrypted Envelopes"

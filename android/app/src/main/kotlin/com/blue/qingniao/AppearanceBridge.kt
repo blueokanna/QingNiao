@@ -36,6 +36,7 @@ class AppearanceBridge(private val activity: Activity) {
                 val value = call.argument<String>("value")
                 val valid = when {
                     key == null || value == null -> false
+                    key in AppearanceValuePolicy.keys -> AppearanceValuePolicy.accepts(key, value)
                     key in choices -> value in choices.getValue(key)
                     key in booleans -> value == "true" || value == "false"
                     key == "fontScale" -> value.toDoubleOrNull()?.let { it.isFinite() && it in 0.85..1.5 } == true

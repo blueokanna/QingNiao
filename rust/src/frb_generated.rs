@@ -39,7 +39,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1785737190;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -624337679;
 
 // Section: executor
 
@@ -108,6 +108,39 @@ fn wire__crate__api__message_analysis__analyze_messages_impl(
                 transform_result_sse::<_, ()>((move || {
                     let output_ok =
                         Ok::<_, ()>(crate::api::message_analysis::analyze_messages(api_bodies))?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__starfield__create_starfield_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "create_starfield",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_seed = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::starfield::create_starfield(api_seed))?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -1237,31 +1270,32 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        3 => wire__crate__api__engine__decode_mms_pdu_impl(port, ptr, rust_vec_len, data_len),
-        4 => wire__crate__api__engine__encode_mms_pdu_impl(port, ptr, rust_vec_len, data_len),
-        5 => wire__crate__api__engine__engine_init_impl(port, ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__engine__index_messages_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__engine__indexed_count_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__message_analysis__initialize_message_engine_impl(
+        3 => wire__crate__api__starfield__create_starfield_impl(port, ptr, rust_vec_len, data_len),
+        4 => wire__crate__api__engine__decode_mms_pdu_impl(port, ptr, rust_vec_len, data_len),
+        5 => wire__crate__api__engine__encode_mms_pdu_impl(port, ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__engine__engine_init_impl(port, ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__engine__index_messages_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__engine__indexed_count_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__message_analysis__initialize_message_engine_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        9 => wire__crate__api__engine__search_messages_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__engine__segment_message_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__engine__settings_get_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__engine__settings_set_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__engine__sync_decrypt_impl(port, ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__engine__sync_encrypt_impl(port, ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__engine__sync_fingerprint_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__engine__sync_init_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__engine__sync_reset_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__engine__trash_add_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__engine__trash_entries_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__engine__trash_purge_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__engine__trash_remove_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__engine__trash_restore_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__engine__search_messages_impl(port, ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__engine__segment_message_impl(port, ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__engine__settings_get_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__engine__settings_set_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__engine__sync_decrypt_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__engine__sync_encrypt_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__engine__sync_fingerprint_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__engine__sync_init_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__engine__sync_reset_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__engine__trash_add_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__engine__trash_entries_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__engine__trash_purge_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__engine__trash_remove_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__engine__trash_restore_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

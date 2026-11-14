@@ -72,6 +72,10 @@ class _AuroraTabTransitionState extends State<AuroraTabTransition> {
               ),
               builder: (context, child) {
                 final progress = _springs[i].value.clamp(0.0, 1.0);
+                // Release inactive page elements and their listeners after exit.
+                if (progress == 0 && i != widget.index) {
+                  return const SizedBox.shrink();
+                }
                 return Offstage(
                   offstage: progress == 0 && i != widget.index,
                   child: IgnorePointer(

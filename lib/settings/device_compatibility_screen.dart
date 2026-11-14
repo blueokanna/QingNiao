@@ -174,6 +174,18 @@ class _DeviceCompatibilityScreenState extends State<DeviceCompatibilityScreen>
               Text('Android API ${device['sdk']} · com.blue.qingniao'),
               const SizedBox(height: 16),
               _status(tr("Default SMS role"), access['defaultApp'] as bool?),
+              if (['oneplus', 'oppo', 'realme'].contains(manufacturer))
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Text(
+                    tr(
+                      "Some ColorOS and OxygenOS versions hide third-party SMS apps in the system picker. An empty list does not mean the default SMS role is missing; check the role status above.",
+                    ),
+                  ),
+                ),
               _status(tr("Read SMS"), access['readSms'] as bool?),
               _status(tr("Receive SMS"), access['receiveSms'] as bool?),
               _status(tr("Send SMS"), access['sendSms'] as bool?),

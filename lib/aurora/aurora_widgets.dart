@@ -2,10 +2,13 @@ import 'package:qingniao/l10n/app_strings.dart';
 
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:material_new_shapes/material_new_shapes.dart';
+
+import '../app/app_settings.dart';
 
 import 'aurora_backdrop.dart';
 import 'aurora_engine.dart';
@@ -338,71 +341,19 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = context.colors;
-    final aurora = context.aurora;
-    return AuroraPressable(
-      onTap: onTap,
-      pressedScale: .035,
-      borderRadius: BorderRadius.circular(18),
-      child: AnimatedContainer(
-        duration: AuroraMotion.base,
-        curve: AuroraMotion.emphasized,
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-        decoration: ShapeDecoration(
-          shape: RoundedSuperellipseBorder(
-            borderRadius: BorderRadius.circular(selected ? 18 : 14),
-          ),
-          color: selected ? null : aurora.glass,
-          gradient: selected
-              ? LinearGradient(
-                  colors: [
-                    scheme.primary,
-                    Color.lerp(scheme.primary, scheme.tertiary, .5)!,
-                  ],
-                )
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (item.icon != null) ...[
-              Icon(
-                item.icon,
-                size: 16,
-                color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 6),
-            ],
-            Text(
-              item.label,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected ? scheme.onPrimary : scheme.onSurfaceVariant,
-              ),
-            ),
-            if (item.count != null && item.count! > 0) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? scheme.onPrimary.withValues(alpha: .2)
-                      : scheme.primary.withValues(alpha: .12),
-                  borderRadius: BorderRadius.circular(98),
-                ),
-                child: Text(
-                  '${item.count}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: selected ? scheme.onPrimary : scheme.primary,
-                  ),
-                ),
-              ),
-            ],
+    return FilterChip(
+      selected: selected,
+      onSelected: (_) => onTap(),
+      avatar: item.icon == null ? null : Icon(item.icon, size: 18),
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(item.label),
+          if (item.count != null && item.count! > 0) ...[
+            const SizedBox(width: 8),
+            Text('${item.count}', style: context.texts.labelSmall),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -461,78 +412,34 @@ class _AuroraSearchFieldState extends State<AuroraSearchField> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = context.colors;
-    final aurora = context.aurora;
-    final focused = _focus.hasFocus;
-    return AnimatedContainer(
-      duration: AuroraMotion.base,
-      curve: AuroraMotion.emphasized,
-      decoration: ShapeDecoration(
-        shape: RoundedSuperellipseBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(
-            color: focused
-                ? scheme.primary.withValues(alpha: .55)
-                : aurora.hairline,
-            width: focused ? 1.4 : 1,
-          ),
-        ),
-        color: aurora.glassStrong,
-        shadows: focused
-            ? [
-                BoxShadow(
-                  color: scheme.primary.withValues(alpha: .12),
-                  blurRadius: 22,
-                  offset: const Offset(0, 8),
-                ),
-              ]
-            : null,
+    return SearchBar(
+      controller: _controller,
+      focusNode: _focus,
+      autoFocus: widget.autofocus,
+      hintText: widget.hintText,
+      onChanged: widget.onChanged,
+      onSubmitted: widget.onSubmitted,
+      elevation: const WidgetStatePropertyAll(0),
+      backgroundColor: WidgetStatePropertyAll(
+        context.colors.surfaceContainerHigh,
       ),
-      child: Row(
-        children: [
-          Padding(
-            padding: const EdgeInsetsDirectional.only(start: 16, end: 10),
-            child:
-                widget.leading ??
-                Icon(
-                  Icons.search_rounded,
-                  size: 20,
-                  color: scheme.onSurfaceVariant,
-                ),
-          ),
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              focusNode: _focus,
-              autofocus: widget.autofocus,
-              onChanged: widget.onChanged,
-              onSubmitted: widget.onSubmitted,
-              textInputAction: TextInputAction.search,
-              style: context.texts.bodyLarge,
-              decoration: InputDecoration(
-                hintText: widget.hintText,
-                filled: false,
-                isDense: true,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-            ),
-          ),
-          if (_hasText)
-            IconButton(
-              tooltip: tr("Clear"),
-              icon: const Icon(Icons.close_rounded, size: 18),
-              onPressed: () {
-                _controller.clear();
-                widget.onChanged?.call('');
-              },
-            )
-          else
-            widget.trailing ?? const SizedBox(width: 14),
-        ],
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 16),
       ),
+      leading: widget.leading ?? const Icon(Icons.search_rounded),
+      trailing: [
+        if (_hasText)
+          IconButton(
+            tooltip: tr('Clear'),
+            icon: const Icon(Icons.close_rounded),
+            onPressed: () {
+              _controller.clear();
+              widget.onChanged?.call('');
+            },
+          )
+        else if (widget.trailing != null)
+          widget.trailing!,
+      ],
     );
   }
 }
@@ -913,8 +820,13 @@ class AuroraSection extends StatelessWidget {
               ),
             ),
           AuroraGlass(
+            border: false,
+            color: context.colors.surfaceContainerLow,
             padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Column(children: children),
+            child: Material(
+              type: MaterialType.transparency,
+              child: Column(children: children),
+            ),
           ),
         ],
       ),
@@ -1173,43 +1085,88 @@ class AuroraNavBar extends StatelessWidget {
     required this.index,
     required this.destinations,
     required this.onSelected,
+    this.blurSigma,
+    this.surfaceOpacity,
   });
 
   final int index;
   final List<AuroraNavDestination> destinations;
   final ValueChanged<int> onSelected;
+  final double? blurSigma;
+  final double? surfaceOpacity;
+
+  // Integer slider steps bound this cache to 33 small filter objects.
+  static final _blurFilters = <int, ui.ImageFilter>{};
 
   @override
   Widget build(BuildContext context) {
+    final scheme = context.colors;
+    final settings = AppScope.maybeOf(context);
+    final sigma = (blurSigma ?? settings?.navigationBlur ?? 18).round().clamp(
+      0,
+      32,
+    );
+    final tintOpacity = MediaQuery.highContrastOf(context)
+        ? .94
+        : (surfaceOpacity ?? settings?.navigationOpacity ?? .78).clamp(
+            .55,
+            .95,
+          );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: NavigationBar(
-          selectedIndex: index,
-          onDestinationSelected: onSelected,
-          animationDuration: AuroraMotion.base,
-          height: 72,
-          backgroundColor: context.colors.surfaceContainer,
-          indicatorShape: RoundedSuperellipseBorder(
-            borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(40),
+        // Filter the live scene only inside the capsule. No snapshots or
+        // animation timer: the compositor updates this when its backdrop paints.
+        child: BackdropFilter(
+          enabled: sigma > 0,
+          filter: _blurFilters.putIfAbsent(
+            sigma,
+            () => ui.ImageFilter.blur(
+              sigmaX: sigma.toDouble(),
+              sigmaY: sigma.toDouble(),
+            ),
           ),
-          destinations: [
-            for (final destination in destinations)
-              NavigationDestination(
-                icon: Badge.count(
-                  count: destination.badge,
-                  isLabelVisible: destination.badge > 0,
-                  child: Icon(destination.icon),
+          child: NavigationBar(
+            selectedIndex: index,
+            onDestinationSelected: onSelected,
+            animationDuration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : AuroraMotion.base,
+            height: 80,
+            backgroundColor: scheme.surfaceContainer.withValues(
+              alpha: tintOpacity,
+            ),
+            surfaceTintColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            elevation: 0,
+            indicatorShape: RoundedSuperellipseBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            destinations: [
+              for (final destination in destinations)
+                GestureDetector(
+                  onLongPress: destination.onLongPress,
+                  child: Semantics(
+                    onLongPress: destination.onLongPress,
+                    child: NavigationDestination(
+                      tooltip: destination.onLongPress == null ? null : '',
+                      icon: Badge.count(
+                        count: destination.badge,
+                        isLabelVisible: destination.badge > 0,
+                        child: Icon(destination.icon),
+                      ),
+                      selectedIcon: Badge.count(
+                        count: destination.badge,
+                        isLabelVisible: destination.badge > 0,
+                        child: Icon(destination.selectedIcon),
+                      ),
+                      label: destination.label,
+                    ),
+                  ),
                 ),
-                selectedIcon: Badge.count(
-                  count: destination.badge,
-                  isLabelVisible: destination.badge > 0,
-                  child: Icon(destination.selectedIcon),
-                ),
-                label: destination.label,
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1222,12 +1179,14 @@ class AuroraNavDestination {
     required this.selectedIcon,
     required this.label,
     this.badge = 0,
+    this.onLongPress,
   });
 
   final IconData icon;
   final IconData selectedIcon;
   final String label;
   final int badge;
+  final VoidCallback? onLongPress;
 }
 
 class AuroraFab extends StatelessWidget {

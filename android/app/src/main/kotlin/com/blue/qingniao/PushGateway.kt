@@ -11,7 +11,6 @@ import android.os.Looper
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailabilityLight
 import com.google.firebase.installations.FirebaseInstallations
-import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -21,20 +20,74 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object PushGateway {
+    private val operation = java.util.concurrent.atomic.AtomicBoolean(false)
     private const val CHANNEL = "network_sync"
     private const val NOTICE = 4102
     @Volatile var onSignal: (() -> Unit)? = null
     private fun prefs(context: Context) = context.getSharedPreferences("network_push", Context.MODE_PRIVATE)
-    private fun configured(context: Context) = FirebaseApp.getApps(context).isNotEmpty()
 
-    fun handle(context: Context, call: MethodCall, result: MethodChannel.Result): Boolean {
-        if (call.method !in setOf("pushStatus", "pushSetEnabled", "pushRegistrationId")) return false
+    fun handle(context: Context, call: MethodCall, reply: MethodChannel.Result): Boolean {
+        if (call.method !in setOf("pushStatus", "pushSetEnabled", "pushRegistrationId",
+                "pushSaveConfiguration", "pushResetConfiguration")) return false
+        val exclusive = call.method != "pushStatus"
+        if (exclusive && !operation.compareAndSet(false, true)) {
+            reply.error("push_busy", "A push operation is already in progress", null)
+            return true
+        }
+        val result = object : MethodChannel.Result {
+            override fun success(value: Any?) { if (exclusive) operation.set(false); reply.success(value) }
+            override fun error(code: String, message: String?, details: Any?) {
+                if (exclusive) operation.set(false)
+                reply.error(code, message, details)
+            }
+            override fun notImplemented() { if (exclusive) operation.set(false); reply.notImplemented() }
+        }
+        return try { handleLocked(context, call, result) }
+        catch (_: Exception) {
+            result.error("push_unavailable", "Unable to initialize network push", null)
+            true
+        }
+    }
+
+    private fun handleLocked(context: Context, call: MethodCall, result: MethodChannel.Result): Boolean {
+        if (call.method !in setOf("pushStatus", "pushSetEnabled", "pushRegistrationId",
+                "pushSaveConfiguration", "pushResetConfiguration")) return false
+        if (call.method == "pushSaveConfiguration" || call.method == "pushResetConfiguration") {
+            MessageIo.executor.execute {
+                try {
+                    val project = if (call.method == "pushResetConfiguration") null
+                        else FirebaseProject.fromFields(call.arguments as? Map<*, *> ?: emptyMap<String, String>())
+                    FirebaseConfiguration.save(context.applicationContext, project)
+                    Handler(Looper.getMainLooper()).post { result.success(null) }
+                } catch (_: Exception) {
+                    Handler(Looper.getMainLooper()).post {
+                        result.error("push_config_invalid", "Check the Firebase project fields and disable push before changing projects", null)
+                    }
+                }
+            }
+            return true
+        }
         val settings = prefs(context)
-        val available = configured(context)
+        val configuration = FirebaseConfiguration.status(context)
+        val available = configuration["configured"] == true
         val services = GoogleApiAvailabilityLight.getInstance().isGooglePlayServicesAvailable(context) == ConnectionResult.SUCCESS
         if (call.method == "pushStatus") {
-            result.success(mapOf("configured" to available, "services" to services,
+            result.success(configuration + mapOf("services" to services,
                 "enabled" to settings.getBoolean("enabled", false)))
+            return true
+        }
+        // Disabling is always possible, including offline or after services vanish.
+        if (call.method == "pushSetEnabled" && call.argument<Boolean>("enabled") != true) {
+            settings.edit().putBoolean("enabled", false).remove("recent").apply()
+            context.getSystemService(NotificationManager::class.java).cancel(NOTICE)
+            if (available) {
+                val messaging = FirebaseMessaging.getInstance()
+                messaging.isAutoInitEnabled = false
+                messaging.unregister().addOnCompleteListener { task ->
+                    if (task.isSuccessful) result.success(null)
+                    else result.error("push_unregister_failed", "Push is disabled locally; registration revocation could not reach Firebase", null)
+                }
+            } else result.success(null)
             return true
         }
         if (!available || !services) {
@@ -54,23 +107,16 @@ object PushGateway {
             }
             return true
         }
-        val enabled = call.argument<Boolean>("enabled") == true
-        messaging.isAutoInitEnabled = enabled
-        settings.edit().putBoolean("enabled", enabled).remove("recent").apply()
-        if (enabled) {
-            messaging.register().addOnCompleteListener { task ->
-                if (task.isSuccessful) result.success(null)
-                else {
-                    settings.edit().putBoolean("enabled", false).apply()
-                    messaging.isAutoInitEnabled = false
-                    result.error("push_registration_failed", "Unable to register for network push", null)
-                }
-            }
-        } else {
-            context.getSystemService(NotificationManager::class.java).cancel(NOTICE)
-            messaging.unregister().addOnCompleteListener { task ->
-                if (task.isSuccessful) result.success(null)
-                else result.error("push_unregister_failed", "Push is disabled locally; registration revocation could not reach Firebase", null)
+        // Only a successful registration is persisted as enabled.
+        messaging.register().addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                settings.edit().putBoolean("enabled", true).remove("recent").apply()
+                messaging.isAutoInitEnabled = true
+                result.success(null)
+            } else {
+                settings.edit().putBoolean("enabled", false).apply()
+                messaging.isAutoInitEnabled = false
+                result.error("push_registration_failed", "Unable to register for network push", null)
             }
         }
         return true

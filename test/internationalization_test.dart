@@ -52,8 +52,11 @@ void main() {
                   appearance: const AuroraAppearance(),
                 ),
                 builder: (context, child) => MediaQuery(
-                  data: MediaQuery.of(context)
-                      .copyWith(textScaler: const TextScaler.linear(1.4)),
+                  data: MediaQuery.of(context).copyWith(
+                    textScaler: const TextScaler.linear(1.4),
+                    padding: const EdgeInsets.only(top: 32),
+                    viewPadding: const EdgeInsets.only(top: 32),
+                  ),
                   child: child!,
                 ),
                 home: Scaffold(
@@ -95,6 +98,18 @@ void main() {
             ),
             findsOneWidget,
           );
+          if (!appearance && !otp) {
+            await tester.drag(
+              find.byType(CustomScrollView),
+              const Offset(0, -500),
+            );
+            await tester.pump(const Duration(seconds: 1));
+            expect(
+              tester.getTopLeft(find.text(tr('Messages'))).dy,
+              greaterThanOrEqualTo(32),
+            );
+            expect(tester.takeException(), isNull);
+          }
           await tester.pumpWidget(const SizedBox());
           hub.dispose();
         },

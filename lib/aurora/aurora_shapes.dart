@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:material_new_shapes/material_new_shapes.dart';
 
 import 'aurora_engine.dart';
+import '../app/app_settings.dart';
 import 'aurora_theme.dart';
 
 abstract final class AuroraShapes {
@@ -100,7 +101,14 @@ class AuroraAvatar extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final aurora = Theme.of(context).extension<AuroraColors>() ?? _fallback;
     final base = AuroraShapes.forKey(seed);
-    final active = unread ? MaterialShapes.sunny : base;
+    final active =
+        AuroraShapes.avatars[(AuroraShapes.avatars.indexOf(base) + 1) %
+            AuroraShapes.avatars.length];
+    final animate =
+        !MediaQuery.disableAnimationsOf(context) &&
+        !AuroraEngine.instance.reduceMotion &&
+        TickerMode.valuesOf(context).enabled &&
+        (AppScope.maybeOf(context)?.morphShapes ?? true);
     final initials = _initials(label, seed);
     final bright = Theme.of(context).brightness == Brightness.dark;
 
@@ -108,7 +116,9 @@ class AuroraAvatar extends StatelessWidget {
       painter: _ShapeAvatarPainter(
         start: base,
         end: active,
-        progress: unread ? 1 : 0,
+        progress: 0,
+        clock: animate ? AuroraEngine.instance.clock : null,
+        phase: AuroraShapes.avatars.indexOf(base) * .61,
         colors: [
           Color.alphaBlend(
             colors.primary.withValues(alpha: bright ? .34 : .16),
@@ -210,8 +220,12 @@ class _ShapeAvatarPainter extends CustomPainter {
     required this.colors,
     required this.ring,
     this.glow,
-  });
+    this.clock,
+    this.phase = 0,
+  }) : super(repaint: clock);
 
+  final ValueListenable<double>? clock;
+  final double phase;
   final RoundedPolygon start;
   final RoundedPolygon end;
   final double progress;
@@ -223,7 +237,13 @@ class _ShapeAvatarPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
     final path = AuroraShapes.morph(start, end)
-        .toPath(progress: progress, rotationPivotX: .5, rotationPivotY: .5)
+        .toPath(
+          progress: clock == null
+              ? progress
+              : (1 - math.cos(clock!.value * math.pi / 7 + phase)) / 2,
+          rotationPivotX: .5,
+          rotationPivotY: .5,
+        )
         .transform(Matrix4.diagonal3Values(size.width, size.height, 1).storage);
     if (glow != null) {
       canvas.drawPath(
@@ -256,6 +276,8 @@ class _ShapeAvatarPainter extends CustomPainter {
       old.start != start ||
       old.end != end ||
       old.progress != progress ||
+      old.clock != clock ||
+      old.phase != phase ||
       old.colors != colors ||
       old.ring != ring ||
       old.glow != glow;

@@ -70,7 +70,7 @@ void main() {
     engine.configure(motion: AuroraMotionLevel.full, reduce: false);
   });
 
-  test('Monet rejects malformed data and preserves Android ARGB colors', () {
+  test('Monet rejects malformed data and accepts signed Android ARGB colors before chroma adjustment', () {
     expect(
       AndroidPalette.fromMap({
         'accent1': [0],
@@ -91,9 +91,9 @@ void main() {
     final dark = palette.applyTo(
       ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.dark),
     );
-    expect(light.primary.toARGB32(), 0xff000008);
-    expect(dark.primary.toARGB32(), 0xff000004);
-    expect(dark.onPrimary.toARGB32(), 0xff00000a);
+    expect(light.primary, softenDynamicColor(const Color(0xff000008)));
+    expect(dark.primary, softenDynamicColor(const Color(0xff000004)));
+    expect(dark.onPrimary, softenDynamicColor(const Color(0xff00000a)));
   });
 
   test('AMOLED is black and bundled fonts retain Chinese fallback', () {

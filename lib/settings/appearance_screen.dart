@@ -7,6 +7,7 @@ import '../aurora/aurora_theme.dart';
 import '../aurora/aurora_widgets.dart';
 import '../messaging/models.dart';
 import '../messaging/message_widgets.dart';
+import 'navigation_appearance.dart';
 
 class AppearanceScreen extends StatelessWidget {
   const AppearanceScreen({super.key});
@@ -218,23 +219,38 @@ class AppearanceScreen extends StatelessWidget {
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-                    child: Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        for (final entry in AuroraPalettes.seeds.entries)
-                          _SeedSwatch(
-                            name: entry.key,
-                            color: entry.value,
-                            selected:
-                                !settings.useDynamic &&
-                                settings.seed == entry.value,
-                            onTap: () {
-                              settings.setDynamic(false);
-                              settings.setSeed(entry.key);
-                            },
-                          ),
-                      ],
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final columns =
+                            constraints.maxWidth >= 280 &&
+                                MediaQuery.textScalerOf(context).scale(12) <= 16
+                            ? 3
+                            : 2;
+                        final width =
+                            (constraints.maxWidth - 12 * (columns - 1)) /
+                            columns;
+                        return Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            for (final entry in AuroraPalettes.seeds.entries)
+                              SizedBox(
+                                width: width,
+                                child: _SeedSwatch(
+                                  name: entry.key,
+                                  color: entry.value,
+                                  selected:
+                                      !settings.useDynamic &&
+                                      settings.seed == entry.value,
+                                  onTap: () {
+                                    settings.setDynamic(false);
+                                    settings.setSeed(entry.key);
+                                  },
+                                ),
+                              ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -317,18 +333,10 @@ class AppearanceScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  AuroraSettingTile(
-                    title: tr("Reduce background effects"),
-                    subtitle: tr("Pause ambient motion to save power"),
-                    icon: Icons.battery_saver_outlined,
-                    trailing: Switch(
-                      value: settings.lowPowerAurora,
-                      onChanged: settings.setLowPower,
-                    ),
-                  ),
                 ],
               ),
             ),
+            const SliverToBoxAdapter(child: NavigationAppearance()),
             const SliverToBoxAdapter(child: SizedBox(height: 40)),
           ],
         ),
@@ -378,51 +386,57 @@ class _SeedSwatch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = context.colors;
-    return AuroraPressable(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Column(
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 240),
-            curve: Curves.easeOutCubic,
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color,
-              border: Border.all(
-                color: selected ? scheme.onSurface : Colors.transparent,
-                width: 2,
-              ),
-              boxShadow: selected
-                  ? [
-                      BoxShadow(
-                        color: color.withValues(alpha: .4),
-                        blurRadius: 18,
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: name,
+      child: Material(
+        color: selected ? scheme.secondaryContainer : scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(22),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            child: Column(
+              children: [
+                AnimatedContainer(
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 300),
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                  child: selected
+                      ? Icon(
+                          Icons.check_rounded,
+                          color: color.computeLuminance() > .179
+                              ? Colors.black
+                              : Colors.white,
+                        )
+                      : null,
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: MediaQuery.textScalerOf(context).scale(12) * 2.6,
+                  child: Center(
+                    child: Text(
+                      name.replaceFirst('PANTONE ', ''),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      style: context.texts.labelSmall?.copyWith(
+                        color: scheme.onSurface,
                       ),
-                    ]
-                  : null,
-            ),
-            child: selected
-                ? Icon(
-                    Icons.check_rounded,
-                    color: color.computeLuminance() > .179
-                        ? Colors.black
-                        : Colors.white,
-                    size: 22,
-                  )
-                : null,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            name.replaceFirst('PANTONE ', ''),
-            style: context.texts.labelSmall?.copyWith(
-              color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

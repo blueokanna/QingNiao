@@ -41,6 +41,7 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _search.text = widget.hub.query;
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _openIntent());
   }
@@ -273,12 +274,34 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
       });
 
   Widget _toolbar() => SliverAppBar(
-    primary: false,
+    primary: true,
     pinned: true,
     automaticallyImplyLeading: false,
-    backgroundColor: context.colors.surface,
+    backgroundColor: Colors.transparent,
     surfaceTintColor: Colors.transparent,
-    titleTextStyle: context.texts.titleLarge,
+    scrolledUnderElevation: 0,
+    flexibleSpace: Builder(
+      builder: (context) {
+        final scrolled =
+            context
+                .dependOnInheritedWidgetOfExactType<FlexibleSpaceBarSettings>()
+                ?.isScrolledUnder ==
+            true;
+        return AnimatedContainer(
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 240),
+          decoration: BoxDecoration(
+            color: scrolled ? context.colors.surface : Colors.transparent,
+            borderRadius: const BorderRadius.vertical(
+              bottom: Radius.circular(28),
+            ),
+          ),
+        );
+      },
+    ),
+    toolbarHeight: 64,
+    titleTextStyle: context.texts.headlineSmall,
     title: Text(
       _selecting ? tr('Selected: {p0}', [_selected.length]) : tr('Messages'),
     ),
@@ -344,7 +367,7 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
               icon: const Icon(Icons.done_all_rounded),
               onPressed: _bulkBusy || !widget.hub.access.ready
                   ? null
-                  : () => _perform(widget.repository.markAllRead),
+                  : () => _perform(() => widget.hub.markAllRead()),
             ),
             MenuAnchor(
               menuChildren: [
@@ -408,12 +431,30 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
                 parent: BouncingScrollPhysics(),
               ),
               slivers: [
-                SliverToBoxAdapter(
-                  child: SizedBox(
-                    height: MediaQuery.paddingOf(context).top + 8,
-                  ),
-                ),
                 _toolbar(),
+                if (!_selecting)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 2, 24, 8),
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Text(
+                            '\u9752\u9e1f\u8854\u661f\u81f3\uff0c\u5c3a\u7d20\u5bc4\u5fc3\u95f4',
+                            maxLines: 1,
+                            softWrap: false,
+                            style: context.texts.bodyMedium?.copyWith(
+                              color: context.colors.onSurfaceVariant,
+                              height: 1.65,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
@@ -531,49 +572,45 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
           final end = rtl ? right : left;
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(26),
-              child: Dismissible(
-                key: ValueKey('thread-${thread.threadId}'),
-                direction: _selecting || _bulkBusy
-                    ? DismissDirection.none
-                    : start == ThreadSwipeAction.none &&
-                          end == ThreadSwipeAction.none
-                    ? DismissDirection.none
-                    : start == ThreadSwipeAction.none
-                    ? DismissDirection.endToStart
-                    : end == ThreadSwipeAction.none
-                    ? DismissDirection.startToEnd
-                    : DismissDirection.horizontal,
-                resizeDuration: null,
-                dismissThresholds: const {
-                  DismissDirection.startToEnd: .38,
-                  DismissDirection.endToStart: .38,
-                },
-                background: _swipeBackground(
-                  start,
-                  AlignmentDirectional.centerStart,
-                ),
-                secondaryBackground: _swipeBackground(
-                  end,
-                  AlignmentDirectional.centerEnd,
-                ),
-                confirmDismiss: (direction) async {
-                  await _swipe(
-                    thread,
-                    direction == DismissDirection.startToEnd ? start : end,
-                  );
-                  return false;
-                },
-                child: ConversationTile(
-                  thread: thread,
-                  selected: _selected.contains(thread.threadId),
-                  selectionMode: _selecting,
-                  showSim: widget.hub.sims.length > 1,
-                  onTap: () =>
-                      _selecting ? _toggle(thread) : _openThread(thread),
-                  onLongPress: () => _toggle(thread),
-                ),
+            child: Dismissible(
+              key: ValueKey('thread-${thread.threadId}'),
+              direction: _selecting || _bulkBusy
+                  ? DismissDirection.none
+                  : start == ThreadSwipeAction.none &&
+                        end == ThreadSwipeAction.none
+                  ? DismissDirection.none
+                  : start == ThreadSwipeAction.none
+                  ? DismissDirection.endToStart
+                  : end == ThreadSwipeAction.none
+                  ? DismissDirection.startToEnd
+                  : DismissDirection.horizontal,
+              resizeDuration: null,
+              dismissThresholds: const {
+                DismissDirection.startToEnd: .38,
+                DismissDirection.endToStart: .38,
+              },
+              background: _swipeBackground(
+                start,
+                AlignmentDirectional.centerStart,
+              ),
+              secondaryBackground: _swipeBackground(
+                end,
+                AlignmentDirectional.centerEnd,
+              ),
+              confirmDismiss: (direction) async {
+                await _swipe(
+                  thread,
+                  direction == DismissDirection.startToEnd ? start : end,
+                );
+                return false;
+              },
+              child: ConversationTile(
+                thread: thread,
+                selected: _selected.contains(thread.threadId),
+                selectionMode: _selecting,
+                showSim: widget.hub.sims.length > 1,
+                onTap: () => _selecting ? _toggle(thread) : _openThread(thread),
+                onLongPress: () => _toggle(thread),
               ),
             ),
           );
@@ -588,8 +625,11 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
   ) => _SwipeBackground(
     alignment: alignment,
     color: action == ThreadSwipeAction.trash
-        ? context.colors.error
-        : context.colors.primary,
+        ? context.colors.errorContainer
+        : context.colors.primaryContainer,
+    foreground: action == ThreadSwipeAction.trash
+        ? context.colors.onErrorContainer
+        : context.colors.onPrimaryContainer,
     icon: switch (action) {
       ThreadSwipeAction.trash => Icons.delete_outline_rounded,
       ThreadSwipeAction.read => Icons.done_all_rounded,
@@ -692,12 +732,14 @@ class _SwipeBackground extends StatelessWidget {
   const _SwipeBackground({
     required this.alignment,
     required this.color,
+    required this.foreground,
     required this.icon,
     required this.label,
   });
 
   final AlignmentGeometry alignment;
   final Color color;
+  final Color foreground;
   final IconData icon;
   final String label;
 
@@ -711,14 +753,14 @@ class _SwipeBackground extends StatelessWidget {
         end: left ? 0 : 24,
       ),
       decoration: ShapeDecoration(
-        color: color.withValues(alpha: .18),
+        color: color,
         shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(26),
         ),
       ),
       child: Tooltip(
         message: label,
-        child: Icon(icon, color: color, size: 24),
+        child: Icon(icon, color: foreground, size: 24),
       ),
     );
   }

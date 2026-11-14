@@ -149,7 +149,7 @@ void main() {
   });
 
   testWidgets(
-    'Ambient clock publishes every 120 Hz frame and stops when paused',
+    'Ambient clock caps decorative updates at 30 Hz and stops when paused',
     (tester) async {
       final engine = AuroraEngine.instance;
       engine.setRefreshRate(120);
@@ -165,10 +165,11 @@ void main() {
       for (var i = 0; i < 20; i++) {
         await tester.pump(const Duration(microseconds: 8333));
       }
-      expect(frames, 20);
+      expect(frames, inInclusiveRange(4, 5));
+      final beforePause = frames;
       engine.pause();
       await tester.pump(const Duration(milliseconds: 100));
-      expect(frames, 20);
+      expect(frames, beforePause);
       engine.clock.removeListener(count);
       engine.detach();
       engine.resume();

@@ -12,6 +12,8 @@ class MessageHub extends ChangeNotifier {
 
   AccessState access = const AccessState();
   List<ThreadSummary> threads = const [];
+  List<ThreadSummary> allThreads = const [];
+  bool _markingRead = false;
   List<SimCard> sims = const [];
   String query = '';
   String filter = 'all';
@@ -28,15 +30,44 @@ class MessageHub extends ChangeNotifier {
   bool _again = false;
   bool _indexDirty = true;
 
-  int get unread => threads.fold(0, (sum, thread) => sum + thread.unread);
-  int get otpCount => threads.where((thread) => thread.hasOtp).length;
+  int get unread => allThreads.fold(0, (sum, thread) => sum + thread.unread);
+  int get otpCount => allThreads.where((thread) => thread.hasOtp).length;
+  int get otpUnread =>
+      allThreads.where((thread) => thread.hasOtp && thread.unread > 0).length;
+
+  Future<void> markAllRead({bool verificationOnly = false}) async {
+    if (_markingRead) return;
+    _markingRead = true;
+    try {
+      if (verificationOnly) {
+        final latest = await repository.analyzeThreads(
+          await repository.conversations(filter: 'everything'),
+        );
+        final ids = latest
+            .where((t) => t.hasOtp && t.unread > 0)
+            .map((t) => t.threadId)
+            .toList(growable: false);
+        if (ids.isNotEmpty) await repository.markThreadsRead(ids);
+      } else {
+        await repository.markAllRead();
+      }
+      await refresh(silent: true);
+    } finally {
+      _markingRead = false;
+    }
+  }
 
   int countFor(String value) => switch (value) {
-    'unread' => threads.where((thread) => thread.unread > 0).length,
-    'otp' => otpCount,
-    'pinned' => threads.where((thread) => thread.pinned).length,
-    'archived' => threads.where((thread) => thread.archived).length,
-    _ => threads.length,
+    'unread' =>
+      allThreads
+          .where((thread) => !thread.archived && thread.unread > 0)
+          .length,
+    'otp' =>
+      allThreads.where((thread) => !thread.archived && thread.hasOtp).length,
+    'pinned' =>
+      allThreads.where((thread) => !thread.archived && thread.pinned).length,
+    'archived' => allThreads.where((thread) => thread.archived).length,
+    _ => allThreads.where((t) => !t.archived).length,
   };
 
   void start() {
@@ -89,16 +120,34 @@ class MessageHub extends ChangeNotifier {
       access = nextAccess;
       if (!nextAccess.ready) {
         threads = const [];
+        allThreads = const [];
         sims = const [];
         error = null;
         loading = false;
         notifyListeners();
         return;
       }
-      final loaded = query.trim().isEmpty
-          ? await repository.conversations(query: '', filter: filter)
-          : await _searchThreads();
-      threads = await repository.analyzeThreads(loaded);
+      allThreads = await repository.analyzeThreads(
+        await repository.conversations(query: '', filter: 'everything'),
+      );
+      if (query.trim().isEmpty) {
+        threads = allThreads
+            .where(
+              (t) => switch (filter) {
+                'archived' => t.archived,
+                'unread' => !t.archived && t.unread > 0,
+                'otp' => !t.archived && t.hasOtp,
+                'pinned' => !t.archived && t.pinned,
+                _ => !t.archived,
+              },
+            )
+            .toList(growable: false);
+      } else {
+        threads = await repository.analyzeThreads(await _searchThreads());
+        if (filter == 'otp') {
+          threads = threads.where((t) => t.hasOtp).toList(growable: false);
+        }
+      }
       sims = await repository.subscriptions();
       error = null;
       lastLoaded = DateTime.now();

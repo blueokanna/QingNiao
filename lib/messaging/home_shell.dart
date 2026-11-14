@@ -103,6 +103,19 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     setState(() => _index = index);
   }
 
+  Future<void> _markRead(bool verificationOnly) async {
+    try {
+      await widget.hub.markAllRead(verificationOnly: verificationOnly);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(tr('Mark all as read'))));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(messageError(error))));
+    }
+  }
+
   Future<void> _compose() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -144,12 +157,14 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                   selectedIcon: Icons.forum_rounded,
                   label: tr("Messages"),
                   badge: hub.unread,
+                  onLongPress: () => _markRead(false),
                 ),
                 AuroraNavDestination(
                   icon: Icons.shield_outlined,
                   selectedIcon: Icons.shield_rounded,
                   label: tr("Verification codes"),
-                  badge: hub.otpCount,
+                  badge: hub.otpUnread,
+                  onLongPress: () => _markRead(true),
                 ),
                 AuroraNavDestination(
                   icon: Icons.tune_rounded,

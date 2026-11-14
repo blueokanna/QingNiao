@@ -1,4 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:material_color_utilities/material_color_utilities.dart';
+
+/// Reduce perceived chroma while preserving hue and tone, not opacity.
+Color softenDynamicColor(Color color) {
+  final hct = Hct.fromInt(color.toARGB32());
+  return Color(Hct.from(hct.hue, hct.chroma * .8, hct.tone).toInt());
+}
 
 class AndroidPalette {
   AndroidPalette._(this._tones);
@@ -22,7 +29,7 @@ class AndroidPalette {
       }
       tones[name] = values
           .cast<int>()
-          .map((value) => Color(value & 0xffffffff))
+          .map((value) => softenDynamicColor(Color(value & 0xffffffff)))
           .toList(growable: false);
     }
     return AndroidPalette._(tones);
@@ -35,6 +42,11 @@ class AndroidPalette {
     final tertiary = _tones['accent3']!;
     final neutral = _tones['neutral1']!;
     final variant = _tones['neutral2']!;
+    Color tone(List<Color> family, double value) {
+      final sample = Hct.fromInt(family[7].toARGB32());
+      return Color(Hct.from(sample.hue, sample.chroma, value).toInt());
+    }
+
     return base.copyWith(
       primary: primary[dark ? 4 : 8],
       onPrimary: primary[dark ? 10 : 0],
@@ -48,16 +60,31 @@ class AndroidPalette {
       onTertiary: tertiary[dark ? 10 : 0],
       tertiaryContainer: tertiary[dark ? 9 : 3],
       onTertiaryContainer: tertiary[dark ? 3 : 11],
-      surface: neutral[dark ? 11 : 1],
+      surface: tone(neutral, dark ? 6 : 98),
       onSurface: neutral[dark ? 3 : 11],
       onSurfaceVariant: variant[dark ? 4 : 9],
       outline: variant[dark ? 6 : 7],
       outlineVariant: variant[dark ? 9 : 4],
-      surfaceContainerLowest: neutral[dark ? 12 : 0],
-      surfaceContainerLow: neutral[dark ? 11 : 2],
-      surfaceContainer: neutral[dark ? 11 : 2],
-      surfaceContainerHigh: neutral[dark ? 10 : 3],
-      surfaceContainerHighest: neutral[dark ? 10 : 3],
+      surfaceContainerLowest: tone(neutral, dark ? 4 : 100),
+      surfaceContainerLow: tone(neutral, dark ? 10 : 96),
+      surfaceContainer: tone(neutral, dark ? 12 : 94),
+      surfaceContainerHigh: tone(neutral, dark ? 17 : 92),
+      surfaceContainerHighest: tone(neutral, dark ? 22 : 90),
+      surfaceDim: tone(neutral, dark ? 6 : 87),
+      surfaceBright: tone(neutral, dark ? 24 : 98),
+      surfaceTint: primary[dark ? 4 : 8],
+      primaryFixed: primary[3],
+      primaryFixedDim: primary[4],
+      onPrimaryFixed: primary[11],
+      onPrimaryFixedVariant: primary[9],
+      secondaryFixed: secondary[3],
+      secondaryFixedDim: secondary[4],
+      onSecondaryFixed: secondary[11],
+      onSecondaryFixedVariant: secondary[9],
+      tertiaryFixed: tertiary[3],
+      tertiaryFixedDim: tertiary[4],
+      onTertiaryFixed: tertiary[11],
+      onTertiaryFixedVariant: tertiary[9],
       inverseSurface: neutral[dark ? 3 : 10],
       onInverseSurface: neutral[dark ? 10 : 2],
       inversePrimary: primary[dark ? 8 : 4],

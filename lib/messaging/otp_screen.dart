@@ -23,7 +23,7 @@ class OtpScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: hub,
       builder: (context, _) {
-        final items = hub.threads
+        final items = hub.allThreads
             .where((thread) => thread.hasOtp)
             .toList(growable: false);
         return CustomScrollView(
@@ -37,10 +37,6 @@ class OtpScreen extends StatelessWidget {
             SliverToBoxAdapter(
               child: AuroraLargeHeader(
                 title: tr("Verification codes"),
-                description: tr(
-                  "Available: {p0} \u00b7 Codes are detected on this device",
-                  [items.length],
-                ),
                 padding: const EdgeInsets.fromLTRB(24, 14, 24, 8),
               ),
             ),

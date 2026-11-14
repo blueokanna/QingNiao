@@ -42,6 +42,7 @@ class ConversationTile extends StatelessWidget {
     return RepaintBoundary(
       child: AuroraGlass(
         radius: 26,
+        border: false,
         color: selected
             ? scheme.secondaryContainer
             : scheme.surfaceContainerLow,

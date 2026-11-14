@@ -199,7 +199,9 @@ ThemeData buildAuroraTheme({
   required Brightness brightness,
   required AuroraAppearance appearance,
 }) {
-  final seed = appearance.effectiveSeed;
+  final seed = appearance.useDynamic
+      ? softenDynamicColor(appearance.effectiveSeed)
+      : appearance.effectiveSeed;
   var scheme = ColorScheme.fromSeed(
     seedColor: seed,
     brightness: brightness,
@@ -327,6 +329,43 @@ ThemeData buildAuroraTheme({
         : const ['HarmonyOSSans'],
     scaffoldBackgroundColor: Colors.transparent,
     canvasColor: scheme.surface,
+    dropdownMenuTheme: DropdownMenuThemeData(
+      menuStyle: MenuStyle(
+        backgroundColor: WidgetStatePropertyAll(scheme.surfaceContainerHigh),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        elevation: const WidgetStatePropertyAll(2),
+        padding: const WidgetStatePropertyAll(EdgeInsets.all(8)),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        ),
+      ),
+    ),
+    menuButtonTheme: MenuButtonThemeData(
+      style: ButtonStyle(
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        minimumSize: const WidgetStatePropertyAll(Size(48, 48)),
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) =>
+              states.contains(WidgetState.focused) ||
+                  states.contains(WidgetState.selected)
+              ? scheme.secondaryContainer
+              : Colors.transparent,
+        ),
+        foregroundColor: WidgetStatePropertyAll(scheme.onSurface),
+      ),
+    ),
+    menuTheme: MenuThemeData(
+      style: MenuStyle(
+        backgroundColor: WidgetStatePropertyAll(scheme.surfaceContainer),
+        elevation: const WidgetStatePropertyAll(3),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        ),
+        padding: const WidgetStatePropertyAll(EdgeInsets.all(8)),
+      ),
+    ),
     dividerColor: aurora.hairline,
     visualDensity: VisualDensity.standard,
     extensions: [aurora],
@@ -497,6 +536,11 @@ ThemeData buildAuroraTheme({
       color: aurora.hairline,
       thickness: 1,
       space: 1,
+    ),
+    sliderTheme: const SliderThemeData(
+      // Opt into Flutter's current Material 3 track and handle geometry.
+      // ignore: deprecated_member_use
+      year2023: false,
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith(

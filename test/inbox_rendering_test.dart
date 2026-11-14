@@ -55,6 +55,13 @@ void main() {
           );
           if (Platform.environment['QINGNIAO_PREVIEW_FONT'] != null) {
             theme = theme.copyWith(
+              chipTheme: theme.chipTheme.copyWith(
+                labelStyle: theme.chipTheme.labelStyle?.copyWith(
+                  fontFamily: 'PreviewFont',
+                ),
+                secondaryLabelStyle: theme.chipTheme.secondaryLabelStyle
+                    ?.copyWith(fontFamily: 'PreviewFont'),
+              ),
               textTheme: theme.textTheme.apply(
                 fontFamily: 'PreviewFont',
                 fontFamilyFallback: const ['PreviewFont'],
@@ -84,6 +91,12 @@ void main() {
           await tester.pump(const Duration(milliseconds: 600));
           expect(tester.takeException(), isNull);
           if (!otp) {
+            expect(
+              find.text(
+                '\u9752\u9e1f\u8854\u661f\u81f3\uff0c\u5c3a\u7d20\u5bc4\u5fc3\u95f4',
+              ),
+              findsOneWidget,
+            );
             expect(
               find.textContaining('\u5de5\u5546\u94f6\u884c'),
               findsWidgets,

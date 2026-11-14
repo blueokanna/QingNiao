@@ -50,7 +50,11 @@ class FixtureMessageRepository extends MessageRepository {
           if (filter == 'otp' && !thread.hasOtp) return false;
           if (filter == 'pinned' && !thread.pinned) return false;
           if (filter == 'archived' && !thread.archived) return false;
-          if (filter != 'archived' && thread.archived) return false;
+          if (filter != 'archived' &&
+              filter != 'everything' &&
+              thread.archived) {
+            return false;
+          }
           if (query.trim().isEmpty) return true;
           final needle = query.toLowerCase();
           return thread.title.toLowerCase().contains(needle) ||

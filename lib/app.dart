@@ -53,7 +53,7 @@ class _QingniaoAppState extends State<QingniaoApp>
       reduce:
           _systemReduceMotion ||
           settings.motionLevel == AuroraMotionLevel.reduced,
-      backdrop: !settings.amoled && !settings.lowPowerAurora,
+      backdrop: true,
     );
   }
 
@@ -165,7 +165,6 @@ class _AdjustedTextScaler extends TextScaler {
   double scale(double fontSize) => system.scale(fontSize) * factor;
 
   @override
-  // ignore: deprecated_member_use
   double get textScaleFactor => system.textScaleFactor * factor;
 }
 

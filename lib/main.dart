@@ -7,6 +7,7 @@ import 'app/app_settings.dart';
 import 'design/bundled_fonts.dart';
 import 'messaging/message_repository.dart';
 import 'src/rust/frb_generated.dart';
+import 'aurora/aurora_starfield.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +29,12 @@ Future<void> main() async {
     await RustLib.init();
   } catch (error, stack) {
     debugPrint(tr("Rust engine unavailable: {p0}\n{p1}", [error, stack]));
+  }
+
+  try {
+    await AuroraStarfield.initialize(seed: settings.starfieldSeed);
+  } catch (error) {
+    debugPrint('Starfield resources unavailable: ${error.runtimeType}');
   }
 
   runApp(QingniaoApp(repository: repository, settings: settings));

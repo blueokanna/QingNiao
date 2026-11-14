@@ -53,7 +53,8 @@ class MainActivity : FlutterActivity() {
         "receiveSms" to SmsAccess.granted(this, Manifest.permission.RECEIVE_SMS),
         "readContacts" to SmsAccess.granted(this, Manifest.permission.READ_CONTACTS),
         "notifications" to getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled(),
-        "roleAvailable" to SmsAccess.roleAvailable(this)
+        "roleAvailable" to SmsAccess.roleAvailable(this),
+        "systemSmsPackage" to Telephony.Sms.getDefaultSmsPackage(this)
     )
     private fun requireAccess() {
         val state = access()
@@ -83,13 +84,22 @@ class MainActivity : FlutterActivity() {
                 result.success(null)
                 return
             }
-            "pickContact", "pickAttachment" -> {
+            "pickContact", "pickAttachment", "pickFirebaseConfiguration" -> {
                 if (pendingSelection != null) { result.error("busy", "A picker is already open", null); return }
                 pendingSelection = result
-                val selection = if (call.method == "pickContact") Intent(Intent.ACTION_PICK, android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI)
-                    else Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*").putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "audio/*", "video/*"))
-                try { startActivityForResult(selection, if (call.method == "pickContact") 73 else 74) }
+                val selection = when (call.method) {
+                    "pickContact" -> Intent(Intent.ACTION_PICK, android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI)
+                    "pickFirebaseConfiguration" -> Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+                    else -> Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*").putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("image/*", "audio/*", "video/*"))
+                }
+                val request = when(call.method) { "pickContact" -> 73; "pickFirebaseConfiguration" -> 75; else -> 74 }
+                try { startActivityForResult(selection, request) }
                 catch (_: android.content.ActivityNotFoundException) { pendingSelection = null; result.error("unavailable", "No picker is available", null) }
+                return
+            }
+            "openFirebaseConsole" -> {
+                try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://console.firebase.google.com/"))); result.success(null) }
+                catch (_: android.content.ActivityNotFoundException) { result.error("unavailable", "No browser is available", null) }
                 return
             }
             "access" -> { result.success(access()); return }
@@ -97,9 +107,17 @@ class MainActivity : FlutterActivity() {
                 if (pendingAccess != null) { result.error("busy", "A permission request is already in progress", null); return }
                 pendingAccess = result
                 val roles = getSystemService(RoleManager::class.java)
-                if (!roles.isRoleAvailable(RoleManager.ROLE_SMS)) { requestMessagePermissions(); return }
-                if (!roles.isRoleHeld(RoleManager.ROLE_SMS)) startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_SMS), 71)
-                else requestMessagePermissions()
+                try {
+                    if (!roles.isRoleAvailable(RoleManager.ROLE_SMS)) {
+                        pendingAccess = null
+                        result.error("role_unavailable", "The system SMS role is unavailable", null)
+                    } else if (!roles.isRoleHeld(RoleManager.ROLE_SMS)) {
+                        startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_SMS), 71)
+                    } else requestMessagePermissions()
+                } catch (_: Exception) {
+                    pendingAccess = null
+                    result.error("role_unavailable", "Unable to open the system SMS role request", null)
+                }
                 return
             }
             "launchIntent" -> {
@@ -155,7 +173,7 @@ class MainActivity : FlutterActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (aurora.onActivityResult(requestCode, resultCode, data)) return
-        if (requestCode == 73 || requestCode == 74) {
+        if (requestCode == 73 || requestCode == 74 || requestCode == 75) {
             val result = pendingSelection ?: return
             pendingSelection = null
             val selected = data?.data
@@ -163,7 +181,12 @@ class MainActivity : FlutterActivity() {
             MessageIo.executor.execute {
                 try {
                     val value: Any? = if (requestCode == 73) contentResolver.query(selected, arrayOf(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER), null, null, null)?.use { if (it.moveToFirst()) it.getString(0) else null }
-                    else {
+                    else if (requestCode == 75) {
+                        val bytes = contentResolver.openInputStream(selected)?.use { BoundedAttachmentReader.read(it, 131_072) }
+                            ?: throw IllegalArgumentException("Unable to read Firebase configuration")
+                        require(bytes.size <= 131_072) { "Firebase configuration is too large" }
+                        FirebaseProject.fromGoogleServices(bytes.toString(Charsets.UTF_8), packageName).fields()
+                    } else {
                         val type = contentResolver.getType(selected) ?: "application/octet-stream"
                         require(listOf("image/", "audio/", "video/").any(type::startsWith))
                         mapOf("uri" to selected.toString(), "type" to type)
@@ -176,7 +199,8 @@ class MainActivity : FlutterActivity() {
         if (requestCode == 71) {
 
 
-            requestMessagePermissions()
+            if (SmsAccess.isDefaultSmsApp(this)) requestMessagePermissions()
+            else { pendingAccess?.success(access()); pendingAccess = null }
         }
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {

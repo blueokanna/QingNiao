@@ -28,12 +28,14 @@ Recycling applies to codes unread when loaded and fully visible in the foregroun
 
 Aurora is an application-level scheduler built on Flutter frame scheduling and GPU rendering. It does not modify Android's compositor or drivers.
 
+The star background uses a bundled fragment shader with constant work per pixel and one draw call. Android enables Impeller; the engine selects the available GPU backend. A bounded Canvas fallback remains available if shader loading fails. In Appearance → Navigation appearance, blur strength ranges from 0 to 32 and surface opacity from 55% to 95%. Changes preview while dragging and persist on release. Zero disables blur. Rendering is clipped to the navigation capsule and uses the live backdrop.
+
 - Custom springs and the backdrop share one VSync ticker. Only active springs advance; iteration snapshots are rebuilt when the set changes. Material components and routes retain Flutter's animation lifecycles.
 - Analytic springs preserve position and velocity when retargeted and advance by elapsed time on long frames. Resuming resets the time baseline so background time does not enter transitions.
-- Routes share one backdrop updated through `CustomPainter.repaint`. Retained tabs transition directly to their destination; hidden tabs disable widget tickers and interaction.
-- Display refresh rate determines frame budgets. Build/raster timings adjust background complexity without a 30 FPS animation cap. Android controls the final mode through settings, power and thermal policy.
+- Rust generates a 32×32 RGBA parameter atlas (4 KiB of raw data) from a persisted installation seed. It controls position, depth, magnitude, tint and independent evolution scales. The atlas and shader load before the first frame and remain shared; no per-frame Rust calls are made. Quintic noise changes brightness on a 64–160 second base scale and drift on a 240–600 second base scale, with at most 1.2 logical pixels of displacement per axis. There is no 12-second time reset. Empty sky skips noise evaluation.
+- Routes share one backdrop updated through `CustomPainter.repaint`. Inactive tabs release their elements after the exit animation. Ambient stars and avatar morphs share a clock capped at 30 updates per second; interaction springs follow display VSync. Android controls the final display mode through settings, power and thermal policy.
 - Shape caching is limited to 64 pairs. Memory pressure clears shapes and evictable images. Attachment reads grow on demand and reject oversized input rather than truncating it.
-- System reduced motion is respected. Power-saving pauses ambient effects while retaining interactions; AMOLED uses black surfaces and disables the backdrop.
+- System reduced motion and power-saving freeze the current sky, then resume from the same phase. AMOLED retains faint stars on a black background without the broad colored glow.
 
 These mechanisms do not establish measured power savings or sustained 120 FPS. Performance claims require profile-mode device measurements.
 
@@ -118,11 +120,13 @@ Rust P2P provides a Noise-based authenticated session layer requiring trusted pe
 FCM setup:
 
 1. Register `com.blue.qingniao` in a real Firebase project and obtain `google-services.json`.
-2. Run `python tool/configure_firebase.py android/app/google-services.json` and rebuild. Configuration and generated resources are Git-ignored. Never include service-account private keys.
+2. Import the file in Settings → Network push, review the fields and save. Manual entry accepts the project ID, project number, Android app ID and public API key. Imports are limited to 128 KiB and must match the package and project number; service-account keys are rejected. The first configuration initializes immediately. To switch an existing SDK project, disable push first, save, then force-stop and reopen the app. Publishers can still generate bundled resources with `python tool/configure_firebase.py android/app/google-services.json` and rebuild.
 3. With Google Play services and Firebase connectivity, enable network push, pair sync and copy the FID push identifier.
 4. On a trusted sender, install `google-auth` and `requests`, configure Application Default Credentials with FCM send permission, then run `tool/send_sync_push.py --project PROJECT_ID --space-id SPACE_ID --installation-id-file PRIVATE_FILE`.
 
 Payloads contain only `type=sync_available` and the matching `spaceId`, never SMS bodies. Foreground delivery triggers sync; background delivery shows a generic notification that opens the app for synchronization. The server does not automatically register FIDs; update changed identifiers. Live registration/delivery requires a real Firebase project. A proxy does not convert carrier SMS into FCM.
+
+Saving validates the configuration format, not project connectivity. Push is marked enabled only after successful SDK registration. Configuration lives in private app storage with backup disabled. New configuration labels are translated into Chinese and English; other locales currently use English fallback.
 
 ## Maintenance and license
 

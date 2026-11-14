@@ -1,221 +1,193 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'aurora_engine.dart';
-import 'aurora_theme.dart';
 import '../app/app_settings.dart';
+import 'aurora_engine.dart';
+import 'aurora_starfield.dart';
 
-class AuroraBackdrop extends StatelessWidget {
+class AuroraBackdrop extends StatefulWidget {
   const AuroraBackdrop({super.key, this.veil = true});
-
   final bool veil;
 
   @override
+  State<AuroraBackdrop> createState() => _AuroraBackdropState();
+}
+
+class _AuroraBackdropState extends State<AuroraBackdrop> {
+  ui.FragmentShader? _shader;
+  bool _wasAnimating = true;
+  double _frozenTime = 0;
+  double _timeOffset = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Resources are prepared before runApp: no temporary sky that jumps on load.
+    _shader = AuroraStarfield.program?.fragmentShader();
+  }
+
+  @override
+  void dispose() {
+    _shader?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (Theme.of(context).brightness == Brightness.dark &&
-        AppScope.maybeOf(context)?.amoled == true) {
-      return const ColoredBox(color: Colors.black);
+    final scheme = Theme.of(context).colorScheme;
+    final settings = AppScope.maybeOf(context);
+    final amoled =
+        scheme.brightness == Brightness.dark && settings?.amoled == true;
+    final animate =
+        !MediaQuery.disableAnimationsOf(context) &&
+        !AuroraEngine.instance.reduceMotion &&
+        settings?.lowPowerAurora != true;
+    final now = AuroraEngine.instance.clock.value;
+    if (!animate && _wasAnimating) {
+      _frozenTime = now - _timeOffset;
+    } else if (animate && !_wasAnimating) {
+      _timeOffset = now - _frozenTime;
     }
-    final engine = AuroraEngine.instance;
-    final colors = context.aurora;
-    final scheme = context.colors;
-    final dark = Theme.of(context).brightness == Brightness.dark;
+    _wasAnimating = animate;
     return RepaintBoundary(
       child: CustomPaint(
         size: Size.infinite,
-        isComplex: true,
-        willChange: !engine.reduceMotion,
-        painter: _AuroraPainter(
-          engine: engine,
-          dark: dark,
-          colors: colors,
-          surface: scheme.surface,
-          veil: veil,
-        ),
+        painter: _shader != null
+            ? AuroraGpuStarPainter(
+                shader: _shader!,
+                atlas: AuroraStarfield.atlas!,
+                surface: amoled ? Colors.black : scheme.surface,
+                accent: scheme.primary,
+                star: amoled
+                    ? const Color(0xffb8c9c6)
+                    : scheme.onSurfaceVariant,
+                amoled: amoled,
+                clock: animate ? AuroraEngine.instance.clock : null,
+                frozenTime: _frozenTime,
+                timeOffset: _timeOffset,
+              )
+            : AuroraStarPainter(
+                surface: amoled ? Colors.black : scheme.surface,
+                accent: scheme.primary,
+                star: amoled
+                    ? const Color(0xffb8c9c6)
+                    : scheme.onSurfaceVariant,
+                amoled: amoled,
+              ),
       ),
     );
   }
 }
 
-class _AuroraPainter extends CustomPainter {
-  _AuroraPainter({
-    required this.engine,
-    required this.dark,
-    required this.colors,
+/// GPU fragment shading: one draw, one shared clock, no CPU particle updates.
+class AuroraGpuStarPainter extends CustomPainter {
+  AuroraGpuStarPainter({
+    required this.shader,
+    required this.atlas,
     required this.surface,
-    required this.veil,
-  }) : super(repaint: Listenable.merge([engine.clock, engine]));
-
-  final AuroraEngine engine;
-  double get time => engine.reduceMotion ? 0 : engine.clock.value;
-  final bool dark;
-  final AuroraColors colors;
-  final Color surface;
-  AuroraQuality get quality =>
-      engine.motionLevel == AuroraMotionLevel.balanced &&
-          engine.quality == AuroraQuality.full
-      ? AuroraQuality.balanced
-      : engine.quality;
-  bool get scrolling => engine.scrolling;
-  final bool veil;
-
-  static final List<_Blob> _blobs = [
-    _Blob(-.18, .08, 1.05, 0, .085, 0, 0),
-    _Blob(.98, -.04, .82, 1, .061, 1.7, 1),
-    _Blob(.78, .52, 1.2, 2, .045, 3.1, 2),
-    _Blob(-.12, .82, .92, 0, .073, 4.2, 1),
-    _Blob(.42, .3, .64, 1, .11, 5.6, 2),
-  ];
-
-  static final List<_Star> _stars = _seedStars();
-
-  static List<_Star> _seedStars() {
-    final random = math.Random(9031);
-    return List.generate(46, (_) {
-      return _Star(
-        random.nextDouble(),
-        random.nextDouble() * .72,
-        random.nextDouble(),
-      );
-    });
+    required this.accent,
+    required this.star,
+    required this.amoled,
+    this.clock,
+    this.frozenTime = 0,
+    this.timeOffset = 0,
+  }) : super(repaint: clock) {
+    shader.setImageSampler(0, atlas);
+    _paint = Paint()..shader = shader;
   }
+
+  final ui.FragmentShader shader;
+  final ui.Image atlas;
+  final Color surface, accent, star;
+  final bool amoled;
+  final ValueListenable<double>? clock;
+  final double frozenTime, timeOffset;
+  late final Paint _paint;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    shader.setFloat(0, size.width);
+    shader.setFloat(1, size.height);
+    shader.setFloat(2, clock == null ? frozenTime : clock!.value - timeOffset);
+    var index = 3;
+    for (final color in [surface, accent, star]) {
+      shader.setFloat(index++, color.r);
+      shader.setFloat(index++, color.g);
+      shader.setFloat(index++, color.b);
+    }
+    shader.setFloat(12, amoled ? 1 : 0);
+    canvas.drawRect(Offset.zero & size, _paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant AuroraGpuStarPainter old) =>
+      old.shader != shader ||
+      old.atlas != atlas ||
+      old.surface != surface ||
+      old.accent != accent ||
+      old.star != star ||
+      old.amoled != amoled ||
+      old.frozenTime != frozenTime ||
+      old.timeOffset != timeOffset ||
+      old.clock != clock;
+}
+
+/// Static fallback for unavailable Rust/GPU resources. Never flashes on failure.
+class AuroraStarPainter extends CustomPainter {
+  AuroraStarPainter({
+    required this.surface,
+    required this.accent,
+    required this.star,
+    required this.amoled,
+  });
+  final Color surface;
+  final Color accent;
+  final Color star;
+  final bool amoled;
+  static final _stars = List.generate(48, (i) {
+    final random = math.Random(9031 + i * 97);
+    return (random.nextDouble(), random.nextDouble(), random.nextDouble());
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: dark
-              ? [
-                  Color.alphaBlend(
-                    colors.auroraA.withValues(alpha: .07),
-                    surface,
-                  ),
-                  surface,
-                ]
-              : [
-                  surface,
-                  Color.alphaBlend(
-                    colors.auroraC.withValues(alpha: .03),
-                    surface,
-                  ),
-                ],
-        ).createShader(rect),
-    );
-
-    final count = switch (quality) {
-      AuroraQuality.full => _blobs.length,
-      AuroraQuality.balanced => 3,
-      AuroraQuality.efficient => 2,
-    };
-    final amplitude = scrolling ? .35 : 1.0;
-    canvas.save();
-    for (var index = 0; index < count; index++) {
-      final blob = _blobs[index];
-      final drift = time * blob.speed;
-      final cx =
-          size.width *
-          (blob.x + math.sin(drift + blob.phase) * .045 * amplitude);
-      final cy =
-          size.height *
-          (blob.y + math.cos(drift * .8 + blob.phase) * .03 * amplitude);
-      final radius = size.shortestSide * blob.radius;
-      final color = switch (blob.color) {
-        0 => colors.auroraA,
-        1 => colors.auroraB,
-        _ => colors.auroraC,
-      };
-      final alpha = (dark ? .20 : .11) * (1 - index * .08);
-      final shader = RadialGradient(
-        colors: [
-          color.withValues(alpha: alpha),
-          color.withValues(alpha: alpha * .42),
-          color.withValues(alpha: 0),
-        ],
-        stops: const [0, .48, 1],
-      ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: radius));
-      canvas.drawCircle(
-        Offset(cx, cy),
-        radius,
-        Paint()
-          ..shader = shader
-          ..blendMode = dark ? BlendMode.plus : BlendMode.srcOver,
-      );
-    }
-    canvas.restore();
-
-    if (dark && quality == AuroraQuality.full) {
-      final starPaint = Paint()..color = colors.star;
-      for (final star in _stars) {
-        final twinkle =
-            (math.sin(time * (.5 + star.phase) + star.phase * 6) + 1) / 2;
-        final position = Offset(star.x * size.width, star.y * size.height);
-        canvas.drawCircle(
-          position,
-          .6 + twinkle * .9,
-          starPaint..color = colors.star.withValues(alpha: .08 + twinkle * .24),
-        );
-      }
-    }
-
-    if (veil) {
+    canvas.drawRect(rect, Paint()..color = surface);
+    if (!amoled) {
       canvas.drawRect(
         rect,
         Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+          ..shader = RadialGradient(
+            center: const Alignment(-.8, -.9),
+            radius: 1.4,
             colors: [
-              surface.withValues(alpha: dark ? .24 : .1),
-              surface.withValues(alpha: 0),
-              surface.withValues(alpha: 0),
-              surface.withValues(alpha: dark ? .55 : .32),
+              accent.withValues(alpha: .12),
+              accent.withValues(alpha: 0),
             ],
-            stops: const [0, .22, .62, 1],
           ).createShader(rect),
+      );
+    }
+    final paint = Paint();
+    for (final (x, y, phase) in _stars) {
+      paint.color = star.withValues(alpha: (amoled ? .18 : .1) + phase * .18);
+      canvas.drawCircle(
+        Offset(x * size.width, y * size.height),
+        .65 + phase * .65,
+        paint,
       );
     }
   }
 
   @override
-  bool shouldRepaint(covariant _AuroraPainter old) =>
-      old.time != time ||
-      old.dark != dark ||
-      old.colors != colors ||
+  bool shouldRepaint(covariant AuroraStarPainter old) =>
       old.surface != surface ||
-      old.quality != quality ||
-      old.scrolling != scrolling;
-}
-
-class _Blob {
-  const _Blob(
-    this.x,
-    this.y,
-    this.radius,
-    this.color,
-    this.speed,
-    this.phase,
-    this.layer,
-  );
-  final double x;
-  final double y;
-  final double radius;
-  final int color;
-  final double speed;
-  final double phase;
-  final int layer;
-}
-
-class _Star {
-  const _Star(this.x, this.y, this.phase);
-  final double x;
-  final double y;
-  final double phase;
+      old.accent != accent ||
+      old.star != star ||
+      old.amoled != amoled;
 }
 
 class AuroraBackdropScope extends InheritedWidget {

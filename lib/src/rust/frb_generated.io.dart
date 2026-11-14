@@ -5,6 +5,7 @@
 
 import 'api/engine.dart';
 import 'api/message_analysis.dart';
+import 'api/starfield.dart';
 
 import 'dart:async';
 import 'dart:convert';

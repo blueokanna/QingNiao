@@ -1,7 +1,7 @@
 name: qingniao
 description: "Local-first Android SMS and MMS with a Rust core and Material 3 Expressive interface."
-publish_to: 'none'
-version: 0.1.0+1
+publish_to: "none"
+version: 0.1.1+1
 
 environment:
   sdk: ^3.13.7
@@ -15,6 +15,7 @@ dependencies:
     path: rust_builder
   flutter_rust_bridge: 2.13.0
   material_new_shapes: 1.0.0
+  material_color_utilities: ^0.13.0
   intl: ^0.20.3
   characters: ^1.4.1
 dev_dependencies:
@@ -26,6 +27,8 @@ dev_dependencies:
   analyzer: ^14.7.0
 flutter:
   uses-material-design: true
+  shaders:
+    - shaders/aurora_stars.frag
   assets:
     - assets/licenses/
     - assets/l10n/

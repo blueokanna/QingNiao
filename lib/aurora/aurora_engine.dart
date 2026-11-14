@@ -293,7 +293,9 @@ class AuroraEngine extends ChangeNotifier {
       }
     }
 
-    if (_backdropEnabled && !_reduceMotion) {
+    if (_backdropEnabled &&
+        !_reduceMotion &&
+        _elapsedSeconds - _clock.value >= 1 / 30) {
       _clock.value = _elapsedSeconds;
     }
     _syncTicker();
