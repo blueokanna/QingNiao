@@ -108,7 +108,8 @@ flutter build apk --debug
   运营商 MMS APN、进程被杀后的回执、双卡切换需要在设备上复核。
 - 通知回复、定时发送、MMS 下载已实现但需要设备验证。
 - MMS PDU 仅实现 M-Retrieve.conf 子集；GB2312 文本离线解码为尽力而为。
-- 同步目前为手动触发；后台长轮询 / JobScheduler 兜底与备份导入仍在路线图中。
+- 同步目前为手动触发；后台长轮询 / JobScheduler 兜底仍在路线图中。
+- 备份导入已支持把短信、草稿、置顶/归档与黑名单合并回本机（需默认短信应用）。
 - 搜索索引在内存中重建；超大短信库只索引前 4k 字符/条。
 - 流体云：ColorOS 16.1 可走标准 Live Updates；ColorOS 15 及更早需要 OPPO
   Seedling SDK 审核与 `serviceId`，无法应用侧自助接入。详见
