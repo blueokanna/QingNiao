@@ -1,0 +1,78 @@
+{
+  "sourceSha256": "88200b809cfe4cadd2d135c97cad497967789a11e1f89b5b3726f2fa11960fef",
+  "conversion": "PyMuPDF 1.28.2 PDF colorspace conversion to RGB; screen simulation, not certified spot color",
+  "swatches": [
+    {
+      "id": "dawn",
+      "label": "PANTONE 1665 C",
+      "page": 3,
+      "cmykLabel": "C:0 M:69 Y:100 K:0",
+      "rgb": [
+        243,
+        113,
+        33
+      ],
+      "hex": "#F37121"
+    },
+    {
+      "id": "plum",
+      "label": "PANTONE 2587 C",
+      "page": 5,
+      "cmykLabel": "C:72 M:79 Y:0 K:0",
+      "rgb": [
+        99,
+        82,
+        162
+      ],
+      "hex": "#6352A2"
+    },
+    {
+      "id": "aurora",
+      "label": "PANTONE 2725 C",
+      "page": 6,
+      "cmykLabel": "C:79 M:69 Y:0 K:0",
+      "rgb": [
+        77,
+        95,
+        171
+      ],
+      "hex": "#4D5FAB"
+    },
+    {
+      "id": "lagoon",
+      "label": "PANTONE 3015 C",
+      "page": 7,
+      "cmykLabel": "C:100 M:23 Y:0 K:18",
+      "rgb": [
+        0,
+        124,
+        183
+      ],
+      "hex": "#007CB7"
+    },
+    {
+      "id": "jade",
+      "label": "PANTONE 3295 C",
+      "page": 8,
+      "cmykLabel": "C:100 M:0 Y:56 K:18",
+      "rgb": [
+        0,
+        144,
+        127
+      ],
+      "hex": "#00907F"
+    },
+    {
+      "id": "graphite",
+      "label": "PANTONE Cool Gray 11 C",
+      "page": 11,
+      "cmykLabel": "C:0 M:0 Y:0 K:79",
+      "rgb": [
+        90,
+        91,
+        94
+      ],
+      "hex": "#5A5B5E"
+    }
+  ]
+}

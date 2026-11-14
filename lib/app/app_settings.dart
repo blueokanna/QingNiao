@@ -1,3 +1,4 @@
+import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../aurora/aurora_engine.dart';
@@ -16,7 +17,7 @@ class AppSettings extends ChangeNotifier {
   AuroraThemePreference themePreference = AuroraThemePreference.system;
   Color seed = AuroraPalettes.jade;
   Color? systemSeed;
-  bool useDynamic = true;
+  bool useDynamic = false;
   AuroraBubbleStyle bubbleStyle = AuroraBubbleStyle.soft;
   bool morphShapes = true;
   AuroraMotionLevel motionLevel = AuroraMotionLevel.full;
@@ -28,6 +29,7 @@ class AppSettings extends ChangeNotifier {
   int trashRetentionDays = 30;
   bool sendDelay = false;
   bool lowPowerAurora = false;
+  bool fluidCloud = true;
   bool amoled = false;
   String fontFamily = 'system';
   String launcherIcon = 'bird';
@@ -73,7 +75,7 @@ class AppSettings extends ChangeNotifier {
     };
     final seedName = values['seed'];
     seed = AuroraPalettes.seeds[seedName] ?? AuroraPalettes.jade;
-    useDynamic = values['useDynamic'] != 'false';
+    useDynamic = values['useDynamic'] == 'true';
     bubbleStyle = switch (values['bubble']) {
       'capsule' => AuroraBubbleStyle.capsule,
       'cookie' => AuroraBubbleStyle.cookie,
@@ -94,6 +96,7 @@ class AppSettings extends ChangeNotifier {
     trashRetentionDays = int.tryParse(values['trashDays'] ?? '') ?? 30;
     sendDelay = values['sendDelay'] == 'true';
     lowPowerAurora = values['lowPowerAurora'] == 'true';
+    fluidCloud = values['fluidCloud'] != 'false';
     amoled = values['amoled'] == 'true';
     launcherIcon =
         const ['bird', 'leaf', 'chat'].contains(values['launcherIcon'])
@@ -161,6 +164,8 @@ class AppSettings extends ChangeNotifier {
   void setSendDelay(bool value) => update(() => sendDelay = value);
 
   void setLowPower(bool value) => update(() => lowPowerAurora = value);
+
+  void setFluidCloud(bool value) => update(() => fluidCloud = value);
   void setAmoled(bool value) => update(() {
     amoled = value;
     if (value) themePreference = AuroraThemePreference.dark;
@@ -188,7 +193,7 @@ class AppSettings extends ChangeNotifier {
       'seed': AuroraPalettes.seeds.entries
           .firstWhere(
             (entry) => entry.value == seed,
-            orElse: () => const MapEntry('青碧', AuroraPalettes.jade),
+            orElse: () => const MapEntry("PANTONE 3295 C", AuroraPalettes.jade),
           )
           .key,
       'useDynamic': '$useDynamic',
@@ -211,6 +216,7 @@ class AppSettings extends ChangeNotifier {
       'trashDays': '$trashRetentionDays',
       'sendDelay': '$sendDelay',
       'lowPowerAurora': '$lowPowerAurora',
+      'fluidCloud': '$fluidCloud',
       'amoled': '$amoled',
       'fontFamily': fontFamily,
     };
@@ -229,7 +235,7 @@ class AppScope extends InheritedNotifier<AppSettings> {
 
   static AppSettings of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();
-    assert(scope != null, 'AppScope 未挂载');
+    assert(scope != null, tr("AppScope is not mounted"));
     return scope!.notifier!;
   }
 

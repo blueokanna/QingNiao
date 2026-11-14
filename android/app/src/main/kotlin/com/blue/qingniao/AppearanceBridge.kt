@@ -19,7 +19,7 @@ class AppearanceBridge(private val activity: Activity) {
         "motion" to setOf("full", "balanced", "reduced"),
         "bubble" to setOf("soft", "capsule", "cookie")
     )
-    private val booleans = setOf("useDynamic", "amoled", "morph", "delivery", "notifications", "preview", "sendDelay", "lowPowerAurora")
+    private val booleans = setOf("useDynamic", "amoled", "morph", "delivery", "notifications", "preview", "sendDelay", "lowPowerAurora", "fluidCloud")
 
     fun handle(call: MethodCall, result: MethodChannel.Result): Boolean {
         when (call.method) {

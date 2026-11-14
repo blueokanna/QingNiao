@@ -1,3 +1,4 @@
+import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../aurora/aurora_shapes.dart';
@@ -37,7 +38,7 @@ class OtpScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    '验证码',
+                    tr("Verification codes"),
                     style: context.texts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ],
@@ -46,8 +47,8 @@ class OtpScreen extends StatelessWidget {
             SliverToBoxAdapter(
               child: AuroraLargeHeader(
                 eyebrow: 'LOCAL · ON DEVICE',
-                title: '验证码',
-                description: '${items.length} 条可用 · 解析只在本机完成，不会上传正文',
+                title: tr("Verification codes"),
+                description: tr("Available: {p0} \u00b7 Codes are detected on this device", [items.length]),
                 padding: const EdgeInsets.fromLTRB(24, 14, 24, 8),
               ),
             ),
@@ -56,8 +57,8 @@ class OtpScreen extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.only(top: 20),
                   child: AuroraEmpty(
-                    title: '还没有需要复制的验证码',
-                    message: '当短信里出现验证码时，青鸟会把它们安静地收在这里。',
+                    title: tr("No verification codes yet"),
+                    message: tr("Codes found in your messages will appear here."),
                     icon: Icons.shield_outlined,
                   ),
                 ),
@@ -170,7 +171,7 @@ class _OtpCard extends StatelessWidget {
                   Icon(Icons.lock_outline_rounded, size: 12, color: scheme.onSurfaceVariant),
                   const SizedBox(width: 4),
                   Text(
-                    '仅在设备端解析',
+                    tr("Processed on this device"),
                     style: context.texts.labelSmall?.copyWith(
                       fontSize: 10,
                       color: scheme.onSurfaceVariant,

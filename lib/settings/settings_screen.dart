@@ -1,3 +1,4 @@
+import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../app/app_settings.dart';
@@ -25,12 +26,21 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   EngineStats _stats = const EngineStats();
+  Map<String, dynamic> _capabilities = const {};
   bool _busy = false;
 
   @override
   void initState() {
     super.initState();
     _loadStats();
+    _loadCapabilities();
+  }
+
+  Future<void> _loadCapabilities() async {
+    try {
+      final caps = await widget.repository.notificationCapabilities();
+      if (mounted) setState(() => _capabilities = caps);
+    } catch (_) {}
   }
 
   Future<void> _loadStats() async {
@@ -57,16 +67,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final controller = TextEditingController(text: settings.signature);
     final result = await showAuroraDialog<String>(
       context: context,
-      title: const Text('短信签名'),
+      title:  Text(tr("Message signature")),
       content: TextField(
         controller: controller,
         maxLines: 3,
         maxLength: 80,
-        decoration: const InputDecoration(hintText: '例如：—— 来自青鸟'),
+        decoration:  InputDecoration(hintText: tr("Example: Sent from Qingniao")),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-        FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('保存')),
+        TextButton(onPressed: () => Navigator.pop(context), child:  Text(tr("Cancel"))),
+        FilledButton(onPressed: () => Navigator.pop(context, controller.text), child:  Text(tr("Save"))),
       ],
     );
     if (result != null) settings.setSignature(result.trim());
@@ -93,7 +103,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               const SizedBox(width: 10),
               Text(
-                '设置',
+                tr("Settings"),
                 style: context.texts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
             ],
@@ -102,20 +112,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         SliverToBoxAdapter(
           child: AuroraLargeHeader(
             eyebrow: 'PREFERENCES',
-            title: '设置',
-            description: '外观、通知与隐私都在本机掌控',
+            title: tr("Settings"),
+            description: tr("Appearance, notifications and privacy"),
             padding: const EdgeInsets.fromLTRB(24, 14, 24, 4),
           ),
         ),
         SliverToBoxAdapter(
           child: AuroraSection(
-            title: '短信与权限',
+            title: tr("SMS permissions"),
             children: [
               AuroraSettingTile(
-                title: access.defaultApp ? '默认短信应用已就绪' : '设为默认短信应用',
+                title: access.defaultApp ? tr("Default SMS app is ready") : tr("Set as default SMS app"),
                 subtitle: access.defaultApp
-                    ? '可以完整读取、接收和发送短信'
-                    : '只有默认应用才能写入系统短信库',
+                    ? tr("SMS reading, receiving and sending are available")
+                    : tr("Only the default SMS app can write to the system message store"),
                 icon: access.defaultApp ? Icons.verified_rounded : Icons.sms_outlined,
                 trailing: access.defaultApp
                     ? Icon(Icons.check_circle_rounded, color: scheme.primary, size: 20)
@@ -124,22 +134,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 showDivider: true,
               ),
               AuroraSettingTile(
-                title: '通知权限',
-                subtitle: access.notifications ? '已允许新短信通知' : '未允许，可能收不到提醒',
+                title: tr("Notification permission"),
+                subtitle: access.notifications ? tr("New message notifications are allowed") : tr("Notifications are not allowed"),
                 icon: Icons.notifications_active_outlined,
                 onTap: () => widget.repository.openNotificationSettings(),
                 showDivider: true,
               ),
               AuroraSettingTile(
-                title: '联系人读取',
-                subtitle: access.readContacts ? '已允许显示联系人名称' : '未允许，仅显示号码',
+                title: tr("Contact permission"),
+                subtitle: access.readContacts ? tr("Contact names can be displayed") : tr("Only phone numbers are displayed"),
                 icon: Icons.contacts_outlined,
                 onTap: () => widget.repository.openAppSettings(),
                 showDivider: true,
               ),
               AuroraSettingTile(
-                title: '设备与权限诊断',
-                subtitle: '短信角色、后台限制与厂商设置',
+                title: tr("Device diagnostics"),
+                subtitle: tr("SMS role, background restrictions and device settings"),
                 icon: Icons.phonelink_setup_rounded,
                 onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
                   builder: (_) => DeviceCompatibilityScreen(repository: widget.repository),
@@ -150,14 +160,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         SliverToBoxAdapter(
           child: AuroraSection(
-            title: '外观与动效',
+            title: tr("Appearance and motion"),
             children: [
               AuroraSettingTile(
-                title: '外观',
+                title: tr("Appearance"),
                 subtitle: switch (settings.themePreference) {
-                  AuroraThemePreference.system => '跟随系统',
-                  AuroraThemePreference.light => '浅色',
-                  AuroraThemePreference.dark => '深色',
+                  AuroraThemePreference.system => tr("System default"),
+                  AuroraThemePreference.light => tr("Light"),
+                  AuroraThemePreference.dark => tr("Dark"),
                 },
                 icon: Icons.palette_outlined,
                 onTap: () => Navigator.of(context).push(
@@ -168,8 +178,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 showDivider: true,
               ),
               AuroraSettingTile(
-                title: '动态取色',
-                subtitle: settings.useDynamic ? '跟随壁纸的 Material You 色彩' : '使用青鸟品牌色',
+                title: tr("Dynamic colors"),
+                subtitle: settings.useDynamic ? tr("Use wallpaper colors") : tr("Use reference palette colors"),
                 icon: Icons.colorize_outlined,
                 trailing: Switch(
                   value: settings.useDynamic,
@@ -178,15 +188,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 showDivider: true,
               ),
               AuroraSettingTile(
-                title: '流体动效',
-                subtitle: '极光引擎统一调度，可随时降低强度',
+                title: tr("Interface motion"),
+                subtitle: tr("Choose how much animation to use"),
                 icon: Icons.auto_awesome_outlined,
                 trailing: _MotionChips(settings: settings),
                 showDivider: true,
               ),
               AuroraSettingTile(
-                title: '字体大小',
-                subtitle: '${(settings.fontScale * 100).round()}% · 影响会话与气泡',
+                title: tr("Text size"),
+                subtitle: tr("{p0}% \u00b7 Applies to messages and conversations", [(settings.fontScale * 100).round()]),
                 icon: Icons.text_fields_rounded,
                 onTap: () => _fontScaleSheet(context, settings),
               ),
@@ -195,11 +205,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         SliverToBoxAdapter(
           child: AuroraSection(
-            title: '消息与通知',
+            title: tr("Messages and notifications"),
             children: [
               AuroraSettingTile(
-                title: '送达报告',
-                subtitle: '显示已发送 / 已送达状态',
+                title: tr("Delivery reports"),
+                subtitle: tr("Show sent and delivered states"),
                 icon: Icons.done_all_rounded,
                 trailing: Switch(
                   value: settings.deliveryReports,
@@ -208,8 +218,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 showDivider: true,
               ),
               AuroraSettingTile(
-                title: '新短信通知',
-                subtitle: '支持通知栏直接回复',
+                title: tr("New message notifications"),
+                subtitle: tr("Reply directly from notifications"),
                 icon: Icons.notifications_outlined,
                 trailing: Switch(
                   value: settings.notifications,
@@ -218,8 +228,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 showDivider: true,
               ),
               AuroraSettingTile(
-                title: '通知显示内容预览',
-                subtitle: settings.showPreview ? '在锁屏与通知中显示正文' : '仅显示号码',
+                title: tr("Show message previews"),
+                subtitle: settings.showPreview ? tr("Show message text on the lock screen and in notifications") : tr("Show numbers only"),
                 icon: Icons.visibility_outlined,
                 trailing: Switch(
                   value: settings.showPreview,
@@ -228,15 +238,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 showDivider: true,
               ),
               AuroraSettingTile(
-                title: '短信签名',
-                subtitle: settings.signature.isEmpty ? '未设置' : settings.signature,
+                title: tr("Live updates"),
+                subtitle: _capabilities['fluidCloud'] == true
+                    ? (settings.fluidCloud
+                          ? tr("Enabled \u00b7 Supported systems may show unread message live updates")
+                          : tr("Disabled \u00b7 Use standard notifications"))
+                    : tr("Android 16 Live Updates are unavailable on this device"),
+                icon: Icons.bubble_chart_outlined,
+                trailing: Switch(
+                  value: settings.fluidCloud && _capabilities['fluidCloud'] == true,
+                  onChanged: _capabilities['fluidCloud'] == true
+                      ? settings.setFluidCloud
+                      : null,
+                ),
+                showDivider: true,
+              ),
+              AuroraSettingTile(
+                title: tr("Background activity and startup"),
+                subtitle: _capabilities['batteryUnrestricted'] == true
+                    ? tr("Battery optimization is excluded. Check startup permissions too.")
+                    : tr("SMS uses system broadcasts. Background restrictions may delay notifications."),
+                icon: Icons.battery_charging_full_rounded,
+                onTap: () => _backgroundSheet(settings),
+                showDivider: true,
+              ),
+              AuroraSettingTile(
+                title: tr("Message signature"),
+                subtitle: settings.signature.isEmpty ? tr("Not set") : settings.signature,
                 icon: Icons.draw_outlined,
                 onTap: () => _editSignature(settings),
                 showDivider: true,
               ),
               AuroraSettingTile(
-                title: '定时发送前确认',
-                subtitle: settings.sendDelay ? '发送前等待几秒可撤销' : '立即发送',
+                title: tr("Confirm scheduled messages"),
+                subtitle: settings.sendDelay ? tr("Wait briefly before sending to allow cancellation") : tr("Send immediately"),
                 icon: Icons.schedule_rounded,
                 trailing: Switch(
                   value: settings.sendDelay,
@@ -248,11 +283,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         SliverToBoxAdapter(
           child: AuroraSection(
-            title: '隐私与数据',
+            title: tr("Privacy and data"),
             children: [
               AuroraSettingTile(
-                title: '黑名单',
-                subtitle: '屏蔽号码，拦截通知',
+                title: tr("Blocked numbers"),
+                subtitle: tr("Block numbers and their notifications"),
                 icon: Icons.block_rounded,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -262,48 +297,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 showDivider: true,
               ),
               AuroraSettingTile(
-                title: '回收站保留',
+                title: tr("Trash retention"),
                 subtitle: settings.trashRetentionDays == 0
-                    ? '永久保留'
-                    : '${settings.trashRetentionDays} 天后自动清理',
+                    ? tr("Keep indefinitely")
+                    : tr("Remove after {p0} days", [settings.trashRetentionDays]),
                 icon: Icons.delete_outline_rounded,
                 onTap: () => _retentionSheet(context, settings),
                 showDivider: true,
               ),
               AuroraSettingTile(
-                title: '导出本地备份',
-                subtitle: '包含短信、草稿与设置，不含彩信附件',
+                title: tr("Export backup"),
+                subtitle: tr("Includes SMS, drafts and settings, without MMS attachments"),
                 icon: Icons.file_upload_outlined,
                 onTap: () async {
                   final ok = await widget.repository.exportBackup();
-                  if (context.mounted) showAuroraSnack(context, ok ? '备份已导出' : '已取消导出');
+                  if (context.mounted) showAuroraSnack(context, ok ? tr("Backup exported") : tr("Export canceled"));
                 },
                 showDivider: true,
               ),
               AuroraSettingTile(
-                title: '从备份恢复',
-                subtitle: '导入会合并到现有短信库',
+                title: tr("Restore backup"),
+                subtitle: tr("Imported messages are merged into the system store"),
                 icon: Icons.file_download_outlined,
                 onTap: () async {
                   final confirmed = await showAuroraDialog<bool>(
                     context: context,
-                    title: const Text('从备份恢复？'),
-                    content: const Text('导入的短信将写入系统短信库，并记录到当前会话中。'),
+                    title:  Text(tr("Restore from backup?")),
+                    content:  Text(tr("Imported messages will be added to the system message store.")),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context, false),
-                        child: const Text('取消'),
+                        child:  Text(tr("Cancel")),
                       ),
                       FilledButton(
                         onPressed: () => Navigator.pop(context, true),
-                        child: const Text('选择文件'),
+                        child:  Text(tr("Choose file")),
                       ),
                     ],
                   );
                   if (confirmed != true) return;
                   final ok = await widget.repository.importBackup();
                   if (context.mounted) {
-                    showAuroraSnack(context, ok ? '恢复完成' : '已取消恢复');
+                    showAuroraSnack(context, ok ? tr("Restore complete") : tr("Restore canceled"));
                   }
                 },
               ),
@@ -312,11 +347,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         SliverToBoxAdapter(
           child: AuroraSection(
-            title: '云同步 · 端到端加密',
+            title: tr("Encrypted sync"),
             children: [
               AuroraSettingTile(
-                title: '青鸟同步',
-                subtitle: '仅传输加密信封；服务器看不到正文',
+                title: tr("Device sync"),
+                subtitle: tr("Transfer encrypted envelopes through your server"),
                 icon: Icons.cloud_outlined,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
@@ -329,11 +364,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         SliverToBoxAdapter(
           child: AuroraSection(
-            title: '关于',
+            title: tr("About"),
             children: [
               AuroraSettingTile(
-                title: '青鸟短信',
-                subtitle: '版本 0.4.0 · Flutter + Rust + Kotlin',
+                title: tr("Qingniao"),
+                subtitle: tr("Version 0.4.0"),
                 icon: Icons.info_outline_rounded,
                 onTap: () => showAuroraSheet<void>(
                   context: context,
@@ -343,33 +378,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('青鸟短信', style: context.texts.headlineSmall),
+                        Text(tr("Qingniao"), style: context.texts.headlineSmall),
                         const SizedBox(height: 6),
                         Text(
-                          '本地优先的短信与彩信客户端。短信解析、搜索与回收站状态都留在设备上。',
+                          tr("A local-first SMS and MMS client. Message analysis, search and local state stay on your device."),
                           style: context.texts.bodyMedium?.copyWith(
                             color: context.colors.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 16),
-                        _statRow(context, '会话', '${_stats.threads}'),
-                        _statRow(context, '消息', '${_stats.messages}'),
-                        _statRow(context, '回收站', '${_stats.trash}'),
-                        _statRow(context, '验证码', '${_stats.otpCount}'),
+                        _statRow(context, tr("Conversations"), '${_stats.threads}'),
+                        _statRow(context, tr("Messages"), '${_stats.messages}'),
+                        _statRow(context, tr("Trash"), '${_stats.trash}'),
+                        _statRow(context, tr("Verification codes"), '${_stats.otpCount}'),
                         _statRow(
                           context,
-                          '引擎帧耗时',
+                          tr("Frame time"),
                           '${AuroraEngine.instance.averageFrameMs.toStringAsFixed(1)} ms · ${_stats.quality}',
                         ),
                         const SizedBox(height: 12),
                         TextButton.icon(
                           onPressed: () => showLicensePage(
                             context: context,
-                            applicationName: '青鸟短信',
+                            applicationName: tr("Qingniao"),
                             applicationVersion: '0.4.0',
                           ),
                           icon: const Icon(Icons.code_rounded, size: 18),
-                          label: const Text('开源许可'),
+                          label:  Text(tr("Open-source licenses")),
                         ),
                       ],
                     ),
@@ -383,7 +418,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(30, 10, 30, 130),
             child: Text(
-              '青鸟短信 · 本地优先 · 无广告与统计 SDK\nRust 引擎 / Material 3 Expressive / 极光流体界面',
+              tr("Qingniao \u00b7 Local-first messaging\nFlutter, Rust and Kotlin"),
               textAlign: TextAlign.center,
               style: context.texts.labelSmall?.copyWith(
                 color: scheme.onSurfaceVariant.withValues(alpha: .7),
@@ -393,6 +428,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _backgroundSheet(AppSettings settings) async {
+    await showAuroraSheet<void>(
+      context: context,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(tr("Receiving messages in the background"), style: context.texts.headlineSmall),
+            const SizedBox(height: 8),
+            Text(
+              tr("Android Telephony broadcasts deliver incoming messages directly to this app.")
+              tr("Delivery does not depend on a push server. Device background restrictions can still affect notifications."),
+              style: context.texts.bodySmall?.copyWith(
+                color: context.colors.onSurfaceVariant,
+                height: 1.6,
+              ),
+            ),
+            const SizedBox(height: 12),
+            AuroraSettingTile(
+              title: tr("Battery optimization exemption"),
+              subtitle: _capabilities['batteryUnrestricted'] == true
+                  ? tr("Allowed")
+                  : tr("Reduce restrictions while the screen is off"),
+              icon: Icons.battery_saver_outlined,
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                final ok = await widget.repository.requestBatteryUnrestricted();
+                await _loadCapabilities();
+                if (mounted) {
+                  showAuroraSnack(
+                    context,
+                    ok ? tr("Battery settings opened") : tr("Allow background activity in system settings"),
+                  );
+                }
+              },
+            ),
+            AuroraSettingTile(
+              title: tr("OPPO / OnePlus startup settings"),
+              subtitle: tr("Open device startup or background settings"),
+              icon: Icons.settings_applications_outlined,
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                final ok = await widget.repository.openAutoStartSettings();
+                if (mounted && !ok) {
+                  showAuroraSnack(context, tr("Startup settings are unavailable. Use App info instead."));
+                }
+              },
+            ),
+            AuroraSettingTile(
+              title: tr("Notification and banner permissions"),
+              subtitle: tr("Allow new message notification banners"),
+              icon: Icons.notifications_active_outlined,
+              onTap: () {
+                Navigator.pop(sheetContext);
+                widget.repository.openNotificationSettings();
+              },
+            ),
+            AuroraSettingTile(
+              title: tr("Live update indicator"),
+              subtitle: _capabilities['fluidCloud'] == true
+                  ? tr("This device supports Android 16 Live Updates")
+                  : tr("Requires supported Android 16 software. The system may still decline promotion."),
+              icon: Icons.bubble_chart_outlined,
+              trailing: Switch(
+                value: settings.fluidCloud && _capabilities['fluidCloud'] == true,
+                onChanged: _capabilities['fluidCloud'] == true
+                    ? settings.setFluidCloud
+                    : null,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -423,7 +536,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('字体大小', style: context.texts.titleLarge),
+              Text(tr("Text size"), style: context.texts.titleLarge),
               const SizedBox(height: 6),
               Text(
                 '${(scale * 100).round()}%',
@@ -440,7 +553,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
               Text(
-                '消息气泡与列表会同步缩放，系统级字体大小仍会叠加。',
+                tr("Text scales with both this setting and the system accessibility setting."),
                 style: context.texts.bodySmall?.copyWith(color: context.colors.onSurfaceVariant),
               ),
             ],
@@ -458,8 +571,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           for (final days in const [7, 30, 90, 0])
             AuroraSettingTile(
-              title: days == 0 ? '永久保留' : '$days 天',
-              subtitle: days == 0 ? '不自动清理回收站' : '删除后 $days 天内可恢复',
+              title: days == 0 ? tr("Keep indefinitely") : tr("Days: {p0}", [days]),
+              subtitle: days == 0 ? tr("Do not automatically empty trash") : tr("Restore messages within {p0} days of deletion", [days]),
               icon: Icons.timer_outlined,
               trailing: settings.trashRetentionDays == days
                   ? Icon(Icons.check_circle_rounded, color: context.colors.primary, size: 20)
@@ -485,12 +598,12 @@ class _MotionChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final labels = {
-      AuroraMotionLevel.full: '全速',
-      AuroraMotionLevel.balanced: '平衡',
-      AuroraMotionLevel.reduced: '省电',
+      AuroraMotionLevel.full: tr("Full"),
+      AuroraMotionLevel.balanced: tr("Balanced"),
+      AuroraMotionLevel.reduced: tr("Reduced"),
     };
     return PopupMenuButton<AuroraMotionLevel>(
-      tooltip: '动效强度',
+      tooltip: tr("Motion level"),
       onSelected: settings.setMotion,
       itemBuilder: (context) => [
         for (final entry in labels.entries)

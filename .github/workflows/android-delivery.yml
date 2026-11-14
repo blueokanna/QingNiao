@@ -76,6 +76,7 @@ jobs:
         run: |
           if [[ "$PRODUCTION" == 'true' ]]; then mode=release; else mode=debug; fi
           flutter build apk --"$mode"
+          python3 tool/verify_android_pages.py "build/app/outputs/flutter-apk/app-$mode.apk" --report build/native-pages.json
           (cd android && chmod +x gradlew && ./gradlew lintDebug --no-daemon)
           mkdir -p build/delivery
           cp "build/app/outputs/flutter-apk/app-$mode.apk" "build/delivery/qingniao-$mode.apk"

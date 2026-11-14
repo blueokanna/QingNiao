@@ -1,3 +1,4 @@
+import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../aurora/aurora_theme.dart';
@@ -48,18 +49,18 @@ class _BlockedScreenState extends State<BlockedScreen> {
     final controller = TextEditingController();
     final number = await showAuroraDialog<String>(
       context: context,
-      title: const Text('屏蔽号码'),
+      title:  Text(tr("Block a number")),
       content: TextField(
         controller: controller,
         autofocus: true,
         keyboardType: TextInputType.phone,
-        decoration: const InputDecoration(hintText: '输入号码或短号'),
+        decoration:  InputDecoration(hintText: tr("Enter a number or short code")),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+        TextButton(onPressed: () => Navigator.pop(context), child:  Text(tr("Cancel"))),
         FilledButton(
           onPressed: () => Navigator.pop(context, controller.text),
-          child: const Text('屏蔽'),
+          child:  Text(tr("Block")),
         ),
       ],
     );
@@ -68,7 +69,7 @@ class _BlockedScreenState extends State<BlockedScreen> {
     try {
       await widget.repository.block(trimmed);
       await _load();
-      if (mounted) showAuroraSnack(context, '已屏蔽 $trimmed');
+      if (mounted) showAuroraSnack(context, tr("Blocked: {p0}", [trimmed]));
     } catch (error) {
       if (mounted) showAuroraSnack(context, messageError(error));
     }
@@ -92,12 +93,12 @@ class _BlockedScreenState extends State<BlockedScreen> {
           slivers: [
             SliverToBoxAdapter(
               child: AuroraTopBar(
-                title: '黑名单',
-                subtitle: '${_items.length} 个号码',
+                title: tr("Blocked numbers"),
+                subtitle: tr("Numbers: {p0}", [_items.length]),
                 actions: [
                   AuroraIconButton(
                     icon: Icons.add_rounded,
-                    tooltip: '添加号码',
+                    tooltip: tr("Add number"),
                     onPressed: _add,
                   ),
                 ],
@@ -107,7 +108,7 @@ class _BlockedScreenState extends State<BlockedScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 4, 24, 10),
                 child: Text(
-                  '被屏蔽号码的短信仍会保存在系统中，但不会触发通知，也不会出现在普通筛选里。',
+                  tr("Blocked messages remain in the system store, without notifications or inclusion in the regular inbox."),
                   style: context.texts.bodySmall?.copyWith(color: context.colors.onSurfaceVariant),
                 ),
               ),
@@ -122,12 +123,12 @@ class _BlockedScreenState extends State<BlockedScreen> {
                 ),
               )
             else if (_items.isEmpty)
-              const SliverToBoxAdapter(
+               SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.only(top: 10),
                   child: AuroraEmpty(
-                    title: '黑名单是空的',
-                    message: '把不想再被打扰的号码放进来。',
+                    title: tr("No blocked numbers"),
+                    message: tr("Add numbers you do not want to hear from."),
                     icon: Icons.block_rounded,
                   ),
                 ),
@@ -154,12 +155,12 @@ class _BlockedScreenState extends State<BlockedScreen> {
                           title: Text(MessageFormat.phone(item.address)),
                           subtitle: Text(
                             item.note.isEmpty
-                                ? '屏蔽于 ${MessageFormat.inboxTime(item.createdAt)}'
+                                ? tr("Blocked {p0}", [MessageFormat.inboxTime(item.createdAt)])
                                 : item.note,
                           ),
                           trailing: TextButton(
                             onPressed: () => _remove(item),
-                            child: const Text('解除'),
+                            child:  Text(tr("Unblock")),
                           ),
                         ),
                       ),

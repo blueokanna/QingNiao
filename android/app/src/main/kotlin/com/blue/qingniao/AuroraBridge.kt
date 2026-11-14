@@ -7,6 +7,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
@@ -17,8 +18,10 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.ContactsContract
 import android.provider.MediaStore
+import android.provider.Settings
 import android.provider.Telephony
 import android.telephony.SubscriptionManager
 import io.flutter.plugin.common.MethodCall
@@ -50,6 +53,9 @@ class AuroraBridge(private val activity: Activity) {
                     result.success(null)
                 }
                 "stats" -> result.success(stats())
+                "notificationCapabilities" -> result.success(notificationCapabilities())
+                "batteryUnrestricted" -> result.success(requestBatteryUnrestricted())
+                "autoStartSettings" -> result.success(openAutoStartSettings())
                 "syncState" -> result.success(syncPrefs.getString("state", "") ?: "")
                 "syncStateSet" -> {
                     syncPrefs.edit().putString("state", call.argument<String>("json") ?: "").apply()
@@ -224,7 +230,8 @@ class AuroraBridge(private val activity: Activity) {
         "schedule", "scheduled", "cancelScheduled", "dataDir", "openUrl",
         "stats", "exportBackup", "importBackup", "syncStatus", "syncConfigure",
         "syncPair", "syncNow", "syncReset", "syncState", "syncStateSet",
-        "remoteMessagesSince", "insertRemoteMessage",
+        "remoteMessagesSince", "insertRemoteMessage", "notificationCapabilities",
+        "batteryUnrestricted", "autoStartSettings",
     )
 
     private fun requireAccess() {
@@ -588,6 +595,16 @@ class AuroraBridge(private val activity: Activity) {
             "thread_id=? AND read=0",
             arrayOf(threadId.toString()),
         )
+        val address = context.contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf("address"),
+            "thread_id=?",
+            arrayOf(threadId.toString()),
+            null,
+        )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+        if (address != null) {
+            Notifications.cancel(context, address.hashCode())
+        }
     }
 
     private fun hideMessage(store: AuroraStore, id: Long) {
@@ -856,6 +873,70 @@ class AuroraBridge(private val activity: Activity) {
         val id = ContentUris.parseId(uri)
         AuroraStore(context).use { it.markRemote(id) }
         return id
+    }
+
+    private fun notificationCapabilities(): Map<String, Any?> {
+        val power = context.getSystemService(PowerManager::class.java)
+        return mapOf(
+            "fluidCloud" to Notifications.canPromote(context),
+            "fluidCloudEnabled" to Notifications.fluidCloudEnabled(context),
+            "batteryUnrestricted" to power.isIgnoringBatteryOptimizations(context.packageName),
+            "sdk" to Build.VERSION.SDK_INT,
+            "manufacturer" to Build.MANUFACTURER,
+        )
+    }
+
+    private fun requestBatteryUnrestricted(): Boolean {
+        val power = context.getSystemService(PowerManager::class.java)
+        if (power.isIgnoringBatteryOptimizations(context.packageName)) return true
+        return try {
+            activity.startActivity(
+                Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:${context.packageName}"),
+                ),
+            )
+            true
+        } catch (_: Exception) {
+            try {
+                activity.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            } catch (_: Exception) {}
+            false
+        }
+    }
+
+    /**
+     * ColorOS / OxygenOS 没有公开的“自启动”标准入口，这里按机型依次尝试；
+     * 全部失败时退回应用详情页，用户仍可手动找到“自启动/后台管理”。
+     */
+    private fun openAutoStartSettings(): Boolean {
+        val candidates = listOf(
+            "com.coloros.safecenter/com.coloros.safecenter.permission.startup.StartupAppListActivity",
+            "com.coloros.safecenter/com.coloros.safecenter.startupapp.StartupAppListActivity",
+            "com.oplus.battery/com.oplus.battery.startupapp.StartupAppListActivity",
+            "com.oneplus.security/com.oneplus.security.chainlaunch.view.ChainLaunchAppListActivity",
+            "com.coloros.oppoguardelf/com.coloros.powermanager.fuelgaue.PowerUsageModelActivity",
+        )
+        for (flattened in candidates) {
+            val component = ComponentName.unflattenFromString(flattened) ?: continue
+            try {
+                activity.startActivity(Intent().setComponent(component))
+                return true
+            } catch (_: Exception) {
+                // 尝试下一个 OEM 页面。
+            }
+        }
+        return try {
+            activity.startActivity(
+                Intent(
+                    Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:${context.packageName}"),
+                ),
+            )
+            false
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun syncStatus(): Map<String, Any?> = mapOf(

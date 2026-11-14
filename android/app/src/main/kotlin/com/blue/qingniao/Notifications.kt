@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Icon
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Telephony
@@ -106,6 +107,21 @@ object Notifications {
             .setOnlyAlertOnce(false)
             .addAction(replyAction)
             .addAction(readAction)
+
+        // Android 16 Live Updates：ColorOS 16 / OxygenOS 16 会把它呈现在流体云。
+        // 系统与 OEM 仍可拒绝；失败时自动退回普通高优先级通知。
+        if (canPromote(context) && prefs.getBoolean("fluidCloud", true)) {
+            try {
+                builder
+                    .setOngoing(true)
+                    .setAutoCancel(false)
+                    .setShortCriticalText(if (preview) "新短信" else "消息")
+                requestPromotedOngoing(builder)
+            } catch (_: Exception) {
+                // 某些 ROM 在运行时移除了该能力。
+            }
+        }
+
         val summary = Notification.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setContentTitle("青鸟短信")
@@ -122,6 +138,37 @@ object Notifications {
         }
     }
 
+    /** Android 16 起可用的 Live Updates 能力；ColorOS 16 会桥接到流体云。 */
+    fun canPromote(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < 36) return false
+        return try {
+            val manager = context.getSystemService(NotificationManager::class.java)
+            val method = NotificationManager::class.java.getMethod("canPostPromotedNotifications")
+            method.invoke(manager) as? Boolean ?: false
+        } catch (_: Throwable) {
+            // API 36.1 才提供该能力；36.0 会抛异常。
+            false
+        }
+    }
+
+    /**
+     * `setRequestPromotedOngoing` 位于 Android 16.1（API 36.1），
+     * 而当前 compileSdk 为 36；用反射调用，避免锁死 Preview SDK。
+     */
+    private fun requestPromotedOngoing(builder: Notification.Builder) {
+        try {
+            val method = Notification.Builder::class.java
+                .getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
+            method.invoke(builder, true)
+        } catch (_: Throwable) {
+            // 不支持时保持普通通知。
+        }
+    }
+
+    fun fluidCloudEnabled(context: Context): Boolean =
+        context.getSharedPreferences("appearance", Context.MODE_PRIVATE)
+            .getBoolean("fluidCloud", true) && canPromote(context)
+
     fun markReplied(context: Context, address: String, notificationId: Int) {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.cancel(notificationId)
@@ -131,7 +178,16 @@ object Notifications {
     }
 
     fun cancel(context: Context, notificationId: Int) {
-        context.getSystemService(NotificationManager::class.java).cancel(notificationId)
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.cancel(notificationId)
+        try {
+            val remaining = manager.activeNotifications.any { status ->
+                status.id != SUMMARY_ID && status.notification.group == GROUP
+            }
+            if (!remaining) manager.cancel(SUMMARY_ID)
+        } catch (_: Exception) {
+            // activeNotifications 在极少数 ROM 上不可用。
+        }
     }
 }
 

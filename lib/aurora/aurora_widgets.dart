@@ -1,3 +1,4 @@
+import 'package:qingniao/l10n/app_strings.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -484,7 +485,7 @@ class _AuroraSearchFieldState extends State<AuroraSearchField> {
           ),
           if (_hasText)
             IconButton(
-              tooltip: '清除',
+              tooltip: tr("Clear"),
               icon: const Icon(Icons.close_rounded, size: 18),
               onPressed: () {
                 _controller.clear();
@@ -529,7 +530,7 @@ class AuroraTopBar extends StatelessWidget {
           if (showBack) ...[
             AuroraIconButton(
               icon: Icons.arrow_back_rounded,
-              tooltip: '返回',
+              tooltip: tr("Back"),
               onPressed: onBack ?? () => Navigator.of(context).maybePop(),
             ),
             const SizedBox(width: 10),
@@ -1057,7 +1058,7 @@ class AuroraErrorBanner extends StatelessWidget {
               TextButton(
                 onPressed: onRetry,
                 style: TextButton.styleFrom(foregroundColor: scheme.onErrorContainer),
-                child: const Text('重试'),
+                child:  Text(tr("Retry")),
               ),
           ],
         ),

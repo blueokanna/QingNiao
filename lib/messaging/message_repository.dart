@@ -1,3 +1,4 @@
+import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/services.dart';
 
 import '../src/rust/api/engine.dart';
@@ -58,6 +59,15 @@ class MessageRepository {
 
   Future<void> openNotificationSettings() =>
       _channel.invokeMethod<void>('notificationSettings');
+
+  Future<Map<String, dynamic>> notificationCapabilities() =>
+      _map('notificationCapabilities');
+
+  Future<bool> requestBatteryUnrestricted() async =>
+      await _invoke<bool>('batteryUnrestricted') ?? false;
+
+  Future<bool> openAutoStartSettings() async =>
+      await _invoke<bool>('autoStartSettings') ?? false;
 
   Future<void> openUrl(String url) => _channel.invokeMethod<void>('openUrl', {'url': url});
 
@@ -381,11 +391,9 @@ ThreadSummary demoThread({
   bool archived = false,
   MessageCategory category = MessageCategory.personal,
   String? otp,
-  int subscriptionId = 1,
+  int tr("System messaging service unavailable")nId = 1,
   bool hasMms = false,
-}) => ThreadSummary(
-  threadId: id,
-  address: address,
+}tr("SMS requires an Android phone")hreadId: itr("Could not complete the action. Try again.")s: address,
   displayName: name,
   preview: body,
   date: date,

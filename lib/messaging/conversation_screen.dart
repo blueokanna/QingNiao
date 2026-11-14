@@ -1,3 +1,4 @@
+import 'package:qingniao/l10n/app_strings.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -181,7 +182,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   Future<void> _schedule() async {
     final body = _body.text.trim();
     if (body.isEmpty) {
-      showAuroraSnack(context, '先写下要定时发送的内容', icon: Icons.schedule_rounded);
+      showAuroraSnack(context, tr("Write a message before scheduling it"), icon: Icons.schedule_rounded);
       return;
     }
     final now = DateTime.now();
@@ -199,7 +200,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     if (time == null || !mounted) return;
     final at = DateTime(date.year, date.month, date.day, time.hour, time.minute);
     if (at.isBefore(DateTime.now())) {
-      showAuroraSnack(context, '请选择一个未来的时间');
+      showAuroraSnack(context, tr("Choose a future time"));
       return;
     }
     try {
@@ -214,7 +215,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       if (mounted) {
         showAuroraSnack(
           context,
-          '将在 ${MessageFormat.dateTime(at.millisecondsSinceEpoch)} 发送',
+          tr("Scheduled for {p0}", [MessageFormat.dateTime(at.millisecondsSinceEpoch)]),
         );
       }
     } catch (error) {
@@ -241,7 +242,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
           for (final sim in _sims)
             AuroraSettingTile(
               title: sim.label,
-              subtitle: sim.carrier.isEmpty ? '发送号码' : sim.carrier,
+              subtitle: sim.carrier.isEmpty ? tr("Sending number") : sim.carrier,
               icon: Icons.sim_card_outlined,
               trailing: sim.id == _simId
                   ? Icon(Icons.check_circle_rounded, color: context.colors.primary, size: 20)
@@ -268,28 +269,28 @@ class _ConversationScreenState extends State<ConversationScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           AuroraSettingTile(
-            title: '复制正文',
+            title: tr("Copy text"),
             icon: Icons.copy_rounded,
             onTap: () => Navigator.pop(context, 'copy'),
           ),
           AuroraSettingTile(
-            title: '转发到输入框',
+            title: tr("Forward to composer"),
             icon: Icons.forward_to_inbox_outlined,
             onTap: () => Navigator.pop(context, 'forward'),
           ),
           AuroraSettingTile(
-            title: '查看详情',
+            title: tr("View details"),
             icon: Icons.info_outline_rounded,
             onTap: () => Navigator.pop(context, 'details'),
           ),
           if (message.isFailed)
             AuroraSettingTile(
-              title: '重新发送',
+              title: tr("Resend"),
               icon: Icons.refresh_rounded,
               onTap: () => Navigator.pop(context, 'retry'),
             ),
           AuroraSettingTile(
-            title: '移入回收站',
+            title: tr("Move to trash"),
             icon: Icons.delete_outline_rounded,
             destructive: true,
             onTap: () => Navigator.pop(context, 'trash'),
@@ -301,7 +302,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     switch (action) {
       case 'copy':
         await Clipboard.setData(ClipboardData(text: message.body));
-        if (mounted) showAuroraSnack(context, '已复制');
+        if (mounted) showAuroraSnack(context, tr("Copied"));
       case 'forward':
         _body.text = message.body;
       case 'details':
@@ -313,7 +314,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         await widget.repository.hide(message.id);
         await _load(silent: true);
         widget.hub.refresh(silent: true);
-        if (mounted) showAuroraSnack(context, '已移入回收站');
+        if (mounted) showAuroraSnack(context, tr("Moved to trash"));
     }
   }
 
@@ -326,27 +327,27 @@ class _ConversationScreenState extends State<ConversationScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('消息详情', style: context.texts.headlineSmall),
+            Text(tr("Message details"), style: context.texts.headlineSmall),
             const SizedBox(height: 12),
-            _detailRow(context, '类型', message.isMms ? '彩信 MMS' : '短信 SMS'),
+            _detailRow(context, tr("Type"), message.isMms ? tr("MMS") : tr("SMS")),
             _detailRow(
               context,
-              '状态',
+              tr("Status"),
               switch (message.delivery) {
-                DeliveryState.delivered => '已送达',
-                DeliveryState.sent => '已发送',
-                DeliveryState.sending => '正在发送',
-                DeliveryState.failed => '发送失败',
-                DeliveryState.none => message.outgoing ? '已发送' : '已接收',
+                DeliveryState.delivered => tr("Delivered"),
+                DeliveryState.sent => tr("Sent"),
+                DeliveryState.sending => tr("Sending"),
+                DeliveryState.failed => tr("Failed to send"),
+                DeliveryState.none => message.outgoing ? tr("Sent") : tr("Received"),
               },
             ),
-            _detailRow(context, '时间', MessageFormat.fullDate(message.date)),
-            _detailRow(context, '号码', message.address),
-            if (message.sender.isNotEmpty) _detailRow(context, '发送者', message.sender),
+            _detailRow(context, tr("Time"), MessageFormat.fullDate(message.date)),
+            _detailRow(context, tr("Number"), message.address),
+            if (message.sender.isNotEmpty) _detailRow(context, tr("Sender"), message.sender),
             if (message.subscriptionId >= 0)
               _detailRow(context, 'SIM', 'SIM ${message.subscriptionId}'),
-            _detailRow(context, '编码', MessageFormat.segment(message.body).encoding),
-            _detailRow(context, '字数', '${message.body.length}'),
+            _detailRow(context, tr("Encoding"), MessageFormat.segment(message.body).encoding),
+            _detailRow(context, tr("Character count"), '${message.body.length}'),
           ],
         ),
       ),
@@ -380,23 +381,23 @@ class _ConversationScreenState extends State<ConversationScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           AuroraSettingTile(
-            title: '会话详情',
-            subtitle: '${MessageFormat.phone(widget.thread.address)} · ${_messages.length} 条已加载',
+            title: tr("Conversation details"),
+            subtitle: tr("{p0} \u00b7 Loaded messages: {p1}", [MessageFormat.phone(widget.thread.address), _messages.length]),
             icon: Icons.info_outline_rounded,
             onTap: () => Navigator.pop(context, 'details'),
           ),
           AuroraSettingTile(
-            title: '屏蔽此号码',
+            title: tr("Block this number"),
             icon: Icons.block_rounded,
             onTap: () => Navigator.pop(context, 'block'),
           ),
           AuroraSettingTile(
-            title: '归档会话',
+            title: tr("Archive conversation"),
             icon: Icons.archive_outlined,
             onTap: () => Navigator.pop(context, 'archive'),
           ),
           AuroraSettingTile(
-            title: '打开回收站',
+            title: tr("Open trash"),
             icon: Icons.delete_outline_rounded,
             onTap: () => Navigator.pop(context, 'trash'),
           ),
@@ -407,7 +408,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     switch (action) {
       case 'block':
         await widget.hub.block(widget.thread.address);
-        if (mounted) showAuroraSnack(context, '已屏蔽此号码');
+        if (mounted) showAuroraSnack(context, tr("Number blocked"));
       case 'archive':
         await widget.hub.archive(widget.thread.threadId, true);
         if (mounted) Navigator.maybePop(context);
@@ -423,12 +424,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
           builder: (context) => Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('会话详情', style: context.texts.headlineSmall),
+              Text(tr("Conversation details"), style: context.texts.headlineSmall),
               const SizedBox(height: 12),
-              _detailRow(context, '号码', widget.thread.address),
-              _detailRow(context, '名称', widget.thread.title),
-              _detailRow(context, '会话 ID', '${widget.thread.threadId}'),
-              _detailRow(context, '消息数', '${_messages.length}'),
+              _detailRow(context, tr("Number"), widget.thread.address),
+              _detailRow(context, tr("Name"), widget.thread.title),
+              _detailRow(context, tr("Conversation ID"), '${widget.thread.threadId}'),
+              _detailRow(context, tr("Messages"), '${_messages.length}'),
             ],
           ),
         );
@@ -445,18 +446,18 @@ class _ConversationScreenState extends State<ConversationScreen> {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     setState(() => _selected.clear());
-    showAuroraSnack(context, '已复制 $count 条');
+    showAuroraSnack(context, tr("Copied: {p0}", [count]));
   }
 
   Future<void> _bulkDelete() async {
     final count = _selected.length;
     final confirmed = await showAuroraDialog<bool>(
       context: context,
-      title: Text('移入回收站 $count 条消息？'),
-      content: const Text('可以在回收站中恢复，保留期结束后自动清理。'),
+      title: Text(tr("Move messages to trash: {p0}?", [count])),
+      content:  Text(tr("You can restore these messages until the retention period ends.")),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('移入回收站')),
+        TextButton(onPressed: () => Navigator.pop(context, false), child:  Text(tr("Cancel"))),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child:  Text(tr("Move to trash"))),
       ],
     );
     if (confirmed != true) return;
@@ -499,7 +500,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                           cacheWidth: 1600,
                           errorBuilder: (_, _, _) => Padding(
                             padding: const EdgeInsets.all(32),
-                            child: Text('无法解码图片：${attachment.name}'),
+                            child: Text(tr("Unable to decode image: {p0}", [attachment.name])),
                           ),
                         ),
                       ),
@@ -553,12 +554,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       ),
                       title: widget.thread.title,
                       subtitle: widget.thread.isGroup
-                          ? '${widget.thread.recipients.length} 位收件人'
+                          ? tr("Recipients: {p0}", [widget.thread.recipients.length])
                           : MessageFormat.phone(widget.thread.address),
                       actions: [
                         AuroraIconButton(
                           icon: Icons.more_horiz_rounded,
-                          tooltip: '会话操作',
+                          tooltip: tr("Conversation actions"),
                           onPressed: _headerActions,
                         ),
                       ],
@@ -572,10 +573,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   if (_loading)
                     const Center(child: AuroraLoading())
                   else if (_messages.isEmpty)
-                    const Center(
+                     Center(
                       child: AuroraEmpty(
-                        title: '从一句问候开始',
-                        message: '这段对话还没有消息。',
+                        title: tr("Start with a hello"),
+                        message: tr("No messages in this conversation yet."),
                         icon: Icons.waving_hand_outlined,
                         size: 108,
                       ),
@@ -594,7 +595,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                           return Center(
                             child: TextButton(
                               onPressed: _paging ? null : () => _load(older: true),
-                              child: Text(_paging ? '正在加载…' : '加载更早的消息'),
+                              child: Text(_paging ? tr("Loading\u2026") : tr("Load earlier messages")),
                             ),
                           );
                         }
@@ -639,7 +640,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       bottom: 16,
                       child: AuroraIconButton(
                         icon: Icons.keyboard_double_arrow_down_rounded,
-                        tooltip: '回到底部',
+                        tooltip: tr("Jump to latest"),
                         onPressed: () => _scroll.animateTo(
                           0,
                           duration: const Duration(milliseconds: 360),
@@ -672,7 +673,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       ),
                     ),
                     IconButton(
-                      tooltip: '移除附件',
+                      tooltip: tr("Remove attachment"),
                       onPressed: () => setState(() => _attachment = null),
                       icon: const Icon(Icons.close_rounded, size: 18),
                     ),
@@ -710,7 +711,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         break;
       }
     }
-    return sim == null ? '选择 SIM' : 'SIM ${sim.slot} · ${sim.name}';
+    return sim == null ? tr("Choose SIM") : 'SIM ${sim.slot} · ${sim.name}';
   }
 
   Widget _selectionBar(BuildContext context) {
@@ -721,18 +722,18 @@ class _ConversationScreenState extends State<ConversationScreen> {
         icon: Icons.close_rounded,
         onPressed: () => setState(() => _selected.clear()),
       ),
-      title: '已选 ${_selected.length} 条',
-      subtitle: '复制或移入回收站',
+      title: tr("Selected: {p0}", [_selected.length]),
+      subtitle: tr("Copy or move to trash"),
       actions: [
         AuroraIconButton(
           icon: Icons.copy_rounded,
-          tooltip: '复制',
+          tooltip: tr("Copy"),
           onPressed: _selected.isEmpty ? null : _bulkCopy,
         ),
         const SizedBox(width: 4),
         AuroraIconButton(
           icon: Icons.delete_outline_rounded,
-          tooltip: '移入回收站',
+          tooltip: tr("Move to trash"),
           onPressed: _selected.isEmpty ? null : _bulkDelete,
           color: context.colors.error,
         ),

@@ -16,6 +16,8 @@ Flutter 负责界面与流体动效，Kotlin 对接系统短信服务，Rust 承
 | 🔐 | **验证码中心** | Rust 保守解析（UTF-16 高亮），独立标签页一键复制；正文不上传 |
 | 🖼️ | **彩信** | 系统 `SmsManager` + `android-smsmms` 收发、附件预览；Rust MMS PDU 编解码 |
 | 🔔 | **通知直回** | 通知栏直接回复、标记已读、按 SIM 分渠道、会话分组 |
+| 🌊 | **流体云 / Live Updates** | ColorOS 16 走 Android 16 Live Updates；旧版 ColorOS 回退高优先级通知 |
+| ⚡ | **短信原生唤醒** | `SMS_DELIVER` / `SMS_RECEIVED` 系统广播唤醒，通知先行，不依赖 FCM |
 | 🗑️ | **可恢复回收站** | 7 / 30 / 90 天或永久；恢复与永久删除均二次确认 |
 | 🕒 | **定时发送** | `AlarmManager` 精确闹钟，权限不足时自动降级 |
 | 🎨 | **Material 3 Expressive** | 头像 / FAB / 发送键 / 气泡在 `circle ↔ cookie / sunny` 间连续形变 |
@@ -108,6 +110,9 @@ flutter build apk --debug
 - MMS PDU 仅实现 M-Retrieve.conf 子集；GB2312 文本离线解码为尽力而为。
 - 同步目前为手动触发；后台长轮询 / JobScheduler 兜底与备份导入仍在路线图中。
 - 搜索索引在内存中重建；超大短信库只索引前 4k 字符/条。
+- 流体云：ColorOS 16.1 可走标准 Live Updates；ColorOS 15 及更早需要 OPPO
+  Seedling SDK 审核与 `serviceId`，无法应用侧自助接入。详见
+  [docs/FLUID-CLOUD.md](docs/FLUID-CLOUD.md)。
 
 ## 目录
 

@@ -1,7 +1,8 @@
+import 'package:qingniao/l10n/app_strings.dart';
 import 'dart:math' as math;
 
 abstract final class MessageFormat {
-  static const _weekdays = ['一', '二', '三', '四', '五', '六', '日'];
+  static final _weekdays = [tr("Monday"), tr("Tuesday"), tr("Wednesday"), tr("Thursday"), tr("Friday"), tr("Saturday"), tr("Sunday")];
 
   static String time(int millis) {
     final date = DateTime.fromMillisecondsSinceEpoch(millis);
@@ -13,44 +14,44 @@ abstract final class MessageFormat {
     final now = DateTime.now();
     if (_sameDay(date, now)) return time(millis);
     final yesterday = now.subtract(const Duration(days: 1));
-    if (_sameDay(date, yesterday)) return '昨天';
-    if (date.year == now.year) return '${date.month}月${date.day}日';
+    if (_sameDay(date, yesterday)) return tr("Yesterday");
+    if (date.year == now.year) return tr("{p0}/{p1}", [date.month, date.day]);
     return '${date.year}/${date.month}/${date.day}';
   }
 
   static String todayLabel() {
     final now = DateTime.now();
-    return '${now.month} 月 ${now.day} 日 · 周${_weekdays[now.weekday - 1]}';
+    return tr("{p0}/{p1} \u00b7 {p2}", [now.month, now.day, _weekdays[now.weekday - 1]]);
   }
 
   static String dayLabel(int millis) {
     final date = DateTime.fromMillisecondsSinceEpoch(millis);
     final now = DateTime.now();
-    if (_sameDay(date, now)) return '今天';
-    if (_sameDay(date, now.subtract(const Duration(days: 1)))) return '昨天';
-    if (now.difference(date).inDays < 7) return '周${_weekdays[date.weekday - 1]}';
-    if (date.year == now.year) return '${date.month}月${date.day}日';
-    return '${date.year}年${date.month}月${date.day}日';
+    if (_sameDay(date, now)) return tr("Today");
+    if (_sameDay(date, now.subtract(const Duration(days: 1)))) return tr("Yesterday");
+    if (now.difference(date).inDays < 7) return tr("{p0}", [_weekdays[date.weekday - 1]]);
+    if (date.year == now.year) return tr("{p0}/{p1}", [date.month, date.day]);
+    return tr("{p0}/{p1}/{p2}", [date.year, date.month, date.day]);
   }
 
   static String dateTime(int millis) {    final date = DateTime.fromMillisecondsSinceEpoch(millis);
-    return '${date.month}月${date.day}日 ${time(millis)}';
+    return tr("{p0}/{p1} {p2}", [date.month, date.day, time(millis)]);
   }
 
   static String fullDate(int millis) {
     final date = DateTime.fromMillisecondsSinceEpoch(millis);
-    return '${date.year}年${date.month}月${date.day}日 ${time(millis)}';
+    return tr("{p0}/{p1}/{p2} {p3}", [date.year, date.month, date.day, time(millis)]);
   }
 
   static String duration(int millis) {
-    if (millis < 1000) return '刚刚';
+    if (millis < 1000) return tr("Just now");
     final seconds = millis ~/ 1000;
-    if (seconds < 60) return '$seconds 秒前';
+    if (seconds < 60) return tr("Seconds ago: {p0}", [seconds]);
     final minutes = seconds ~/ 60;
-    if (minutes < 60) return '$minutes 分钟前';
+    if (minutes < 60) return tr("Minutes ago: {p0}", [minutes]);
     final hours = minutes ~/ 60;
-    if (hours < 24) return '$hours 小时前';
-    return '${hours ~/ 24} 天前';
+    if (hours < 24) return tr("Hours ago: {p0}", [hours]);
+    return tr("Days ago: {p0}", [hours ~/ 24]);
   }
 
   static String phone(String address) {
@@ -154,5 +155,5 @@ class SegmentInfo {
   final int remaining;
   final int perSegment;
 
-  String get label => '$segments 条 · $encoding · 余 $remaining 字';
+  String get label => tr("Segments: {p0} \u00b7 {p1} \u00b7 Remaining: {p2}", [segments, encoding, remaining]);
 }

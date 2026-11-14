@@ -6,20 +6,20 @@ import '../design/android_palette.dart';
 import '../design/bundled_fonts.dart';
 
 abstract final class AuroraPalettes {
-  static const jade = Color(0xFF0E7C6B);
-  static const aurora = Color(0xFF5B6CFF);
-  static const lagoon = Color(0xFF1677A8);
-  static const dawn = Color(0xFFB45A34);
-  static const plum = Color(0xFF8E4EC6);
-  static const graphite = Color(0xFF4B5563);
+  static const jade = Color(0xFF00907F);
+  static const aurora = Color(0xFF4D5FAB);
+  static const lagoon = Color(0xFF007CB7);
+  static const dawn = Color(0xFFF37121);
+  static const plum = Color(0xFF6352A2);
+  static const graphite = Color(0xFF5A5B5E);
 
   static const seeds = <String, Color>{
-    '青碧': jade,
-    '极光': aurora,
-    '湖水': lagoon,
-    '晨曦': dawn,
-    '梅子': plum,
-    '石墨': graphite,
+    'PANTONE 3295 C': jade,
+    'PANTONE 2725 C': aurora,
+    'PANTONE 3015 C': lagoon,
+    'PANTONE 1665 C': dawn,
+    'PANTONE 2587 C': plum,
+    'PANTONE Cool Gray 11 C': graphite,
   };
 }
 
@@ -206,6 +206,12 @@ ThemeData buildAuroraTheme({
     dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
   );
   final dark = brightness == Brightness.dark;
+  if (!appearance.useDynamic) {
+    final luminance = seed.computeLuminance();
+    final foreground = (luminance + .05) / .05 >= 1.05 / (luminance + .05)
+        ? Colors.black : Colors.white;
+    scheme = scheme.copyWith(primary: seed, onPrimary: foreground);
+  }
   if (appearance.useDynamic) {
     scheme = appearance.systemPalette?.applyTo(scheme) ?? scheme;
   }
