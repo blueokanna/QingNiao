@@ -1,4 +1,3 @@
-import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../aurora/aurora_widgets.dart';
@@ -59,7 +58,7 @@ class _DeviceCompatibilityScreenState extends State<DeviceCompatibilityScreen>
       });
     } catch (_) {
       if (mounted && request == _request) {
-        setState(() => _error = tr("Unable to read device status. Try again."));
+        setState(() => _error = '无法读取设备状态，请重试');
       }
     } finally {
       if (mounted && request == _request) setState(() => _loading = false);
@@ -70,21 +69,21 @@ class _DeviceCompatibilityScreenState extends State<DeviceCompatibilityScreen>
     try {
       await widget.repository.invoke<void>(method);
     } catch (_) {
-      if (mounted) showAuroraSnack(context, tr("This settings page is unavailable. Open App info in system settings."));
+      if (mounted) showAuroraSnack(context, '系统未提供此设置入口，请从系统设置打开应用信息');
     }
   }
 
   Widget _status(
     String label,
     bool? enabled, {
-    String yes = "Enabled",
-    String no = "Disabled",
+    String yes = '已开启',
+    String no = '未开启',
   }) {
     return ListTile(
       title: Text(label),
       subtitle: Text(
         enabled == null
-            ? tr("Unavailable")
+            ? '无法读取'
             : enabled
             ? yes
             : no,
@@ -102,10 +101,10 @@ class _DeviceCompatibilityScreenState extends State<DeviceCompatibilityScreen>
     final manufacturer = (device['manufacturer'] as String? ?? '')
         .toLowerCase();
     final guidance = switch (manufacturer) {
-      'oneplus' || 'oppo' || 'realme' => tr("ColorOS and OxygenOS may restrict background tasks. If tasks are delayed, check background activity, startup and notification settings. Menu names vary by system version."),
+      'oneplus' || 'oppo' || 'realme' => 'ColorOS / OxygenOS 的后台管理可能影响同步和定时任务。若任务延迟，请检查应用的后台活动、自启动和通知设置；菜单名称随系统版本变化。',
       'xiaomi' || 'redmi' || 'poco' =>
-        tr("HyperOS and MIUI may restrict background tasks. If tasks are delayed, check battery, startup and notification settings. Menu names vary by system version."),
-      _ => tr("Battery and background restrictions may delay tasks. SMS and MMS also depend on permissions, SIM status and carrier configuration."),
+        'HyperOS / MIUI 的省电策略可能影响同步和定时任务。若任务延迟，请检查应用省电、自启动和通知设置；菜单名称随系统版本变化。',
+      _ => '后台限制和省电模式可能影响同步及定时任务。短信与彩信还取决于默认短信角色、SIM 状态和运营商配置。',
     };
     return AuroraScaffold(
       body: SafeArea(
@@ -115,10 +114,10 @@ class _DeviceCompatibilityScreenState extends State<DeviceCompatibilityScreen>
             Row(
               children: [
                 const BackButton(),
-                 Expanded(child: Text(tr("Device diagnostics"))),
+                const Expanded(child: Text('设备与权限诊断')),
                 IconButton(
                   onPressed: _loading ? null : _refresh,
-                  tooltip: tr("Refresh"),
+                  tooltip: '刷新',
                   icon: const Icon(Icons.refresh),
                 ),
               ],
@@ -132,37 +131,37 @@ class _DeviceCompatibilityScreenState extends State<DeviceCompatibilityScreen>
               ),
               Text('Android API ${device['sdk']} · com.blue.qingniao'),
               const SizedBox(height: 16),
-              _status(tr("Default SMS role"), access['defaultApp'] as bool?),
-              _status(tr("Read SMS"), access['readSms'] as bool?),
-              _status(tr("Receive SMS"), access['receiveSms'] as bool?),
-              _status(tr("Send SMS"), access['sendSms'] as bool?),
-              _status(tr("System notifications"), device['notificationsEnabled'] as bool?),
+              _status('默认短信角色', access['defaultApp'] as bool?),
+              _status('读取短信', access['readSms'] as bool?),
+              _status('接收短信', access['receiveSms'] as bool?),
+              _status('发送短信', access['sendSms'] as bool?),
+              _status('系统通知', device['notificationsEnabled'] as bool?),
               _status(
-                tr("Background restriction"),
+                '后台运行限制',
                 device['batteryRestricted'] as bool?,
-                yes: tr("Background activity is restricted"),
-                no: tr("No background restriction reported"),
+                yes: '系统正在限制后台运行',
+                no: '系统未报告后台限制',
               ),
-              _status(tr("Battery saver"), device['powerSaveMode'] as bool?),
+              _status('省电模式', device['powerSaveMode'] as bool?),
               const SizedBox(height: 16),
               Text(guidance),
               const SizedBox(height: 12),
-               Text(tr("These are system-reported settings, not evidence of carrier or device compatibility testing.")),
+              const Text('此页显示系统报告的状态，不代表已经通过该机型或运营商的收发测试。'),
             ],
             const SizedBox(height: 20),
             FilledButton.tonal(
               onPressed: () => _open('appSettings'),
-              child:  Text(tr("App permissions and background settings")),
+              child: const Text('应用权限与后台设置'),
             ),
             const SizedBox(height: 8),
             OutlinedButton(
               onPressed: () => _open('notificationSettings'),
-              child:  Text(tr("Notification settings")),
+              child: const Text('通知设置'),
             ),
             const SizedBox(height: 8),
             OutlinedButton(
               onPressed: () => _open('batterySettings'),
-              child:  Text(tr("Battery optimization")),
+              child: const Text('电池优化设置'),
             ),
           ],
         ),

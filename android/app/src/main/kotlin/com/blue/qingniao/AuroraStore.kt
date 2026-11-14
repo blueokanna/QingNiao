@@ -144,6 +144,15 @@ class AuroraStore(context: Context) : SQLiteOpenHelper(context, "aurora.db", nul
         arrayOf(address),
     ).use { if (it.moveToFirst()) it.getString(0) else "" }
 
+    fun draftsAll(): List<Pair<String, String>> = readableDatabase.rawQuery(
+        "SELECT address,body FROM drafts",
+        null,
+    ).use { cursor ->
+        buildList {
+            while (cursor.moveToNext()) add(cursor.getString(0) to cursor.getString(1))
+        }
+    }
+
     fun saveDraft(address: String, body: String) {
         if (body.isBlank()) {
             writableDatabase.delete("drafts", "address=?", arrayOf(address))

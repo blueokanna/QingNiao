@@ -1,4 +1,3 @@
-import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../app/app_settings.dart';
@@ -22,7 +21,7 @@ class AppearanceScreen extends StatelessWidget {
           physics: const BouncingScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
-              child: AuroraTopBar(title: tr("Appearance"), subtitle: tr("Changes apply immediately")),
+              child: AuroraTopBar(title: '外观', subtitle: '改动即时生效'),
             ),
             SliverToBoxAdapter(
               child: Padding(
@@ -34,7 +33,7 @@ class AppearanceScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        tr("Preview"),
+                        '实时预览',
                         style: context.texts.labelSmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                           letterSpacing: .8,
@@ -43,9 +42,9 @@ class AppearanceScreen extends StatelessWidget {
                       const SizedBox(height: 8),
                       _PreviewBubble(
                         outgoing: false,
-                        text: tr("Are we still meeting tonight?"),
+                        text: '今晚的极光，像一条慢慢展开的短信。',
                       ),
-                      _PreviewBubble(outgoing: true, text: tr("Yes, see you there.")),
+                      _PreviewBubble(outgoing: true, text: '那就把这条留在青鸟里。'),
                     ],
                   ),
                 ),
@@ -53,11 +52,11 @@ class AppearanceScreen extends StatelessWidget {
             ),
             SliverToBoxAdapter(
               child: AuroraSection(
-                title: tr("Theme"),
+                title: '主题',
                 children: [
                   AuroraSettingTile(
-                    title: tr("AMOLED black"),
-                    subtitle: tr("Use dark mode with a black background and no background glow"),
+                    title: 'AMOLED 纯黑',
+                    subtitle: '启用深色与纯黑背景，关闭背景光效',
                     icon: Icons.nightlight_outlined,
                     trailing: Switch(
                       value: settings.amoled,
@@ -71,12 +70,12 @@ class AppearanceScreen extends StatelessWidget {
                     ),
                     child: DropdownButtonFormField<String>(
                       initialValue: settings.fontFamily,
-                      decoration:  InputDecoration(labelText: tr("Font")),
-                      items:  [
-                        DropdownMenuItem(value: 'system', child: Text(tr("System font"))),
+                      decoration: const InputDecoration(labelText: '界面字体'),
+                      items: const [
+                        DropdownMenuItem(value: 'system', child: Text('系统字体')),
                         DropdownMenuItem(
                           value: 'harmony',
-                          child: Text(tr("HarmonyOS Sans")),
+                          child: Text('HarmonyOS Sans · 鸿蒙'),
                         ),
                         DropdownMenuItem(
                           value: 'google',
@@ -91,26 +90,26 @@ class AppearanceScreen extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      tr("Includes HarmonyOS Sans and Google Sans. Other scripts use system font fallback."),
+                      '内置 HarmonyOS Sans 与 Google Sans；Google Sans 的中文使用鸿蒙字体回退。',
                       style: context.texts.bodySmall,
                     ),
                   ),
                   TextButton(
                     onPressed: () => showLicensePage(
                       context: context,
-                      applicationName: tr("Qingniao"),
+                      applicationName: '青鸟短信',
                     ),
-                    child:  Text(tr("Font licenses")),
+                    child: const Text('字体许可与开源声明'),
                   ),
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: DropdownButtonFormField<String>(
                       initialValue: settings.launcherIcon,
-                      decoration:  InputDecoration(labelText: tr("App icon")),
-                      items:  [
-                        DropdownMenuItem(value: 'bird', child: Text(tr("Bird"))),
-                        DropdownMenuItem(value: 'leaf', child: Text(tr("Leaf"))),
-                        DropdownMenuItem(value: 'chat', child: Text(tr("Personal"))),
+                      decoration: const InputDecoration(labelText: '桌面图标'),
+                      items: const [
+                        DropdownMenuItem(value: 'bird', child: Text('青鸟')),
+                        DropdownMenuItem(value: 'leaf', child: Text('新叶')),
+                        DropdownMenuItem(value: 'chat', child: Text('对话')),
                       ],
                       onChanged: (value) async {
                         if (value == null) return;
@@ -119,7 +118,7 @@ class AppearanceScreen extends StatelessWidget {
                         } catch (_) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                               SnackBar(content: Text(tr("Unable to change the app icon. Try again."))),
+                              const SnackBar(content: Text('桌面图标切换失败，请重试')),
                             );
                           }
                         }
@@ -139,20 +138,20 @@ class AppearanceScreen extends StatelessWidget {
                         'dark' => AuroraThemePreference.dark,
                         _ => AuroraThemePreference.system,
                       }),
-                      items:  [
-                        AuroraFilterItem('system', tr("System default")),
-                        AuroraFilterItem('light', tr("Light")),
-                        AuroraFilterItem('dark', tr("Dark")),
+                      items: const [
+                        AuroraFilterItem('system', '跟随系统'),
+                        AuroraFilterItem('light', '浅色'),
+                        AuroraFilterItem('dark', '深色'),
                       ],
                     ),
                   ),
                   AuroraSettingTile(
-                    title: tr("Wallpaper colors"),
+                    title: 'Material You 动态取色',
                     subtitle: settings.systemSeed == null
-                        ? tr("System accent colors are unavailable")
+                        ? '当前设备未提供系统强调色'
                         : settings.useDynamic
-                        ? tr("Using wallpaper colors")
-                        : tr("Using reference palette"),
+                        ? '已跟随壁纸'
+                        : '使用品牌色',
                     icon: Icons.colorize_outlined,
                     trailing: Switch(
                       value: settings.useDynamic,
@@ -166,7 +165,7 @@ class AppearanceScreen extends StatelessWidget {
             ),
             SliverToBoxAdapter(
               child: AuroraSection(
-                title: tr("Reference palette"),
+                title: '色板',
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
@@ -194,7 +193,7 @@ class AppearanceScreen extends StatelessWidget {
             ),
             SliverToBoxAdapter(
               child: AuroraSection(
-                title: tr("Bubbles and shapes"),
+                title: '气泡与形状',
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
@@ -209,16 +208,16 @@ class AppearanceScreen extends StatelessWidget {
                         'cookie' => AuroraBubbleStyle.cookie,
                         _ => AuroraBubbleStyle.soft,
                       }),
-                      items:  [
-                        AuroraFilterItem('soft', tr("Soft")),
-                        AuroraFilterItem('capsule', tr("Capsule")),
-                        AuroraFilterItem('cookie', tr("Cookie")),
+                      items: const [
+                        AuroraFilterItem('soft', '柔和'),
+                        AuroraFilterItem('capsule', '胶囊'),
+                        AuroraFilterItem('cookie', '饼干'),
                       ],
                     ),
                   ),
                   AuroraSettingTile(
-                    title: tr("Shape transitions"),
-                    subtitle: tr("Avatars and indicators change shape with their state"),
+                    title: '形状形变',
+                    subtitle: '头像与指示器在状态变化时连续形变',
                     icon: Icons.auto_awesome_mosaic_outlined,
                     trailing: Switch(
                       value: settings.morphShapes,
@@ -230,7 +229,7 @@ class AppearanceScreen extends StatelessWidget {
             ),
             SliverToBoxAdapter(
               child: AuroraSection(
-                title: tr("Motion and typography"),
+                title: '动效与排版',
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
@@ -245,15 +244,15 @@ class AppearanceScreen extends StatelessWidget {
                         'reduced' => AuroraMotionLevel.reduced,
                         _ => AuroraMotionLevel.full,
                       }),
-                      items:  [
-                        AuroraFilterItem('full', tr("Full")),
-                        AuroraFilterItem('balanced', tr("Balanced")),
-                        AuroraFilterItem('reduced', tr("Reduced")),
+                      items: const [
+                        AuroraFilterItem('full', '全速'),
+                        AuroraFilterItem('balanced', '平衡'),
+                        AuroraFilterItem('reduced', '省电'),
                       ],
                     ),
                   ),
                   AuroraSettingTile(
-                    title: tr("Text size"),
+                    title: '字体大小',
                     subtitle: '${(settings.fontScale * 100).round()}%',
                     icon: Icons.text_fields_rounded,
                     trailing: SizedBox(
@@ -268,8 +267,8 @@ class AppearanceScreen extends StatelessWidget {
                     ),
                   ),
                   AuroraSettingTile(
-                    title: tr("Reduce background effects"),
-                    subtitle: tr("Limit background complexity and frame rate"),
+                    title: '省电极光',
+                    subtitle: '限制背景光团数量与帧率',
                     icon: Icons.battery_saver_outlined,
                     trailing: Switch(
                       value: settings.lowPowerAurora,

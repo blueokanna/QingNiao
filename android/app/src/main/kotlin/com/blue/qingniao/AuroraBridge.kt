@@ -36,6 +36,11 @@ class AuroraBridge(private val activity: Activity) {
     private val prefs by lazy { context.getSharedPreferences("appearance", Context.MODE_PRIVATE) }
     private val syncPrefs by lazy { context.getSharedPreferences("aurora_sync", Context.MODE_PRIVATE) }
     @Volatile private var contactsCache: Pair<Long, Map<String, String>>? = null
+    private var pendingImport: MethodChannel.Result? = null
+
+    companion object {
+        private const val REQUEST_IMPORT = 75
+    }
 
     fun handle(call: MethodCall, result: MethodChannel.Result): Boolean {
         if (call.method !in methods) return false
@@ -75,7 +80,24 @@ class AuroraBridge(private val activity: Activity) {
                     result.success(null)
                 }
                 "exportBackup" -> result.success(exportBackup())
-                "importBackup" -> result.success(false)
+                "importBackup" -> {
+                    if (pendingImport != null) {
+                        result.error("busy", "正在选择备份文件", null)
+                    } else {
+                        pendingImport = result
+                        try {
+                            activity.startActivityForResult(
+                                Intent(Intent.ACTION_OPEN_DOCUMENT)
+                                    .addCategory(Intent.CATEGORY_OPENABLE)
+                                    .setType("application/json"),
+                                REQUEST_IMPORT,
+                            )
+                        } catch (error: Exception) {
+                            pendingImport = null
+                            result.error("unavailable", "设备没有可用的文件选择器", null)
+                        }
+                    }
+                }
                 else -> {
                     MessageIo.executor.execute {
                         try {
@@ -105,6 +127,33 @@ class AuroraBridge(private val activity: Activity) {
             result.error("message_operation_failed", message, null)
             return true
         }
+    }
+
+    fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if (requestCode != REQUEST_IMPORT) return false
+        val result = pendingImport ?: return true
+        pendingImport = null
+        val uri = data?.data
+        if (resultCode != Activity.RESULT_OK || uri == null) {
+            result.success(false)
+            return true
+        }
+        MessageIo.executor.execute {
+            try {
+                val imported = importBackup(uri)
+                handler.post { result.success(imported) }
+            } catch (error: Exception) {
+                handler.post {
+                    result.error("import_failed", error.message ?: "备份导入失败", null)
+                }
+            }
+        }
+        return true
+    }
+
+    fun cancelPending() {
+        pendingImport?.error("activity_closed", "导入已取消", null)
+        pendingImport = null
     }
 
     private fun work(call: MethodCall): Any? {
@@ -773,6 +822,111 @@ class AuroraBridge(private val activity: Activity) {
         null,
     )?.use { it.count } ?: 0
 
+    private fun importBackup(uri: Uri): Boolean {
+        check(Telephony.Sms.getDefaultSmsPackage(context) == context.packageName) {
+            "请先设为默认短信应用再恢复备份"
+        }
+        val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+            val output = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(64 * 1024)
+            var total = 0
+            while (true) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                total += read
+                require(total <= 32 * 1024 * 1024) { "备份文件超过 32 MB" }
+                output.write(buffer, 0, read)
+            }
+            output.toByteArray()
+        } ?: return false
+        if (bytes.isEmpty()) return false
+        val root = JSONObject(String(bytes, Charsets.UTF_8))
+
+        val existing = HashSet<String>()
+        context.contentResolver.query(
+            Telephony.Sms.CONTENT_URI,
+            arrayOf("address", "date", "body"),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                existing.add(
+                    backupKey(cursor.getString(0), cursor.getLong(1), cursor.getString(2)),
+                )
+            }
+        }
+
+        var inserted = 0
+        AuroraStore(context).use { store ->
+            root.optJSONArray("messages")?.let { messages ->
+                val count = minOf(messages.length(), 20_000)
+                for (index in 0 until count) {
+                    val message = messages.optJSONObject(index) ?: continue
+                    val address = message.optString("address").trim()
+                    val body = message.optString("body")
+                    val date = message.optLong("date", 0)
+                    val type = message.optInt("type", 1)
+                    if (address.isEmpty() || date <= 0 || type !in 1..2) continue
+                    if (!existing.add(backupKey(address, date, body))) continue
+                    val values = ContentValues().apply {
+                        put("address", address)
+                        put("body", body)
+                        put("date", date)
+                        put("date_sent", date)
+                        put("type", type)
+                        put("read", if (message.optBoolean("read", true)) 1 else 0)
+                        put("seen", 1)
+                        val subscription = message.optInt("subscriptionId", -1)
+                        if (subscription >= 0) put("sub_id", subscription)
+                    }
+                    try {
+                        if (context.contentResolver.insert(Telephony.Sms.CONTENT_URI, values) != null) {
+                            inserted += 1
+                        }
+                    } catch (_: Exception) {
+                        // 某条损坏不影响其余记录。
+                    }
+                }
+            }
+
+            root.optJSONArray("blocked")?.let { blocked ->
+                for (index in 0 until minOf(blocked.length(), 5_000)) {
+                    val entry = blocked.optJSONObject(index) ?: continue
+                    val address = entry.optString("address").trim()
+                    if (address.isNotEmpty()) store.block(address, entry.optString("note"))
+                }
+            }
+
+            root.optJSONArray("drafts")?.let { drafts ->
+                for (index in 0 until minOf(drafts.length(), 5_000)) {
+                    val entry = drafts.optJSONObject(index) ?: continue
+                    val address = entry.optString("address").trim()
+                    if (address.isNotEmpty()) store.saveDraft(address, entry.optString("body"))
+                }
+            }
+
+            root.optJSONArray("threadState")?.let { states ->
+                for (index in 0 until minOf(states.length(), 5_000)) {
+                    val entry = states.optJSONObject(index) ?: continue
+                    val address = entry.optString("address").trim()
+                    if (address.isEmpty()) continue
+                    val threadId = try {
+                        Telephony.Threads.getOrCreateThreadId(context, address)
+                    } catch (_: Exception) {
+                        continue
+                    }
+                    if (entry.optBoolean("pinned", false)) store.setPinned(threadId, true)
+                    if (entry.optBoolean("archived", false)) store.setArchived(threadId, true)
+                }
+            }
+        }
+        return inserted >= 0
+    }
+
+    private fun backupKey(address: String?, date: Long, body: String?): String =
+        "${address.orEmpty()}|$date|${body.orEmpty().hashCode()}"
+
     private fun exportBackup(): Boolean {
         val payload = JSONObject().apply {
             put("version", 1)
@@ -803,6 +957,42 @@ class AuroraBridge(private val activity: Activity) {
                             put("read", cursor.getInt(6) != 0)
                             put("subscriptionId", cursor.getInt(7))
                         })
+                    }
+                }
+            })
+            put("drafts", JSONArray().apply {
+                AuroraStore(context).use { store ->
+                    store.draftsAll().forEach { (address, body) ->
+                        put(JSONObject().apply {
+                            put("address", address)
+                            put("body", body)
+                        })
+                    }
+                }
+            })
+            put("threadState", JSONArray().apply {
+                val addresses = HashMap<Long, String>()
+                context.contentResolver.query(
+                    Telephony.Sms.CONTENT_URI,
+                    arrayOf("thread_id", "address"),
+                    null,
+                    null,
+                    null,
+                )?.use { cursor ->
+                    while (cursor.moveToNext()) {
+                        addresses.putIfAbsent(cursor.getLong(0), cursor.getString(1) ?: "")
+                    }
+                }
+                AuroraStore(context).use { store ->
+                    store.states().forEach { (threadId, state) ->
+                        val address = addresses[threadId]
+                        if (!address.isNullOrEmpty()) {
+                            put(JSONObject().apply {
+                                put("address", address)
+                                put("pinned", state.pinned)
+                                put("archived", state.archived)
+                            })
+                        }
                     }
                 }
             })

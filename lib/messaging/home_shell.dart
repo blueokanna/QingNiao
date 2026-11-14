@@ -1,4 +1,3 @@
-import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../aurora/aurora_widgets.dart';
@@ -67,7 +66,7 @@ class _HomeShellState extends State<HomeShell> {
                   padding: const EdgeInsets.only(bottom: 4),
                   child: AuroraFab(
                     icon: Icons.edit_rounded,
-                    tooltip: tr("Compose"),
+                    tooltip: '写短信',
                     onTap: _compose,
                   ),
                 )
@@ -83,19 +82,19 @@ class _HomeShellState extends State<HomeShell> {
                 AuroraNavDestination(
                   icon: Icons.forum_outlined,
                   selectedIcon: Icons.forum_rounded,
-                  label: tr("Messages"),
+                  label: '消息',
                   badge: hub.unread,
                 ),
                 AuroraNavDestination(
                   icon: Icons.shield_outlined,
                   selectedIcon: Icons.shield_rounded,
-                  label: tr("Verification codes"),
+                  label: '验证码',
                   badge: hub.otpCount,
                 ),
-                 AuroraNavDestination(
+                const AuroraNavDestination(
                   icon: Icons.tune_rounded,
                   selectedIcon: Icons.tune_rounded,
-                  label: tr("Settings"),
+                  label: '设置',
                 ),
               ],
             ),

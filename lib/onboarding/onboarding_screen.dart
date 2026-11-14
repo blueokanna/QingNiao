@@ -1,4 +1,3 @@
-import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../aurora/aurora_shapes.dart';
@@ -38,7 +37,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       if (access.ready) {
         widget.onReady();
       } else {
-        setState(() => _error = tr("The default SMS role was not granted. You can try again in Settings."));
+        setState(() => _error = '还没有获得默认短信角色，可以稍后在设置里再试。');
       }
     } catch (error) {
       if (mounted) setState(() => _error = messageError(error));
@@ -69,7 +68,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    tr("Qingniao"),
+                    '青鸟短信',
                     style: context.texts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                   ),
                   const Spacer(),
@@ -86,7 +85,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               Center(child: AuroraBloom(size: 156)),
               const SizedBox(height: 18),
               Text(
-                tr("Make room for\nwhat matters."),
+                '让重要的消息\n自然抵达。',
                 style: context.texts.displayMedium?.copyWith(
                   height: 1.12,
                   fontWeight: FontWeight.w600,
@@ -95,24 +94,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
               const SizedBox(height: 14),
               Text(
-                tr("Keep SMS, verification codes and MMS together, with colors and motion you control."),
+                '短信、验证码与彩信在一处安放。界面会随壁纸取色，动效由极光引擎统一调度。',
                 style: context.texts.bodyLarge?.copyWith(color: scheme.onSurfaceVariant, height: 1.7),
               ),
               const SizedBox(height: 28),
-               _FeatureRow(
+              const _FeatureRow(
                 icon: Icons.shield_outlined,
-                title: tr("Verification codes stay on your device"),
-                body: tr("Message analysis runs locally, without ads or analytics SDKs."),
+                title: '验证码只在本机解析',
+                body: '不上传正文，不接入广告或统计 SDK。',
               ),
-               _FeatureRow(
+              const _FeatureRow(
                 icon: Icons.auto_awesome_outlined,
                 title: 'Material 3 Expressive',
-                body: tr("Shapes respond smoothly as the interface changes."),
+                body: '形状随状态连续形变，页面之间没有硬切。',
               ),
-               _FeatureRow(
+              const _FeatureRow(
                 icon: Icons.memory_rounded,
-                title: tr("Local processing"),
-                body: tr("Search, message segmentation and encryption run on this device."),
+                title: 'Rust 引擎',
+                body: '分词搜索、短信分段与端到端加密都在本地完成。',
               ),
               if (_error != null)
                 Padding(
@@ -148,20 +147,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.sms_outlined),
-                  label: Text(_busy ? tr("Waiting for system confirmation\u2026") : tr("Set as default SMS app")),
+                  label: Text(_busy ? '等待系统确认…' : '设为默认短信应用'),
                 ),
               ),
               const SizedBox(height: 6),
               Center(
                 child: TextButton(
                   onPressed: widget.onSkip,
-                  child:  Text(tr("Explore first")),
+                  child: const Text('先看看界面'),
                 ),
               ),
               const SizedBox(height: 6),
               Center(
                 child: Text(
-                  tr("You can change your default SMS app in system settings at any time"),
+                  '之后可以随时在系统设置中切换默认短信应用',
                   style: context.texts.labelSmall?.copyWith(
                     color: scheme.onSurfaceVariant.withValues(alpha: .75),
                   ),

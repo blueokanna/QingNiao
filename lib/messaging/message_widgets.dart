@@ -1,4 +1,3 @@
-import 'package:qingniao/l10n/app_strings.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
@@ -142,7 +141,7 @@ class ConversationTile extends StatelessWidget {
                             const Spacer(),
                             if (thread.count > 0 && !thread.hasOtp)
                               Text(
-                                tr("Messages: {p0}", [thread.count]),
+                                '${thread.count} 条',
                                 style: context.texts.labelSmall?.copyWith(
                                   color: scheme.onSurfaceVariant.withValues(alpha: .7),
                                 ),
@@ -165,7 +164,7 @@ class ConversationTile extends StatelessWidget {
     if (thread.hasOtp) {
       return thread.preview.replaceAll(thread.otp!, '•' * thread.otp!.length);
     }
-    return thread.preview.isEmpty ? tr("(Empty message)") : thread.preview;
+    return thread.preview.isEmpty ? '（空白消息）' : thread.preview;
   }
 }
 
@@ -204,10 +203,10 @@ class CategoryTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, icon) = switch (category) {
-      MessageCategory.verification => (tr("Verification codes"), Icons.lock_outline_rounded),
-      MessageCategory.finance => (tr("Finance"), Icons.account_balance_outlined),
-      MessageCategory.promotion => (tr("Promotions"), Icons.local_offer_outlined),
-      MessageCategory.personal => (tr("Personal"), Icons.chat_bubble_outline_rounded),
+      MessageCategory.verification => ('验证码', Icons.lock_outline_rounded),
+      MessageCategory.finance => ('账单', Icons.account_balance_outlined),
+      MessageCategory.promotion => ('推广', Icons.local_offer_outlined),
+      MessageCategory.personal => ('对话', Icons.chat_bubble_outline_rounded),
     };
     final scheme = context.colors;
     final color = switch (category) {
@@ -444,7 +443,7 @@ class MessageBubble extends StatelessWidget {
                 textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
               ),
               icon: const Icon(Icons.refresh_rounded, size: 13),
-              label:  Text(tr("Resend")),
+              label: const Text('重新发送'),
             ),
           ),
       ],
@@ -581,11 +580,11 @@ class _DeliveryMark extends StatelessWidget {
         ? context.colors.onPrimaryContainer.withValues(alpha: .62)
         : context.colors.onSurfaceVariant;
     final (icon, tooltip) = switch (state) {
-      DeliveryState.sending => (Icons.schedule_rounded, tr("Sending")),
-      DeliveryState.sent => (Icons.done_rounded, tr("Sent")),
-      DeliveryState.delivered => (Icons.done_all_rounded, tr("Delivered")),
-      DeliveryState.failed => (Icons.error_outline_rounded, tr("Failed to send")),
-      DeliveryState.none => (Icons.done_rounded, tr("Sent")),
+      DeliveryState.sending => (Icons.schedule_rounded, '正在发送'),
+      DeliveryState.sent => (Icons.done_rounded, '已发送'),
+      DeliveryState.delivered => (Icons.done_all_rounded, '已送达'),
+      DeliveryState.failed => (Icons.error_outline_rounded, '发送失败'),
+      DeliveryState.none => (Icons.done_rounded, '已发送'),
     };
     return Tooltip(
       message: tooltip,
@@ -756,7 +755,7 @@ class MessageComposer extends StatelessWidget {
     this.onPickSim,
     this.simLabel,
     this.attachments = 0,
-    this.hintText = "Write a message\u2026",
+    this.hintText = '写下消息…',
     this.onChanged,
     this.showTools = true,
   });
@@ -795,14 +794,14 @@ class MessageComposer extends StatelessWidget {
                     if (onAttach != null)
                       _ToolIcon(
                         icon: Icons.add_photo_alternate_outlined,
-                        tooltip: tr("Add attachment"),
+                        tooltip: '添加附件',
                         onTap: enabled ? onAttach : null,
                         badge: attachments,
                       ),
                     if (onSchedule != null)
                       _ToolIcon(
                         icon: Icons.schedule_send_outlined,
-                        tooltip: tr("Schedule message"),
+                        tooltip: '定时发送',
                         onTap: enabled ? onSchedule : null,
                       ),
                     const Spacer(),
@@ -885,7 +884,7 @@ class MessageComposer extends StatelessWidget {
                   if (segment.segments > 1)
                     Flexible(
                       child: Text(
-                        tr("This message will be sent in {p0} segments", [segment.segments]),
+                        '将拆分为 ${segment.segments} 条发送',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.end,

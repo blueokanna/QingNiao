@@ -1,4 +1,3 @@
-import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -26,7 +25,7 @@ Future<void> main() async {
   try {
     await RustLib.init();
   } catch (error, stack) {
-    debugPrint(tr("Rust engine unavailable: {p0}\n{p1}", [error, stack]));
+    debugPrint('Rust 引擎未启用：$error\n$stack');
   }
 
   runApp(QingniaoApp(repository: repository, settings: settings));

@@ -1,4 +1,3 @@
-import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -63,7 +62,7 @@ class _SyncScreenState extends State<SyncScreen> {
   String get _server => '${_status?['serverUrl'] ?? ''}';
   String get _fingerprint {
     final value = '${_status?['fingerprint'] ?? ''}';
-    return value.isEmpty ? tr("Not generated") : value;
+    return value.isEmpty ? '尚未生成' : value;
   }
 
   String get _pairingCode => '${_status?['pairingCode'] ?? ''}';
@@ -87,19 +86,19 @@ class _SyncScreenState extends State<SyncScreen> {
     final controller = TextEditingController(text: _server);
     final url = await showAuroraDialog<String>(
       context: context,
-      title:  Text(tr("Sync server")),
+      title: const Text('同步服务器'),
       content: TextField(
         controller: controller,
         autofocus: true,
         keyboardType: TextInputType.url,
-        decoration:  InputDecoration(
+        decoration: const InputDecoration(
           hintText: 'https://sync.example.com',
-          helperText: tr("Use a self-hosted server for encrypted envelopes"),
+          helperText: '自建服务器；只保存加密信封',
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child:  Text(tr("Cancel"))),
-        FilledButton(onPressed: () => Navigator.pop(context, controller.text), child:  Text(tr("Save"))),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+        FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('保存')),
       ],
     );
     final trimmed = url?.trim() ?? '';
@@ -111,23 +110,23 @@ class _SyncScreenState extends State<SyncScreen> {
     final controller = TextEditingController();
     final code = await showAuroraDialog<String>(
       context: context,
-      title:  Text(tr("Enter pairing code")),
+      title: const Text('输入配对码'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-           Text(tr("Open Settings > Device sync on the other device and copy its pairing code.")),
+          const Text('在另一台设备上打开「设置 → 青鸟同步」，复制它的配对码。'),
           const SizedBox(height: 12),
           TextField(
             controller: controller,
             autofocus: true,
-            decoration:  InputDecoration(hintText: tr("Pairing code / public key")),
+            decoration: const InputDecoration(hintText: '配对码 / 公钥'),
           ),
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child:  Text(tr("Cancel"))),
-        FilledButton(onPressed: () => Navigator.pop(context, controller.text), child:  Text(tr("Pair"))),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+        FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('配对')),
       ],
     );
     if (code == null || code.trim().isEmpty) return;
@@ -135,7 +134,7 @@ class _SyncScreenState extends State<SyncScreen> {
     try {
       await _engine.join(code.trim());
       await _load();
-      if (mounted) showAuroraSnack(context, tr("Pairing complete"));
+      if (mounted) showAuroraSnack(context, '配对成功，接下来只传输加密信封');
     } catch (error) {
       if (mounted) setState(() => _error = _syncError(error));
     } finally {
@@ -159,14 +158,14 @@ class _SyncScreenState extends State<SyncScreen> {
   Future<void> _reset() async {
     final confirmed = await showAuroraDialog<bool>(
       context: context,
-      title:  Text(tr("Reset sync keys?")),
-      content:  Text(tr("This device identity will be deleted. Other devices will need to pair again.")),
+      title: const Text('重置同步密钥？'),
+      content: const Text('本机的设备密钥会被删除，已配对设备需要重新配对。'),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child:  Text(tr("Cancel"))),
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
         FilledButton(
           onPressed: () => Navigator.pop(context, true),
           style: FilledButton.styleFrom(backgroundColor: context.colors.error),
-          child:  Text(tr("Reset")),
+          child: const Text('重置'),
         ),
       ],
     );
@@ -174,7 +173,7 @@ class _SyncScreenState extends State<SyncScreen> {
     try {
       await _engine.reset();
       await _load();
-      if (mounted) showAuroraSnack(context, tr("Sync identity reset"));
+      if (mounted) showAuroraSnack(context, '已重置同步身份');
     } catch (error) {
       if (mounted) showAuroraSnack(context, _syncError(error));
     }
@@ -201,12 +200,12 @@ class _SyncScreenState extends State<SyncScreen> {
             slivers: [
               SliverToBoxAdapter(
                 child: AuroraTopBar(
-                  title: tr("Device sync"),
-                  subtitle: tr("Optional encrypted sync"),
+                  title: '青鸟同步',
+                  subtitle: '端到端加密 · 可选',
                   actions: [
                     AuroraIconButton(
                       icon: Icons.sync_rounded,
-                      tooltip: tr("Sync now"),
+                      tooltip: '立即同步',
                       onPressed: _busy || !_enabled ? null : _syncNow,
                     ),
                   ],
@@ -231,14 +230,14 @@ class _SyncScreenState extends State<SyncScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                _enabled ? tr("Connected") : tr("Sync is off"),
+                                _enabled ? '已连接' : '未开启同步',
                                 style: context.texts.titleLarge,
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 _enabled
-                                    ? tr("Last synced {p0}", [lastSync == null ? '—' : MessageFormat.duration(DateTime.now().millisecondsSinceEpoch - (lastSync as num).toInt())])
-                                    : tr("Sync encrypted messages across your devices"),
+                                    ? '最近同步 ${lastSync == null ? '—' : MessageFormat.duration(DateTime.now().millisecondsSinceEpoch - (lastSync as num).toInt())}'
+                                    : '开启后，短信在多台设备间以密文流转',
                                 style: context.texts.bodySmall?.copyWith(
                                   color: scheme.onSurfaceVariant,
                                 ),
@@ -258,7 +257,7 @@ class _SyncScreenState extends State<SyncScreen> {
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    _enabled ? tr("Receive updates using long polling") : tr("Local first"),
+                                    _enabled ? '长轮询实时接收' : '本地优先',
                                     style: context.texts.labelSmall,
                                   ),
                                 ],
@@ -282,11 +281,11 @@ class _SyncScreenState extends State<SyncScreen> {
                 ),
               SliverToBoxAdapter(
                 child: AuroraSection(
-                  title: tr("Connection"),
+                  title: '连接',
                   children: [
                     AuroraSettingTile(
-                      title: tr("Enable sync"),
-                      subtitle: _enabled ? tr("Receive encrypted updates in the background") : tr("No sync traffic while disabled"),
+                      title: '启用同步',
+                      subtitle: _enabled ? '在后台保持加密长轮询' : '关闭时完全离线',
                       icon: Icons.cloud_sync_outlined,
                       trailing: Switch(
                         value: _enabled,
@@ -297,31 +296,31 @@ class _SyncScreenState extends State<SyncScreen> {
                       showDivider: true,
                     ),
                     AuroraSettingTile(
-                      title: tr("Server address"),
-                      subtitle: _server.isEmpty ? tr("Not set") : _server,
+                      title: '服务器地址',
+                      subtitle: _server.isEmpty ? '未设置' : _server,
                       icon: Icons.dns_outlined,
                       onTap: _busy ? null : _editServer,
                       showDivider: true,
                     ),
                     AuroraSettingTile(
-                      title: tr("This device's pairing code"),
-                      subtitle: _pairingCode.isEmpty ? tr("Generated when sync is enabled") : _pairingCode,
+                      title: '本机配对码',
+                      subtitle: _pairingCode.isEmpty ? '启用同步后生成' : _pairingCode,
                       icon: Icons.key_rounded,
                       trailing: _pairingCode.isEmpty
                           ? null
                           : IconButton(
-                              tooltip: tr("Copy pairing code"),
+                              tooltip: '复制配对码',
                               onPressed: () async {
                                 await Clipboard.setData(ClipboardData(text: _pairingCode));
-                                if (context.mounted) showAuroraSnack(context, tr("Pairing code copied"));
+                                if (context.mounted) showAuroraSnack(context, '配对码已复制');
                               },
                               icon: const Icon(Icons.copy_rounded, size: 18),
                             ),
                       showDivider: true,
                     ),
                     AuroraSettingTile(
-                      title: tr("Pair another device"),
-                      subtitle: tr("Verify device fingerprints before sharing messages"),
+                      title: '配对另一台设备',
+                      subtitle: '交换公钥指纹后才会解密',
                       icon: Icons.qr_code_2_rounded,
                       onTap: _pair,
                     ),
@@ -330,7 +329,7 @@ class _SyncScreenState extends State<SyncScreen> {
               ),
               SliverToBoxAdapter(
                 child: AuroraSection(
-                  title: tr("This device"),
+                  title: '本机身份',
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -340,17 +339,17 @@ class _SyncScreenState extends State<SyncScreen> {
                           Row(
                             children: [
                               Text(
-                                tr("Device fingerprint"),
+                                '设备指纹',
                                 style: context.texts.labelSmall?.copyWith(
                                   color: scheme.onSurfaceVariant,
                                 ),
                               ),
                               const Spacer(),
                               IconButton(
-                                tooltip: tr("Copy fingerprint"),
+                                tooltip: '复制指纹',
                                 onPressed: () async {
                                   await Clipboard.setData(ClipboardData(text: _fingerprint));
-                                  if (context.mounted) showAuroraSnack(context, tr("Fingerprint copied"));
+                                  if (context.mounted) showAuroraSnack(context, '指纹已复制');
                                 },
                                 icon: const Icon(Icons.copy_rounded, size: 18),
                               ),
@@ -369,7 +368,7 @@ class _SyncScreenState extends State<SyncScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  tr("Compare fingerprints through a trusted channel. Identity verification and secure key storage require additional validation."),
+                                  '指纹用于核对设备身份。服务器永远拿不到明文与私钥。',
                                   style: context.texts.bodySmall?.copyWith(
                                     color: scheme.onSurfaceVariant,
                                   ),
@@ -378,7 +377,7 @@ class _SyncScreenState extends State<SyncScreen> {
                               TextButton(
                                 onPressed: _reset,
                                 style: TextButton.styleFrom(foregroundColor: scheme.error),
-                                child:  Text(tr("Reset")),
+                                child: const Text('重置'),
                               ),
                             ],
                           ),
@@ -390,13 +389,13 @@ class _SyncScreenState extends State<SyncScreen> {
               ),
               SliverToBoxAdapter(
                 child: AuroraSection(
-                  title: tr("Paired devices"),
+                  title: '已配对设备',
                   children: [
                     if (devices.isEmpty)
                       Padding(
                         padding: const EdgeInsets.all(18),
                         child: Text(
-                          tr("No other devices yet. Pair a device to exchange encrypted messages."),
+                          '还没有其他设备。配对后，短信会在设备之间以密文同步。',
                           style: context.texts.bodySmall?.copyWith(
                             color: scheme.onSurfaceVariant,
                           ),
@@ -419,8 +418,8 @@ class _SyncScreenState extends State<SyncScreen> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(24, 6, 24, 40),
                   child: Text(
-                    tr("Encryption uses X25519, HKDF and AES-256-GCM.")
-                    tr("The server can see routing metadata, timestamps and ciphertext sizes. Envelope encryption alone does not authenticate the sender."),
+                    '安全模型：每台设备生成 X25519 密钥对；内容密钥经 HKDF 派生后用 AES-256-GCM 加密；'
+                    '信封只携带临时公钥、nonce 与密文。服务器可见账号、时间与密文大小。',
                     style: context.texts.labelSmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                       height: 1.7,

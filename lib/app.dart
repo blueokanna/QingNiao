@@ -1,4 +1,3 @@
-import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -82,7 +81,7 @@ class _QingniaoAppState extends State<QingniaoApp>
         return AppScope(
           settings: settings,
           child: MaterialApp(
-            title: tr("Qingniao"),
+            title: '青鸟短信',
             debugShowCheckedModeBanner: false,
             locale: const Locale('zh', 'CN'),
             supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
@@ -203,7 +202,7 @@ class _RootGateState extends State<RootGate> {
             children: [
               const AuroraBloom(size: 132),
               const SizedBox(height: 18),
-              Text(tr("Opening your messages"), style: context.texts.titleMedium),
+              Text('青鸟正在苏醒', style: context.texts.titleMedium),
               const SizedBox(height: 10),
               const AuroraLoading(),
             ],

@@ -1,4 +1,3 @@
-import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../app/app_settings.dart';
@@ -113,11 +112,11 @@ class _ComposeScreenState extends State<ComposeScreen> {
   Future<void> _schedule() async {
     final body = _body.text.trim();
     if (body.isEmpty) {
-      showAuroraSnack(context, tr("Write a message before scheduling it"), icon: Icons.schedule_rounded);
+      showAuroraSnack(context, '先写下要定时发送的内容', icon: Icons.schedule_rounded);
       return;
     }
     if (_recipients.isEmpty) {
-      showAuroraSnack(context, tr("Add a recipient first"));
+      showAuroraSnack(context, '先添加收件人');
       return;
     }
     final now = DateTime.now();
@@ -135,7 +134,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
     if (time == null || !mounted) return;
     final at = DateTime(date.year, date.month, date.day, time.hour, time.minute);
     if (at.isBefore(DateTime.now())) {
-      showAuroraSnack(context, tr("Choose a future time"));
+      showAuroraSnack(context, '请选择一个未来的时间');
       return;
     }
     try {
@@ -149,7 +148,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
       if (mounted) {
         showAuroraSnack(
           context,
-          tr("Scheduled for {p0}", [MessageFormat.dateTime(at.millisecondsSinceEpoch)]),
+          '将在 ${MessageFormat.dateTime(at.millisecondsSinceEpoch)} 发送',
         );
       }
     } catch (error) {
@@ -161,7 +160,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
     if (_sending) return;
     final body = _body.text.trim();
     if (_recipients.isEmpty) {
-      setState(() => _error = tr("Add at least one recipient"));
+      setState(() => _error = '请添加至少一位收件人');
       return;
     }
     if (body.isEmpty && _attachment == null) return;
@@ -212,14 +211,14 @@ class _ComposeScreenState extends State<ComposeScreen> {
         child: Column(
           children: [
             AuroraTopBar(
-              title: tr("New message"),
+              title: '新短信',
               subtitle: _recipients.isEmpty
-                  ? tr("Enter a number or choose a contact")
-                  : tr("Recipients: {p0}", [_recipients.length]),
+                  ? '输入号码或从联系人中选择'
+                  : '${_recipients.length} 位收件人',
               actions: [
                 AuroraIconButton(
                   icon: Icons.send_rounded,
-                  tooltip: tr("Send"),
+                  tooltip: '发送',
                   filled: true,
                   onPressed: _sending ? null : _send,
                 ),
@@ -259,8 +258,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
                           keyboardType: TextInputType.phone,
                           textInputAction: TextInputAction.done,
                           onSubmitted: _addRecipient,
-                          decoration:  InputDecoration(
-                            hintText: tr("Number"),
+                          decoration: const InputDecoration(
+                            hintText: '号码',
                             isDense: true,
                             contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           ),
@@ -274,13 +273,13 @@ class _ComposeScreenState extends State<ComposeScreen> {
                       TextButton.icon(
                         onPressed: _sending ? null : _pickContact,
                         icon: const Icon(Icons.person_add_alt_outlined, size: 18),
-                        label:  Text(tr("Choose a contact")),
+                        label: const Text('从联系人选择'),
                       ),
                       const SizedBox(width: 6),
                       TextButton.icon(
                         onPressed: _sending ? null : _pickAttachment,
                         icon: const Icon(Icons.attach_file_rounded, size: 18),
-                        label: Text(_attachment == null ? tr("Add attachment") : tr("Change attachment")),
+                        label: Text(_attachment == null ? '添加附件' : '更换附件'),
                       ),
                     ],
                   ),
@@ -321,8 +320,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
                         maxLines: 18,
                         maxLength: 20000,
                         style: context.texts.bodyLarge?.copyWith(height: 1.55),
-                        decoration:  InputDecoration(
-                          hintText: tr("Write a message\u2026"),
+                        decoration: const InputDecoration(
+                          hintText: '写下消息…',
                           filled: false,
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
@@ -342,7 +341,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                           label: Text(
                             _sims.length == 1
                                 ? 'SIM ${_sims.first.slot} · ${_sims.first.name}'
-                                : tr("Choose SIM"),
+                                : '选择 SIM',
                           ),
                           onPressed: _sending ? null : _pickSim,
                         ),
@@ -366,7 +365,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                 segment: MessageFormat.segment(_body.text),
                 sending: _sending,
                 showTools: false,
-                hintText: tr("Write a message\u2026"),
+                hintText: '写下消息…',
                 onSend: _send,
                 onAttach: _pickAttachment,
                 onSchedule: _schedule,
@@ -374,7 +373,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
                 simLabel: _sims.isEmpty
                     ? null
                     : (_sims.where((sim) => sim.id == _simId).isEmpty
-                          ? tr("Choose SIM")
+                          ? '选择 SIM'
                           : 'SIM ${_sims.where((sim) => sim.id == _simId).first.slot}'),
                 attachments: _attachment == null ? 0 : 1,
               ),

@@ -1,4 +1,3 @@
-import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:material_new_shapes/material_new_shapes.dart';
 
@@ -86,7 +85,6 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
     await widget.hub.refresh(silent: true);
   }
 
-  /// 通知/流体云点击进入时携带 address；直接落到对应会话。
   Future<void> _openIntent() async {
     try {
       final data = await widget.repository.launchIntent();
@@ -146,22 +144,22 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
             ),
           ),
           AuroraSettingTile(
-            title: thread.pinned ? tr("Unpin") : tr("Pin conversation"),
+            title: thread.pinned ? '取消置顶' : '置顶会话',
             icon: thread.pinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
             onTap: () => Navigator.pop(context, 'pin'),
           ),
           AuroraSettingTile(
-            title: thread.archived ? tr("Unarchive") : tr("Archive conversation"),
+            title: thread.archived ? '移出存档' : '归档会话',
             icon: Icons.archive_outlined,
             onTap: () => Navigator.pop(context, 'archive'),
           ),
           AuroraSettingTile(
-            title: tr("Mark as read"),
+            title: '标为已读',
             icon: Icons.mark_chat_read_outlined,
             onTap: () => Navigator.pop(context, 'read'),
           ),
           AuroraSettingTile(
-            title: tr("Block this number"),
+            title: '屏蔽此号码',
             icon: Icons.block_rounded,
             destructive: true,
             onTap: () => Navigator.pop(context, 'block'),
@@ -179,7 +177,7 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
         await widget.hub.markRead(thread.threadId);
       case 'block':
         await widget.hub.block(thread.address);
-        if (mounted) showAuroraSnack(context, tr("Blocked: {p0}", [thread.title]));
+        if (mounted) showAuroraSnack(context, '已屏蔽 ${thread.title}');
     }
   }
 
@@ -207,10 +205,10 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
               SliverToBoxAdapter(
                 child: AuroraLargeHeader(
                   eyebrow: MessageFormat.todayLabel(),
-                  title: tr("Messages"),
+                  title: '消息',
                   description: hub.access.ready
-                      ? tr("Unread: {p0} \u00b7 Conversations: {p1}", [hub.unread, hub.threads.length])
-                      : tr("SMS and MMS, stored locally"),
+                      ? '${hub.unread} 条未读 · ${hub.threads.length} 个会话'
+                      : '本地优先的短信与彩信',
                   padding: const EdgeInsets.fromLTRB(24, 6, 24, 2),
                 ),
               ),
@@ -219,7 +217,7 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
                   child: AuroraSearchField(
                     controller: _search,
-                    hintText: tr("Search messages or contacts"),
+                    hintText: '搜索号码、联系人或是短信里的短语',
                     onChanged: hub.search,
                   ),
                 ),
@@ -229,11 +227,11 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
                   selected: hub.filter,
                   onSelected: hub.setFilter,
                   items: [
-                    AuroraFilterItem('all', tr("All"), count: hub.countFor('all')),
-                    AuroraFilterItem('unread', tr("Unread"), count: hub.countFor('unread')),
-                    AuroraFilterItem('otp', tr("Verification codes"), count: hub.countFor('otp')),
-                    AuroraFilterItem('pinned', tr("Pinned"), count: hub.countFor('pinned')),
-                    AuroraFilterItem('archived', tr("Archived"), count: hub.countFor('archived')),
+                    AuroraFilterItem('all', '全部', count: hub.countFor('all')),
+                    AuroraFilterItem('unread', '未读', count: hub.countFor('unread')),
+                    AuroraFilterItem('otp', '验证码', count: hub.countFor('otp')),
+                    AuroraFilterItem('pinned', '置顶', count: hub.countFor('pinned')),
+                    AuroraFilterItem('archived', '存档', count: hub.countFor('archived')),
                   ],
                 ),
               ),
@@ -249,10 +247,10 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
                   child: Padding(
                     padding: const EdgeInsets.only(top: 30),
                     child: AuroraEmpty(
-                      title: hub.query.isNotEmpty ? tr("No matching messages") : tr("Your inbox is empty"),
+                      title: hub.query.isNotEmpty ? '没有找到匹配的消息' : '收件箱很安静',
                       message: hub.query.isNotEmpty
-                          ? tr("Try another keyword or clear your search.")
-                          : tr("New messages will appear here."),
+                          ? '换个关键词，或清空搜索看看全部会话。'
+                          : '新的短信会像光一样落在这里。',
                       icon: Icons.mark_chat_unread_outlined,
                       action: hub.query.isNotEmpty
                           ? TextButton(
@@ -260,19 +258,19 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
                                 _search.clear();
                                 hub.search('');
                               },
-                              child:  Text(tr("Clear search")),
+                              child: const Text('清空搜索'),
                             )
                           : null,
                     ),
                   ),
                 ),
               if (pinned.isNotEmpty) ...[
-                SliverToBoxAdapter(child: _sectionLabel(context, tr("Pinned"))),
+                SliverToBoxAdapter(child: _sectionLabel(context, '置顶')),
                 _threadSliver(pinned),
               ],
               if (recent.isNotEmpty) ...[
                 SliverToBoxAdapter(
-                  child: _sectionLabel(context, pinned.isEmpty ? tr("All conversations") : tr("Recent")),
+                  child: _sectionLabel(context, pinned.isEmpty ? '全部会话' : '最近'),
                 ),
                 _threadSliver(recent),
               ],
@@ -300,13 +298,13 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
                 alignment: Alignment.centerLeft,
                 color: context.colors.primary,
                 icon: thread.pinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
-                label: thread.pinned ? tr("Unpin") : tr("Pinned"),
+                label: thread.pinned ? '取消置顶' : '置顶',
               ),
               secondaryBackground: _SwipeBackground(
                 alignment: Alignment.centerRight,
                 color: context.colors.tertiary,
                 icon: Icons.archive_outlined,
-                label: tr("Archive"),
+                label: '归档',
               ),
               confirmDismiss: (direction) async {
                 if (direction == DismissDirection.startToEnd) {
@@ -347,11 +345,11 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                tr("Qingniao"),
+                '青鸟短信',
                 style: context.texts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
               Text(
-                tr("SMS and MMS"),
+                '短信与彩信',
                 style: context.texts.labelSmall?.copyWith(
                   fontSize: 8.5,
                   letterSpacing: 1.6,
@@ -363,7 +361,7 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
           const Spacer(),
           AuroraIconButton(
             icon: Icons.delete_outline_rounded,
-            tooltip: tr("Trash"),
+            tooltip: '回收站',
             onPressed: () async {
               await Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -376,7 +374,7 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
           const SizedBox(width: 8),
           AuroraIconButton(
             icon: Icons.bolt_outlined,
-            tooltip: tr("Diagnostics"),
+            tooltip: '引擎状态',
             onPressed: () => _showEngine(context, hub),
           ),
         ],
@@ -394,10 +392,10 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(tr("Animation diagnostics"), style: context.texts.headlineSmall),
+            Text('极光引擎', style: context.texts.headlineSmall),
             const SizedBox(height: 6),
             Text(
-              tr("Frame scheduling, adaptive quality and continuous transitions"),
+              '统一帧调度 · 自适应画质 · 跨页连续动效',
               style: context.texts.bodyMedium?.copyWith(color: context.colors.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
@@ -405,16 +403,16 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  _engineRow(context, tr("Rendering quality"), engine.quality.name),
-                  _engineRow(context, tr("Average frame time"), '${engine.averageFrameMs.toStringAsFixed(1)} ms'),
-                  _engineRow(context, tr("Background frame rate"), '${engine.backdropFps} fps'),
-                  _engineRow(context, tr("Conversation count"), '${hub.threads.length}'),
+                  _engineRow(context, '渲染质量', engine.quality.name),
+                  _engineRow(context, '平均帧耗时', '${engine.averageFrameMs.toStringAsFixed(1)} ms'),
+                  _engineRow(context, '背景帧率', '${engine.backdropFps} fps'),
+                  _engineRow(context, '会话数量', '${hub.threads.length}'),
                 ],
               ),
             ),
             const SizedBox(height: 10),
             Text(
-              tr("Quality adapts to measured frame times. Background animation slows while scrolling."),
+              '引擎根据真实 build/raster 耗时自动降级；滚动时背景让出 GPU 预算。',
               style: context.texts.bodySmall?.copyWith(color: context.colors.onSurfaceVariant),
             ),
           ],
@@ -479,10 +477,10 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(tr("Make Qingniao your default SMS app"), style: context.texts.titleMedium),
+                      Text('把青鸟设为默认短信应用', style: context.texts.titleMedium),
                       const SizedBox(height: 3),
                       Text(
-                        tr("The default SMS role is required to read, receive and send messages."),
+                        '只有默认短信应用才能完整读取、接收与发送短信。',
                         style: context.texts.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                       ),
                     ],
@@ -502,12 +500,12 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.verified_user_outlined, size: 18),
-                  label: Text(_requesting ? tr("Waiting for system confirmation\u2026") : tr("Open settings")),
+                  label: Text(_requesting ? '等待系统确认…' : '去设置'),
                 ),
                 const SizedBox(width: 8),
                 TextButton(
                   onPressed: () => widget.repository.openAppSettings(),
-                  child:  Text(tr("App settings")),
+                  child: const Text('应用设置'),
                 ),
               ],
             ),

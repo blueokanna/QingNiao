@@ -1,4 +1,3 @@
-import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../aurora/aurora_engine.dart';
@@ -17,7 +16,7 @@ class AppSettings extends ChangeNotifier {
   AuroraThemePreference themePreference = AuroraThemePreference.system;
   Color seed = AuroraPalettes.jade;
   Color? systemSeed;
-  bool useDynamic = false;
+  bool useDynamic = true;
   AuroraBubbleStyle bubbleStyle = AuroraBubbleStyle.soft;
   bool morphShapes = true;
   AuroraMotionLevel motionLevel = AuroraMotionLevel.full;
@@ -75,7 +74,7 @@ class AppSettings extends ChangeNotifier {
     };
     final seedName = values['seed'];
     seed = AuroraPalettes.seeds[seedName] ?? AuroraPalettes.jade;
-    useDynamic = values['useDynamic'] == 'true';
+    useDynamic = values['useDynamic'] != 'false';
     bubbleStyle = switch (values['bubble']) {
       'capsule' => AuroraBubbleStyle.capsule,
       'cookie' => AuroraBubbleStyle.cookie,
@@ -193,7 +192,7 @@ class AppSettings extends ChangeNotifier {
       'seed': AuroraPalettes.seeds.entries
           .firstWhere(
             (entry) => entry.value == seed,
-            orElse: () => const MapEntry("PANTONE 3295 C", AuroraPalettes.jade),
+            orElse: () => const MapEntry('青碧', AuroraPalettes.jade),
           )
           .key,
       'useDynamic': '$useDynamic',
@@ -235,7 +234,7 @@ class AppScope extends InheritedNotifier<AppSettings> {
 
   static AppSettings of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();
-    assert(scope != null, tr("AppScope is not mounted"));
+    assert(scope != null, 'AppScope 未挂载');
     return scope!.notifier!;
   }
 

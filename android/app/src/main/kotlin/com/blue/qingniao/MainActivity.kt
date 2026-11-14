@@ -128,6 +128,7 @@ class MainActivity : FlutterActivity() {
     }
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (aurora.onActivityResult(requestCode, resultCode, data)) return
         if (requestCode == 73 || requestCode == 74) {
             val result = pendingSelection ?: return
             pendingSelection = null
@@ -159,6 +160,7 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         contentResolver.unregisterContentObserver(observer)
         handler.removeCallbacks(changed)
+        aurora.cancelPending()
         events = null
         pendingAccess?.error("activity_closed", "权限申请已结束，请重试", null)
         pendingAccess = null

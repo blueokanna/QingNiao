@@ -1,4 +1,3 @@
-import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/services.dart';
 
 import '../src/rust/api/engine.dart';
@@ -391,9 +390,11 @@ ThreadSummary demoThread({
   bool archived = false,
   MessageCategory category = MessageCategory.personal,
   String? otp,
-  int tr("System messaging service unavailable")nId = 1,
+  int subscriptionId = 1,
   bool hasMms = false,
-}tr("SMS requires an Android phone")hreadId: itr("Could not complete the action. Try again.")s: address,
+}) => ThreadSummary(
+  threadId: id,
+  address: address,
   displayName: name,
   preview: body,
   date: date,

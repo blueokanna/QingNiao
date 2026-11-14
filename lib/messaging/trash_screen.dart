@@ -1,4 +1,3 @@
-import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 
 import '../app/app_settings.dart';
@@ -51,7 +50,7 @@ class _TrashScreenState extends State<TrashScreen> {
     try {
       await widget.repository.restore(item.id);
       await _load();
-      if (mounted) showAuroraSnack(context, tr("Restored to the conversation"));
+      if (mounted) showAuroraSnack(context, '已恢复到原会话');
     } catch (error) {
       if (mounted) showAuroraSnack(context, messageError(error));
     }
@@ -60,14 +59,14 @@ class _TrashScreenState extends State<TrashScreen> {
   Future<void> _delete(TrashItem item) async {
     final confirmed = await showAuroraDialog<bool>(
       context: context,
-      title:  Text(tr("Delete permanently?")),
-      content: Text(tr("This message from {p0} will be removed from the system message store. This cannot be undone.", [item.address])),
+      title: const Text('永久删除？'),
+      content: Text('这条来自 ${item.address} 的消息将从系统短信库中移除，无法恢复。'),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child:  Text(tr("Cancel"))),
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
         FilledButton(
           onPressed: () => Navigator.pop(context, true),
           style: FilledButton.styleFrom(backgroundColor: context.colors.error),
-          child:  Text(tr("Delete permanently")),
+          child: const Text('永久删除'),
         ),
       ],
     );
@@ -88,7 +87,7 @@ class _TrashScreenState extends State<TrashScreen> {
       await widget.repository.purgeTrash(days);
       await _load();
       if (mounted) {
-        showAuroraSnack(context, days == 0 ? tr("Messages will be kept indefinitely") : tr("Items older than {p0} days will be removed", [days]));
+        showAuroraSnack(context, days == 0 ? '已设置为永久保留' : '超过 $days 天的项目会自动清理');
       }
     } catch (error) {
       if (mounted) showAuroraSnack(context, messageError(error));
@@ -105,13 +104,13 @@ class _TrashScreenState extends State<TrashScreen> {
           slivers: [
             SliverToBoxAdapter(
               child: AuroraTopBar(
-                title: tr("Trash"),
+                title: '回收站',
                 subtitle:
-                    tr("{p0} \u00b7 {p1}", [_items.length, settings.trashRetentionDays == 0 ? '永久保留' : '保留 ${settings.trashRetentionDays} 天']),
+                    '${_items.length} 条 · ${settings.trashRetentionDays == 0 ? '永久保留' : '保留 ${settings.trashRetentionDays} 天'}',
                 actions: [
                   AuroraIconButton(
                     icon: Icons.cleaning_services_outlined,
-                    tooltip: tr("Remove expired items"),
+                    tooltip: '清理过期项目',
                     onPressed: () async {
                       final removed = await widget.repository.purgeTrash(
                         settings.trashRetentionDays,
@@ -120,7 +119,7 @@ class _TrashScreenState extends State<TrashScreen> {
                       if (context.mounted) {
                         showAuroraSnack(
                           context,
-                          removed == 0 ? tr("No expired items") : tr("Expired messages removed: {p0}", [removed]),
+                          removed == 0 ? '没有需要清理的项目' : '已清理 $removed 条过期消息',
                         );
                       }
                     },
@@ -132,11 +131,11 @@ class _TrashScreenState extends State<TrashScreen> {
               child: AuroraFilterBar(
                 selected: '${settings.trashRetentionDays}',
                 onSelected: (value) => _setRetention(int.parse(value)),
-                items:  [
-                  AuroraFilterItem('7', tr("7 days")),
-                  AuroraFilterItem('30', tr("30 days")),
-                  AuroraFilterItem('90', tr("90 days")),
-                  AuroraFilterItem('0', tr("Forever")),
+                items: const [
+                  AuroraFilterItem('7', '7 天'),
+                  AuroraFilterItem('30', '30 天'),
+                  AuroraFilterItem('90', '90 天'),
+                  AuroraFilterItem('0', '永久'),
                 ],
               ),
             ),
@@ -150,12 +149,12 @@ class _TrashScreenState extends State<TrashScreen> {
                 ),
               ),
             if (!_loading && _items.isEmpty)
-               SliverToBoxAdapter(
+              const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.only(top: 20),
                   child: AuroraEmpty(
-                    title: tr("Trash is empty"),
-                    message: tr("Deleted messages can be restored during their retention period."),
+                    title: '回收站是空的',
+                    message: '删除的短信会先来到这里，保留期内随时可以恢复。',
                     icon: Icons.delete_outline_rounded,
                   ),
                 ),
@@ -204,7 +203,7 @@ class _TrashScreenState extends State<TrashScreen> {
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         Text(
-                                          tr("Deleted {p0}", [MessageFormat.dateTime(item.deletedAt)]),
+                                          '删除于 ${MessageFormat.dateTime(item.deletedAt)}',
                                           style: context.texts.labelSmall?.copyWith(
                                             color: context.colors.onSurfaceVariant,
                                           ),
@@ -216,7 +215,7 @@ class _TrashScreenState extends State<TrashScreen> {
                               ),
                               const SizedBox(height: 10),
                               Text(
-                                item.body.isEmpty ? tr("(No text)") : item.body,
+                                item.body.isEmpty ? '（无正文）' : item.body,
                                 maxLines: 3,
                                 overflow: TextOverflow.ellipsis,
                                 style: context.texts.bodySmall?.copyWith(
@@ -230,7 +229,7 @@ class _TrashScreenState extends State<TrashScreen> {
                                   TextButton.icon(
                                     onPressed: () => _restore(item),
                                     icon: const Icon(Icons.restore_rounded, size: 17),
-                                    label:  Text(tr("Restore")),
+                                    label: const Text('恢复'),
                                   ),
                                   TextButton.icon(
                                     onPressed: () => _delete(item),
@@ -238,12 +237,12 @@ class _TrashScreenState extends State<TrashScreen> {
                                       foregroundColor: context.colors.error,
                                     ),
                                     icon: const Icon(Icons.delete_forever_outlined, size: 17),
-                                    label:  Text(tr("Delete permanently")),
+                                    label: const Text('永久删除'),
                                   ),
                                   const Spacer(),
                                   if (item.kind == 1)
                                     Text(
-                                      tr("MMS messages"),
+                                      '彩信',
                                       style: context.texts.labelSmall?.copyWith(
                                         color: context.colors.onSurfaceVariant,
                                       ),
