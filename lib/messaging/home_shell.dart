@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../aurora/aurora_widgets.dart';
@@ -6,6 +8,7 @@ import '../messaging/message_hub.dart';
 import '../messaging/message_repository.dart';
 import '../messaging/otp_screen.dart';
 import '../settings/settings_screen.dart';
+import '../sync/sync_engine.dart';
 import 'compose_screen.dart';
 
 class HomeShell extends StatefulWidget {
@@ -18,18 +21,61 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _index = 0;
   late final PageController _pages = PageController();
+  late final SyncEngine _sync = SyncEngine(widget.repository);
+  Timer? _syncTimer;
+  bool _syncing = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     widget.hub.start();
+    _startForegroundSync();
+  }
+
+  Future<void> _startForegroundSync() async {
+    try {
+      final status = await _sync.status(refresh: false);
+      if (status['enabled'] != true) return;
+      _syncTimer?.cancel();
+      _syncTimer = Timer.periodic(
+        const Duration(minutes: 2),
+        (_) => _syncNow(),
+      );
+      await _syncNow();
+    } catch (_) {
+      // 同步未配置或服务器不可达时保持静默，不影响本地短信。
+    }
+  }
+
+  Future<void> _syncNow() async {
+    if (_syncing) return;
+    _syncing = true;
+    try {
+      await _sync.syncNow();
+      await widget.hub.refresh(silent: true);
+    } catch (_) {
+      // 后台自动同步失败不打断收件箱。
+    } finally {
+      _syncing = false;
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _syncTimer != null) {
+      _syncNow();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _syncTimer?.cancel();
+    _sync.dispose();
     _pages.dispose();
     super.dispose();
   }
