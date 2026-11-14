@@ -32,6 +32,11 @@ object MmsTransport {
         val token = UUID.randomUUID().toString()
         val prefs = context.getSharedPreferences("mms_pending", Context.MODE_PRIVATE)
         check(prefs.edit().putString("$token.location", location).putString("$token.notification", saved.toString()).putInt("$token.subscription", subscription).commit())
+        val savedId = ContentUris.parseId(saved)
+        val address = mmsAddress(context, savedId) ?: "彩信"
+        val progressId = address.hashCode()
+        prefs.edit().putInt("$token.progress", progressId).commit()
+        Notifications.showProgress(context, address, "正在接收彩信…", subscription, progressId)
         download(context, token)
     }
     fun download(context: Context, token: String) {
@@ -59,6 +64,8 @@ object MmsTransport {
         if (!prefs.contains("$token.location")) return
         prefs.edit().remove("$token.active").commit()
         if (!success) {
+            Notifications.cancel(context, prefs.getInt("$token.progress", token.hashCode()))
+            prefs.edit().remove("$token.progress").commit()
             MessageNotifications.show(context, "", "彩信下载失败，请在彩信页面重试", token.hashCode())
             return
         }
@@ -98,6 +105,8 @@ object MmsTransport {
             subject.isNotEmpty() -> "彩信 · $subject"
             else -> "收到新彩信"
         }
+        Notifications.cancel(context, prefs.getInt("$token.progress", address.hashCode()))
+        prefs.edit().remove("$token.progress").commit()
         Notifications.showSms(context, address, preview, subscriptionId, threadId)
     }
 

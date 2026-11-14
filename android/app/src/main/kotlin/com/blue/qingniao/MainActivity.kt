@@ -73,7 +73,7 @@ class MainActivity : FlutterActivity() {
                 if (pendingAccess != null) { result.error("busy", "权限申请正在进行", null); return }
                 pendingAccess = result
                 val roles = getSystemService(RoleManager::class.java)
-                if (!roles.isRoleAvailable(RoleManager.ROLE_SMS)) { pendingAccess = null; result.error("unavailable", "设备不支持默认短信应用", null); return }
+                if (!roles.isRoleAvailable(RoleManager.ROLE_SMS)) { requestMessagePermissions(); return }
                 if (!roles.isRoleHeld(RoleManager.ROLE_SMS)) startActivityForResult(roles.createRequestRoleIntent(RoleManager.ROLE_SMS), 71)
                 else requestMessagePermissions()
                 return
@@ -148,8 +148,9 @@ class MainActivity : FlutterActivity() {
             return
         }
         if (requestCode == 71) {
-            if (access()["defaultApp"] == true) requestMessagePermissions()
-            else { pendingAccess?.success(access()); pendingAccess = null }
+            // 即使用户拒绝默认短信角色，也申请短信权限：
+            // 非默认应用仍可通过 SMS_RECEIVED 收到并提醒新短信。
+            requestMessagePermissions()
         }
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {

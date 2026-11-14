@@ -138,6 +138,57 @@ object Notifications {
         }
     }
 
+    /** 彩信下载中的低打扰进度通知；完成后由富通知替换。 */
+    fun showProgress(
+        context: Context,
+        address: String,
+        text: String,
+        subscriptionId: Int,
+        notificationId: Int,
+    ) {
+        val prefs = context.getSharedPreferences("appearance", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("notifications", true)) return
+        val manager = context.getSystemService(NotificationManager::class.java)
+        val channelId = "messages_${subscriptionId.coerceAtLeast(0)}"
+        manager.createNotificationChannel(
+            NotificationChannel(
+                channelId,
+                if (subscriptionId >= 0) "短信 · SIM $subscriptionId" else "短信",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "新短信、彩信与直接回复"
+                enableVibration(true)
+                setShowBadge(true)
+            },
+        )
+        val open = Intent(context, MainActivity::class.java)
+            .putExtra("address", address)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val contentIntent = PendingIntent.getActivity(
+            context,
+            notificationId,
+            open,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val builder = Notification.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setContentTitle(address.ifBlank { "彩信" })
+            .setContentText(text)
+            .setStyle(Notification.BigTextStyle().bigText(text))
+            .setContentIntent(contentIntent)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setOnlyAlertOnce(true)
+            .setCategory(Notification.CATEGORY_PROGRESS)
+            .setProgress(0, 0, true)
+            .setGroup(GROUP)
+        try {
+            manager.notify(notificationId, builder.build())
+        } catch (_: SecurityException) {
+            // 通知权限关闭时静默失败。
+        }
+    }
+
     /** Android 16 起可用的 Live Updates 能力；ColorOS 16 会桥接到流体云。 */
     fun canPromote(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < 36) return false
