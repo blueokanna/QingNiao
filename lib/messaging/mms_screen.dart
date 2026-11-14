@@ -86,7 +86,7 @@ class _MmsScreenState extends State<MmsScreen> {
 
   Future<void> _compose() async {
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+      MessageRoute<void>(
         builder: (_) => MmsComposer(repository: widget.repository),
       ),
     );
@@ -316,8 +316,9 @@ class _MmsComposerState extends State<MmsComposer> {
                     final attachment = await widget.repository.invoke<Map>(
                       'pickAttachment',
                     );
-                    if (mounted && attachment != null)
+                    if (mounted && attachment != null) {
                       setState(() => _attachment = attachment);
+                    }
                   } catch (error) {
                     if (mounted) setState(() => _error = messageError(error));
                   }

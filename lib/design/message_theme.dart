@@ -7,6 +7,14 @@ abstract final class MessageMotion {
       MediaQuery.disableAnimationsOf(context) ? Duration.zero : duration;
 }
 
+class MessageRoute<T> extends MaterialPageRoute<T> {
+  MessageRoute({required super.builder});
+  @override
+  Duration get transitionDuration => MessageMotion.duration;
+  @override
+  Duration get reverseTransitionDuration => MessageMotion.duration;
+}
+
 ThemeData messageTheme(Brightness brightness) {
   final colors = ColorScheme.fromSeed(
     seedColor: const Color(0xff416b53),

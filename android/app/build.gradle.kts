@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "dev.qingniao.sms"
+    namespace = "com.blue.qingniao"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -14,7 +14,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "dev.qingniao.sms"
+        applicationId = "com.blue.qingniao"
         minSdk = 31
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

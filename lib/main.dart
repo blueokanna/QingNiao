@@ -1,44 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-import 'design/message_theme.dart';
-import 'messaging/inbox_screen.dart';
+import 'app.dart';
+import 'app/app_settings.dart';
+import 'messaging/demo_repository.dart';
+import 'messaging/message_repository.dart';
 import 'src/rust/frb_generated.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
+
+  const demo = bool.fromEnvironment('QINGNIAO_DEMO');
+  final MessageRepository repository = demo ? DemoMessageRepository() : MessageRepository();
+  final settings = await AppSettings.load(repository);
+
   try {
     await RustLib.init();
-    runApp(const QingniaoApp());
-  } catch (_) {
-    runApp(
-      MaterialApp(
-        theme: messageTheme(Brightness.light),
-        home: Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('本地消息引擎未能启动'),
-                const SizedBox(height: 16),
-                FilledButton(onPressed: main, child: const Text('重试')),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+  } catch (error, stack) {
+    debugPrint('Rust 引擎未启用：$error\n$stack');
   }
-}
 
-class QingniaoApp extends StatelessWidget {
-  const QingniaoApp({super.key});
-  @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: '青鸟短信',
-    debugShowCheckedModeBanner: false,
-    theme: messageTheme(Brightness.light),
-    darkTheme: messageTheme(Brightness.dark),
-    themeMode: ThemeMode.system,
-    home: const InboxScreen(),
-  );
+  runApp(QingniaoApp(repository: repository, settings: settings));
 }

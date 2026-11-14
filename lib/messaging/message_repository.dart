@@ -1,32 +1,344 @@
+import 'dart:typed_data';
+
 import 'package:flutter/services.dart';
+
+import '../src/rust/api/message_analysis.dart';
+import 'models.dart';
 
 typedef MessageRecord = Map<String, dynamic>;
 
+/// 平台通道的统一封装。所有短信读写都经过 Kotlin 平台层；
+/// 验证码/分类由 Rust 引擎批量计算。
 class MessageRepository {
   const MessageRepository();
-  static const _channel = MethodChannel('dev.qingniao/messages');
-  static const _events = EventChannel('dev.qingniao/changes');
+
+  static const MethodChannel _channel = MethodChannel('com.blue.qingniao/messages');
+  static const EventChannel _events = EventChannel('com.blue.qingniao/changes');
+
   Stream<String> get changes => _events.receiveBroadcastStream().cast<String>();
+
   Future<T?> invoke<T>(String method, [MessageRecord? arguments]) =>
       _channel.invokeMethod<T>(method, arguments);
-  Future<List<MessageRecord>> records(
-    String method, [
-    MessageRecord? arguments,
-  ]) async {
-    final result = await _channel.invokeListMethod<dynamic>(method, arguments);
-    return (result ?? [])
-        .map((item) => Map<String, dynamic>.from(item as Map))
-        .toList();
-  }
+
+  Future<List<MessageRecord>> records(String method, [MessageRecord? arguments]) =>
+      _list(method, arguments);
 
   Future<bool> hasAccess() async {
-    final result = await _channel.invokeMapMethod<String, dynamic>('access');
-    return result != null && result.values.every((value) => value == true);
+    final state = await _map('access');
+    return state['defaultApp'] == true && state['readSms'] == true && state['sendSms'] == true;
+  }
+
+  Future<Map<String, dynamic>> _map(
+    String method, [
+    Map<String, dynamic>? args,
+  ]) async {
+    final result = await _channel.invokeMapMethod<String, dynamic>(
+      method,
+      args,
+    );
+    return result ?? const {};
+  }
+
+  Future<List<Map<String, dynamic>>> _list(
+    String method, [
+    Map<String, dynamic>? args,
+  ]) async {
+    final result = await _channel.invokeListMethod<dynamic>(method, args);
+    return (result ?? const [])
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList(growable: false);
+  }
+
+  Future<T?> _invoke<T>(String method, [Map<String, dynamic>? args]) =>
+      _channel.invokeMethod<T>(method, args);
+
+  Future<AccessState> access() async =>
+      AccessState.fromMap(await _map('access'));
+
+  Future<void> requestAccess() => _channel.invokeMethod<void>('requestAccess');
+
+  Future<void> openAppSettings() => _channel.invokeMethod<void>('appSettings');
+
+  Future<void> openNotificationSettings() =>
+      _channel.invokeMethod<void>('notificationSettings');
+
+  Future<void> openUrl(String url) => _channel.invokeMethod<void>('openUrl', {'url': url});
+
+  Future<List<ThreadSummary>> conversations({
+    String query = '',
+    String filter = 'all',
+  }) async {
+    final rows = await _list('conversations', {
+      'query': query,
+      'filter': filter,
+    });
+    return rows.map(ThreadSummary.fromMap).toList(growable: false);
+  }
+
+  Future<List<SmsMessage>> messages({
+    required int threadId,
+    int? before,
+    int limit = 80,
+  }) async {
+    final rows = await _list('messages', {
+      'threadId': threadId,
+      if (before != null) 'before': before,
+      'limit': limit,
+    });
+    return rows.map(SmsMessage.fromMap).toList(growable: false);
+  }
+
+  Future<int?> send({
+    required String address,
+    required String body,
+    int? subscriptionId,
+  }) => _invoke<int>('send', {
+    'address': address,
+    'body': body,
+    if (subscriptionId != null) 'subscriptionId': subscriptionId,
+  });
+
+  Future<int?> sendMms({
+    required List<String> recipients,
+    required String body,
+    int? subscriptionId,
+    String? attachment,
+  }) => _invoke<int>('sendMms', {
+    'recipients': recipients,
+    'body': body,
+    if (subscriptionId != null) 'subscriptionId': subscriptionId,
+    if (attachment != null) 'attachment': attachment,
+  });
+
+  Future<void> markRead(int threadId) =>
+      _channel.invokeMethod<void>('markRead', {'threadId': threadId});
+
+  Future<void> hide(int id) => _channel.invokeMethod<void>('hide', {'id': id});
+
+  Future<void> restore(int id) =>
+      _channel.invokeMethod<void>('restore', {'id': id});
+
+  Future<void> deleteForever(int id) =>
+      _channel.invokeMethod<void>('delete', {'id': id});
+
+  Future<List<TrashItem>> trash() async =>
+      (await _list('trash')).map(TrashItem.fromMap).toList(growable: false);
+
+  Future<void> setTrashRetention(int days) =>
+      _channel.invokeMethod<void>('trashRetention', {'days': days});
+
+  Future<int> purgeTrash(int days) async =>
+      await _invoke<int>('purgeTrash', {'days': days}) ?? 0;
+
+  Future<List<SimCard>> subscriptions() async =>
+      (await _list('subscriptions'))
+          .map(SimCard.fromMap)
+          .toList(growable: false);
+
+  Future<String?> draft(String address) =>
+      _invoke<String>('draft', {'address': address});
+
+  Future<void> saveDraft(String address, String body) => _channel
+      .invokeMethod<void>('saveDraft', {'address': address, 'body': body});
+
+  Future<ContactChoice?> pickContact() async {
+    final map = await _channel.invokeMapMethod<String, dynamic>('pickContact');
+    if (map == null || (map['number'] as String? ?? '').isEmpty) return null;
+    return ContactChoice.fromMap(map);
+  }
+
+  Future<AttachmentChoice?> pickAttachment() async {
+    final map = await _channel.invokeMapMethod<String, dynamic>(
+      'pickAttachment',
+    );
+    if (map == null || (map['uri'] as String? ?? '').isEmpty) return null;
+    return AttachmentChoice.fromMap(map);
+  }
+
+  Future<Uint8List?> attachmentData(String uri) =>
+      _invoke<Uint8List>('attachmentData', {'uri': uri});
+
+  Future<void> retryMms() => _channel.invokeMethod<void>('retryMms');
+
+  Future<void> pin(int threadId, bool pinned) => _channel.invokeMethod<void>(
+    'pin',
+    {'threadId': threadId, 'pinned': pinned},
+  );
+
+  Future<void> archive(int threadId, bool archived) =>
+      _channel.invokeMethod<void>('archive', {
+        'threadId': threadId,
+        'archived': archived,
+      });
+
+  Future<void> block(String address) =>
+      _channel.invokeMethod<void>('block', {'address': address});
+
+  Future<void> unblock(String address) =>
+      _channel.invokeMethod<void>('unblock', {'address': address});
+
+  Future<List<BlockedNumber>> blocked() async =>
+      (await _list('blocked'))
+          .map(BlockedNumber.fromMap)
+          .toList(growable: false);
+
+  Future<int> schedule({
+    required String address,
+    required String body,
+    required int at,
+    int? subscriptionId,
+  }) async =>
+      await _invoke<int>('schedule', {
+        'address': address,
+        'body': body,
+        'at': at,
+        if (subscriptionId != null) 'subscriptionId': subscriptionId,
+      }) ??
+      0;
+
+  Future<List<ScheduledMessage>> scheduled() async =>
+      (await _list('scheduled'))
+          .map(ScheduledMessage.fromMap)
+          .toList(growable: false);
+
+  Future<void> cancelScheduled(int id) =>
+      _channel.invokeMethod<void>('cancelScheduled', {'id': id});
+
+  Future<Map<String, dynamic>> launchIntent() => _map('launchIntent');
+
+  Future<String?> systemSeed() => _invoke<String>('systemSeed');
+
+  Future<Map<String, String>> settingsAll() async {
+    final map = await _map('settingsAll');
+    return map.map((key, value) => MapEntry(key, '$value'));
+  }
+
+  Future<void> settingsSet(String key, String value) =>
+      _channel.invokeMethod<void>('settingsSet', {'key': key, 'value': value});
+
+  Future<EngineStats> stats() async => EngineStats.fromMap(await _map('stats'));
+
+  Future<bool> exportBackup() async =>
+      await _invoke<bool>('exportBackup') ?? false;
+
+  Future<bool> importBackup() async =>
+      await _invoke<bool>('importBackup') ?? false;
+
+  Future<Map<String, dynamic>> syncStatus() => _map('syncStatus');
+
+  Future<Map<String, dynamic>> syncConfigure({
+    required String serverUrl,
+    required bool enabled,
+    String? deviceName,
+  }) => _map('syncConfigure', {
+    'serverUrl': serverUrl,
+    'enabled': enabled,
+    if (deviceName != null) 'deviceName': deviceName,
+  });
+
+  Future<Map<String, dynamic>> syncPair(String pairingCode) =>
+      _map('syncPair', {'code': pairingCode});
+
+  Future<Map<String, dynamic>> syncNow() => _map('syncNow');
+
+  Future<void> syncReset() => _channel.invokeMethod<void>('syncReset');
+
+  /// 批量补充验证码与分类。Rust 不可用时保持原值，不阻塞列表。
+  Future<List<SmsMessage>> analyzeMessages(List<SmsMessage> messages) async {
+    if (messages.isEmpty) return messages;
+    try {
+      final insights = await analyzeMessagesRust(
+        bodies: messages.map((message) => message.body).toList(growable: false),
+      );
+      if (insights.length != messages.length) return messages;
+      return [
+        for (var index = 0; index < messages.length; index++)
+          messages[index].copyWith(
+            category: categoryFrom(insights[index].category),
+            otp: insights[index].verificationCode,
+          ),
+      ];
+    } catch (_) {
+      return messages;
+    }
+  }
+
+  Future<List<ThreadSummary>> analyzeThreads(
+    List<ThreadSummary> threads,
+  ) async {
+    if (threads.isEmpty) return threads;
+    try {
+      final insights = await analyzeMessagesRust(
+        bodies: threads.map((thread) => thread.preview).toList(growable: false),
+      );
+      if (insights.length != threads.length) return threads;
+      return [
+        for (var index = 0; index < threads.length; index++)
+          ThreadSummary(
+            threadId: threads[index].threadId,
+            address: threads[index].address,
+            displayName: threads[index].displayName,
+            preview: threads[index].preview,
+            date: threads[index].date,
+            unread: threads[index].unread,
+            subscriptionId: threads[index].subscriptionId,
+            messageType: threads[index].messageType,
+            pinned: threads[index].pinned,
+            archived: threads[index].archived,
+            blocked: threads[index].blocked,
+            category: categoryFrom(insights[index].category),
+            otp: insights[index].verificationCode,
+            recipients: threads[index].recipients,
+            count: threads[index].count,
+            hasMms: threads[index].hasMms,
+            latestId: threads[index].latestId,
+            latestBody: threads[index].latestBody,
+          ),
+      ];
+    } catch (_) {
+      return threads;
+    }
   }
 }
+
+/// 与 Rust 桥接的薄封装，便于未来替换为带位置信息的分析结果。
+Future<List<MessageInsight>> analyzeMessagesRust({
+  required List<String> bodies,
+}) => analyzeMessages(bodies: bodies);
 
 String messageError(Object error) => switch (error) {
   PlatformException(:final message) => message ?? '系统消息服务不可用',
   MissingPluginException() => '短信功能需要在 Android 手机上运行',
   _ => '操作未完成，请重试',
 };
+
+ThreadSummary demoThread({
+  required int id,
+  required String address,
+  required String name,
+  required String body,
+  required int date,
+  int unread = 0,
+  bool pinned = false,
+  bool archived = false,
+  MessageCategory category = MessageCategory.personal,
+  String? otp,
+  int subscriptionId = 1,
+  bool hasMms = false,
+}) => ThreadSummary(
+  threadId: id,
+  address: address,
+  displayName: name,
+  preview: body,
+  date: date,
+  unread: unread,
+  subscriptionId: subscriptionId,
+  pinned: pinned,
+  archived: archived,
+  category: category,
+  otp: otp,
+  count: 1 + unread,
+  hasMms: hasMms,
+  latestBody: body,
+);
