@@ -306,7 +306,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               AuroraSettingTile(
                 title: '导出本地备份',
-                subtitle: '包含短信、草稿与设置，不含彩信附件',
+                subtitle: '包含短信、草稿、置顶/归档与黑名单，不含彩信附件',
                 icon: Icons.file_upload_outlined,
                 onTap: () async {
                   final ok = await widget.repository.exportBackup();
@@ -322,7 +322,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   final confirmed = await showAuroraDialog<bool>(
                     context: context,
                     title: const Text('从备份恢复？'),
-                    content: const Text('导入的短信将写入系统短信库，并记录到当前会话中。'),
+                    content: const Text('导入的短信、草稿、置顶/归档与黑名单会合并到本机，不会覆盖现有记录。'),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context, false),
