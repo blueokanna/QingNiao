@@ -4,17 +4,19 @@ import java.net.URI
 
 /** Restricts metadata and download redirects to the project's GitHub release infrastructure. */
 internal object AppUpdatePolicy {
-    const val REPOSITORY = "blueokanna/qingniao"
+    const val REPOSITORY = "blueokanna/QingNiao"
     const val LATEST_URL = "https://api.github.com/repos/$REPOSITORY/releases/latest"
     const val MAX_APK_BYTES = 256L * 1024 * 1024
     const val MAX_METADATA_BYTES = 1024 * 1024
 
-    private val assetPath = Regex("/$REPOSITORY/releases/download/v[0-9]+\\.[0-9]+\\.[0-9]+/(update\\.json|qingniao-release\\.apk)")
+    private val assetPath = Regex("/(?i:$REPOSITORY)/releases/download/(v[0-9]+\\.[0-9]+\\.[0-9]+)/(update\\.json|qingniao-release\\.apk)")
 
-    fun releaseAsset(raw: String): Boolean = runCatching {
+    fun releaseAsset(raw: String, tag: String? = null, name: String? = null): Boolean = runCatching {
         val uri = URI(raw)
+        val match = assetPath.matchEntire(uri.rawPath) ?: return false
         secure(uri) && uri.host == "github.com" &&
-            assetPath.matches(uri.rawPath) &&
+            (tag == null || match.groupValues[1] == tag) &&
+            (name == null || match.groupValues[2] == name) &&
             uri.rawQuery == null && uri.rawFragment == null
     }.getOrDefault(false)
 

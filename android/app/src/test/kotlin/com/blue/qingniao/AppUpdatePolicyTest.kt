@@ -20,6 +20,15 @@ class AppUpdatePolicyTest {
         )) assertFalse(url, AppUpdatePolicy.releaseAsset(url))
     }
 
+    @Test fun githubRepositoryCasingKeepsReleaseTagAndAssetNameExact() {
+        val root = "https://github.com/blueokanna/QingNiao/releases/download/v0.1.2"
+        assertTrue(AppUpdatePolicy.releaseAsset("$root/update.json", "v0.1.2", "update.json"))
+        assertTrue(AppUpdatePolicy.releaseAsset("$root/qingniao-release.apk", "v0.1.2", "qingniao-release.apk"))
+        assertFalse(AppUpdatePolicy.releaseAsset("$root/update.json", "v0.1.1", "update.json"))
+        assertFalse(AppUpdatePolicy.releaseAsset("$root/update.json", "v0.1.2", "qingniao-release.apk"))
+        assertFalse(AppUpdatePolicy.releaseAsset("$root/Update.json", "v0.1.2", "update.json"))
+    }
+
     @Test fun redirectsStayOnExplicitHttpsAssetHosts() {
         assertTrue(AppUpdatePolicy.downloadUrl("https://release-assets.githubusercontent.com/github-production-release-asset/1?sig=abc"))
         assertTrue(AppUpdatePolicy.downloadUrl("https://objects.githubusercontent.com/asset"))

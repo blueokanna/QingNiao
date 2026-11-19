@@ -78,7 +78,6 @@ internal object AppUpdates {
     private fun parseRelease(raw: JSONObject): Release? {
         if (raw.optBoolean("draft", true) || raw.optBoolean("prerelease", true)) return null
         val tag = raw.getString("tag_name")
-        val assetRoot = "https://github.com/${AppUpdatePolicy.REPOSITORY}/releases/download/$tag"
         val assets = raw.getJSONArray("assets")
         require(assets.length() <= 100)
         fun asset(name: String): JSONObject {
@@ -90,7 +89,7 @@ internal object AppUpdates {
         val manifestAsset = asset("update.json")
         require(manifestAsset.getLong("size") in 1..AppUpdatePolicy.MAX_METADATA_BYTES.toLong())
         val manifestUrl = manifestAsset.getString("browser_download_url")
-        require(manifestUrl == "$assetRoot/update.json" && AppUpdatePolicy.releaseAsset(manifestUrl))
+        require(AppUpdatePolicy.releaseAsset(manifestUrl, tag, "update.json"))
         val connection = open(manifestUrl)
         val manifest = try { readJson(connection) } finally { connection.disconnect() }
         require(integer(manifest, "schemaVersion") == 1L)
@@ -107,7 +106,7 @@ internal object AppUpdates {
         val apk = asset("qingniao-release.apk")
         require(apk.getLong("size") == size)
         val apkUrl = apk.getString("browser_download_url")
-        require(apkUrl == "$assetRoot/qingniao-release.apk")
+        require(AppUpdatePolicy.releaseAsset(apkUrl, tag, "qingniao-release.apk"))
         return Release(version, code, size, sha256, apkUrl,
             "https://github.com/${AppUpdatePolicy.REPOSITORY}/releases/tag/v$version",
             raw.optString("body").take(12_000))
