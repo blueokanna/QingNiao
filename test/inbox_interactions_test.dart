@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:qingniao/app/app_settings.dart';
 import 'package:qingniao/aurora/aurora_engine.dart';
 import 'package:qingniao/aurora/aurora_theme.dart';
+import 'package:qingniao/aurora/aurora_widgets.dart';
 import 'package:qingniao/l10n/app_strings.dart';
 import 'package:qingniao/messaging/inbox_screen.dart';
 import 'package:qingniao/messaging/message_hub.dart';
@@ -19,6 +20,7 @@ void main() {
     WidgetTester tester, {
     AppSettings? settings,
     TextDirection direction = TextDirection.ltr,
+    bool disableAnimations = false,
   }) async {
     final repository = FixtureMessageRepository();
     final hub = MessageHub(repository)..start();
@@ -33,6 +35,11 @@ void main() {
           theme: buildAuroraTheme(
             brightness: Brightness.light,
             appearance: const AuroraAppearance(),
+          ),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(disableAnimations: disableAnimations),
+            child: child!,
           ),
           home: Directionality(
             textDirection: direction,
@@ -99,6 +106,80 @@ void main() {
       expect((await repository.trash()).length, greaterThan(before));
       expect(tester.takeException(), isNull);
     });
+  }
+
+  for (final direction in TextDirection.values) {
+    testWidgets('Partial swipe keeps four rounded corners in $direction', (
+      tester,
+    ) async {
+      final (repository, _) = await mount(tester, direction: direction);
+      final before = (await repository.trash()).length;
+      final row = find.byType(ConversationTile).first;
+      final gesture = await tester.startGesture(tester.getCenter(row));
+      await gesture.moveBy(const Offset(-20, 0));
+      await tester.pump();
+      await gesture.moveBy(const Offset(-80, 0));
+      await tester.pump();
+      final surface = find.descendant(
+        of: find.byType(Dismissible).first,
+        matching: find.byKey(const ValueKey('swipe-action-surface')),
+      );
+      expect(surface, findsOneWidget);
+      final glass = tester.widget<AuroraGlass>(surface);
+      expect(glass.radius, ConversationTile.radius);
+      expect(glass.clip, isTrue);
+      final size = tester.getSize(surface);
+      expect(size.width, inInclusiveRange(65, 105));
+      expect(size.width, lessThan(tester.getSize(row).width));
+      final path = RoundedSuperellipseBorder(
+        borderRadius: BorderRadius.circular(glass.radius),
+      ).getOuterPath(Offset.zero & size);
+      for (final corner in [
+        const Offset(1, 1),
+        Offset(size.width - 1, 1),
+        Offset(1, size.height - 1),
+        Offset(size.width - 1, size.height - 1),
+      ]) {
+        expect(path.contains(corner), isFalse);
+      }
+      // Pause before release to avoid turning a short drag into a fling.
+      await tester.pump(const Duration(milliseconds: 300));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect((await repository.trash()).length, before);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final platform in [false, true]) {
+    testWidgets(
+      'Swipe settles without motion for ${platform ? 'platform' : 'app'} preference',
+      (tester) async {
+        final settings = AppSettings()
+          ..motionLevel = platform
+              ? AuroraMotionLevel.full
+              : AuroraMotionLevel.reduced;
+        final (repository, _) = await mount(
+          tester,
+          settings: settings,
+          disableAnimations: platform,
+        );
+        expect(
+          tester
+              .widget<Dismissible>(find.byType(Dismissible).first)
+              .movementDuration,
+          Duration.zero,
+        );
+        final before = (await repository.trash()).length;
+        await tester.drag(
+          find.byType(ConversationTile).first,
+          const Offset(-300, 0),
+        );
+        await tester.pumpAndSettle();
+        expect((await repository.trash()).length, greaterThan(before));
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets('Canceled swipe and disabled gestures do not change storage', (

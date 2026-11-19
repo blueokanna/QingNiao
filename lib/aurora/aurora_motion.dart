@@ -2,13 +2,19 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../app/app_settings.dart';
 import 'aurora_engine.dart';
 
-bool _motionDisabled(BuildContext context) =>
-    MediaQuery.disableAnimationsOf(context) ||
-    AuroraEngine.instance.reduceMotion;
-
 abstract final class AuroraMotion {
+  /// Depend on both platform and app preferences so mounted controls update too.
+  static bool isReduced(BuildContext context) =>
+      MediaQuery.disableAnimationsOf(context) ||
+      AppScope.maybeOf(context)?.motionLevel == AuroraMotionLevel.reduced ||
+      AuroraEngine.instance.reduceMotion;
+
+  static Duration duration(BuildContext context, Duration normal) =>
+      isReduced(context) ? Duration.zero : normal;
+
   static const fast = Duration(milliseconds: 160);
   static const base = Duration(milliseconds: 280);
   static const slow = Duration(milliseconds: 420);
@@ -61,7 +67,7 @@ class AuroraAccessiblePageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    if (_motionDisabled(context)) return child;
+    if (AuroraMotion.isReduced(context)) return child;
     return _delegate.buildTransitions(
       route,
       context,
@@ -89,7 +95,7 @@ class AuroraPageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    if (_motionDisabled(context)) return child;
+    if (AuroraMotion.isReduced(context)) return child;
     final enter = CurvedAnimation(
       parent: animation,
       curve: AuroraMotion.decelerate,
@@ -139,7 +145,7 @@ class AuroraSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (_motionDisabled(context)) return child;
+    if (AuroraMotion.isReduced(context)) return child;
     final begin = axis == Axis.vertical
         ? const Offset(0, .035)
         : const Offset(.04, 0);
@@ -179,7 +185,7 @@ class AuroraReveal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (_motionDisabled(context)) return child;
+    if (AuroraMotion.isReduced(context)) return child;
     final extra = delay ? (math.min(index, 9) * 38) : 0;
     final duration = AuroraMotion.reveal + Duration(milliseconds: extra);
     final start = extra / duration.inMilliseconds;
@@ -213,7 +219,7 @@ class AuroraCounter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (_motionDisabled(context)) {
+    if (AuroraMotion.isReduced(context)) {
       return Text('$value', style: style);
     }
     return TweenAnimationBuilder<double>(
@@ -246,7 +252,7 @@ class AuroraParallax extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (_motionDisabled(context)) return child;
+    if (AuroraMotion.isReduced(context)) return child;
     return AnimatedBuilder(
       animation: controller,
       child: child,

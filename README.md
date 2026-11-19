@@ -14,6 +14,7 @@
 | --- | --- |
 | 支持平台 | Android 12 及以上（API 31+） |
 | 应用包名 | `com.blue.qingniao` |
+| 当前源码版本 | **0.1.2** · Android versionCode **2** |
 | 技术栈 | Flutter / Dart · Kotlin · Rust |
 | 设计 | Material 3 组件、Expressive 形状与 Aurora 动效 |
 | 许可证 | [PolyForm Small Business License 1.0.0](LICENSE) |
@@ -27,28 +28,45 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/preview-dark.png" alt="青鸟短信深色与 AMOLED 界面：收件箱、会话与设置">
+  <img src="docs/images/preview-dark.png" alt="青鸟 0.1.2 深色界面：收件箱、会话与设置">
 </p>
 
 <p align="center">
-  <img src="docs/images/preview-navigation.png" alt="导航栏外观：模糊强度与表面不透明度调节">
+  <img src="docs/images/preview-navigation.png" alt="青鸟 0.1.2 导航栏外观：白色边缘高光开关、模糊强度与表面不透明度">
 </p>
 
-<p align="center"><sub>截图由 <code>test/preview_screens_test.dart</code> 用真实 widget 树离屏渲染生成，会话内容为测试夹具数据。</sub></p>
+<p align="center"><sub>0.1.2 界面由 <code>test/preview_screens_test.dart</code> 用真实 widget 树离屏渲染，<code>tool/compose_previews.py</code> 排版。会话与 SIM 信息为测试夹具，不是真机短信。</sub></p>
+
+0.1.2 加入持久化收件恢复与 GitHub Release 更新流程，修复手输号码发送和外部短信链接预填，完善每条消息的 SIM/eSIM 来源、滑动圆角、带文字的写短信入口与可关闭的导航高光。接收机制及验证范围见 [可靠性与性能说明](docs/reliability-and-performance.md)；正式 APK 的发布状态以 [GitHub Releases](https://github.com/blueokanna/qingniao/releases) 为准。
+
+<details>
+<summary>重新生成预览图（PowerShell）</summary>
+
+从仓库根目录运行。Python 环境需要安装 Pillow。
+
+```powershell
+$env:QINGNIAO_RENDER_PREVIEW = '1'
+flutter test test/preview_screens_test.dart
+Remove-Item Env:QINGNIAO_RENDER_PREVIEW
+python tool/compose_previews.py
+```
+
+</details>
 
 ## 功能
 
 | 模块 | 能力 |
 | --- | --- |
-| 短信与彩信 | 默认短信角色、双卡、长短信分段、发送与送达状态、混合 SMS/MMS 会话、群组收件人与附件预览 |
+| 短信与彩信 | 默认短信角色、双卡/eSIM 来源标识、持久化收件恢复、长短信分段、发送与送达状态、混合 SMS/MMS 会话、群组收件人与附件预览 |
 | 会话管理 | 搜索、分页、草稿、多选、置顶、归档、黑名单与可配置滑动操作 |
 | 未读管理 | 长按底部「消息」将所有消息标为已读；长按「验证码」仅处理验证码会话；验证码导航角标显示未读数量 |
 | 验证码 | 本机提取、一键复制、敏感剪贴板标记与可关闭的阅后回收 |
 | 回收站 | 恢复、永久删除与保留期限；无法确认系统删除时保留本地记录 |
 | 定时发送 | 持久化任务、系统闹钟、启动及重启恢复；缺少精确闹钟权限时使用降级调度 |
 | 通知 | 快捷回复、标为已读、复制验证码；增强通知的最终展示由系统决定 |
-| 个性化 | 系统动态取色、六套参考色、深浅主题、AMOLED、导航模糊调节、三种自适应图标与字体选择 |
+| 个性化 | 系统动态取色、六套参考色、深浅主题、AMOLED、导航模糊与高光开关、三种自适应图标与字体选择 |
 | 语言与无障碍 | 十种语言资源、RTL、系统字体缩放与减少动态效果支持 |
+| 在线更新 | GitHub 正式 Release、前台自动检查、下载进度、包名与签名校验、系统确认安装 |
 
 阅后回收只处理加载时未读、在前台会话中完整显示约两秒的验证码；滚动、切到后台或进入多选会打断计时。批量已读不触发回收，通知到期也不等于删除消息。错过发送时间的定时任务保留待确认，不会在重启后集中补发。
 
@@ -58,7 +76,7 @@
 
 界面以 Material 3 组件、色调表面和 Expressive 形状为基础，头像使用缓慢的形状过渡。系统动态取色读取 Android 色阶，在 HCT 色彩空间将彩度调整为原值的 80%，尽量保留色相与明度；最终显示受色域约束。手动参考色板独立于此调整。
 
-底部胶囊使用裁剪范围内的实时高斯背景模糊，直接参与当前画面的合成，不使用背景截图。在「外观 → 导航栏外观」中可设置模糊强度 **0–32**、表面不透明度 **55%–95%**；拖动时预览，松手后保存，强度为 0 时关闭模糊。高对比度模式提高表面遮罩浓度。
+底部胶囊使用裁剪范围内的实时高斯背景模糊，直接参与当前画面的合成，不使用背景截图。在「外观 → 导航栏外观」中可设置模糊强度 **0–32**、表面不透明度 **55%–95%**；拖动时预览，松手后保存，强度为 0 时关闭模糊。边缘高光开关控制胶囊轮廓的细白光带，默认开启，并随深浅主题调节亮度；关闭后保留基础轮廓。高对比度模式提高表面遮罩浓度。
 
 ### Rust 与 GPU 星空
 
@@ -84,6 +102,7 @@ Aurora 将星点与头像的环境更新限制为每秒最多 30 次，交互弹
 | --- | --- |
 | [`lib/aurora`](lib/aurora) | 主题、公共组件、弹簧、形状与环境动效调度 |
 | [`lib/messaging`](lib/messaging) | 会话、验证码、编辑器、彩信与回收站 |
+| [`lib/updates`](lib/updates) | 更新检查调度、下载状态与安装入口 |
 | [`lib/settings`](lib/settings)、[`lib/sync`](lib/sync) | 设置与同步客户端 |
 | [`android/app/src/main/kotlin`](android/app/src/main/kotlin) | 默认角色、Telephony、双卡、通知、权限与任务调度 |
 | [`rust/src`](rust/src) | 消息分析、搜索、MMS 编解码、星空参数与密码学模块 |
@@ -131,7 +150,7 @@ Android 单元测试与 lint 在 `android` 目录执行 `./gradlew testDebugUnit
 python tool/verify_android_pages.py build/app/outputs/flutter-apk/app-debug.apk
 ```
 
-对齐检查不代替 16 KB 页大小设备上的运行验证。十种语言的资源检查覆盖键名与占位符一致性，不代表所有翻译均已完成；部分新增配置文案在中英文以外使用英文回退。
+对齐检查不代替 16 KB 页大小设备上的运行验证。新增更新、SIM 与导航设置文案已补齐十种语言，资源检查覆盖键名与占位符一致性；实际语言体验仍需结合设备布局验收。
 
 修改 Rust 桥接接口后，使用仓库的 Android 生成入口更新绑定：
 
@@ -174,7 +193,7 @@ powershell -File tool/build-release.ps1 -SplitAbi
 powershell -File tool/build-release.ps1 -Bundle
 ```
 
-缺少签名凭据时发布构建失败，不回退到开发签名。发布前更新 `pubspec.yaml` 的版本代码，并核对最终证书、SHA-256 与产物。不要并行运行会更新插件注册文件的测试和发布构建。CI 可生成验证产物，并通过手动工作流创建 Release 草稿；具体参数以工作流为准。
+手动运行 Android delivery 工作流可生成生产签名的 APK 和 `update.json`，并创建 Release 草稿。发布为 Latest 后，应用在启动、恢复前台及持续前台使用期间检查更新。常规检查间隔为 5 分钟，检查失败后自动重试间隔为 30 分钟。用户可在设置中立即检查、关闭自动检查，或下载更新并交由 Android 确认安装。签名配置及发布步骤见 [发布与在线更新](docs/releases.md)。
 
 ## 可选联网功能
 

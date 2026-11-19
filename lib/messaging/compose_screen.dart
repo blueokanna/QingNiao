@@ -8,6 +8,7 @@ import 'format.dart';
 import 'message_hub.dart';
 import 'message_repository.dart';
 import 'models.dart';
+import 'sim_identity.dart';
 
 class ComposeScreen extends StatefulWidget {
   const ComposeScreen({
@@ -15,23 +16,29 @@ class ComposeScreen extends StatefulWidget {
     required this.repository,
     required this.hub,
     this.initialRecipient,
+    this.initialRecipients = const [],
+    this.initialBody = '',
   });
 
   final MessageRepository repository;
   final MessageHub hub;
   final String? initialRecipient;
+  final List<String> initialRecipients;
+  final String initialBody;
 
   @override
   State<ComposeScreen> createState() => _ComposeScreenState();
 }
 
-class _ComposeScreenState extends State<ComposeScreen> {
+class _ComposeScreenState extends State<ComposeScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _recipientInput = TextEditingController();
   final TextEditingController _body = TextEditingController();
   final FocusNode _bodyFocus = FocusNode();
   final List<ContactChoice> _recipients = [];
   List<SimCard> _sims = const [];
   int? _simId;
+  int _simGeneration = 0;
   AttachmentChoice? _attachment;
   bool _sending = false;
   String? _error;
@@ -39,32 +46,53 @@ class _ComposeScreenState extends State<ComposeScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialRecipient != null &&
-        widget.initialRecipient!.isNotEmpty) {
-      _recipients.add(
-        ContactChoice(number: widget.initialRecipient!, name: ''),
-      );
+    WidgetsBinding.instance.addObserver(this);
+    for (final value in [
+      if (widget.initialRecipient != null) widget.initialRecipient!,
+      ...widget.initialRecipients,
+    ]) {
+      final number = value.trim();
+      if (number.isNotEmpty && !_recipients.any((r) => r.number == number)) {
+        _recipients.add(ContactChoice(number: number, name: ''));
+      }
     }
+    _body.text = widget.initialBody;
     _loadSims();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _loadSims();
+  }
+
   Future<void> _loadSims() async {
+    final generation = ++_simGeneration;
     try {
       final sims = await widget.repository.subscriptions();
-      if (!mounted) return;
+      if (!mounted || generation != _simGeneration) return;
       setState(() {
         _sims = sims;
-        if (sims.length == 1) _simId = sims.first.id;
+        if (!sims.any((sim) => sim.id == _simId)) {
+          _simId = sims.length == 1 ? sims.first.id : null;
+        }
       });
-    } catch (_) {}
+    } catch (_) {
+      if (mounted && generation == _simGeneration) {
+        setState(() {
+          _sims = const [];
+          _simId = null;
+        });
+      }
+    }
   }
 
   void _addRecipient(String value) {
     final number = value.trim();
     if (number.isEmpty) return;
-    if (_recipients.any((item) => item.number == number)) return;
     setState(() {
-      _recipients.add(ContactChoice(number: number, name: ''));
+      if (!_recipients.any((item) => item.number == number)) {
+        _recipients.add(ContactChoice(number: number, name: ''));
+      }
       _recipientInput.clear();
     });
   }
@@ -72,7 +100,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
   Future<void> _pickContact() async {
     try {
       final contact = await widget.repository.pickContact();
-      if (contact == null) return;
+      if (contact == null || !mounted) return;
       if (_recipients.any((item) => item.number == contact.number)) return;
       setState(() => _recipients.add(contact));
     } catch (error) {
@@ -92,7 +120,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
   }
 
   Future<void> _pickSim() async {
-    if (_sims.length < 2) return;
+    await _loadSims();
+    if (!mounted || _sims.length < 2) return;
     final selected = await showAuroraSheet<int>(
       context: context,
       builder: (context) => Column(
@@ -100,8 +129,10 @@ class _ComposeScreenState extends State<ComposeScreen> {
         children: [
           for (final sim in _sims)
             AuroraSettingTile(
-              title: sim.label,
-              subtitle: sim.carrier,
+              title: simCardLabel(sim),
+              subtitle:
+                  '${tr('Subscription ID')}: ${sim.id}'
+                  '${sim.carrier.isEmpty ? '' : ' · ${sim.carrier}'}',
               icon: Icons.sim_card_outlined,
               trailing: sim.id == _simId
                   ? Icon(
@@ -115,10 +146,11 @@ class _ComposeScreenState extends State<ComposeScreen> {
         ],
       ),
     );
-    if (selected != null) setState(() => _simId = selected);
+    if (selected != null && mounted) setState(() => _simId = selected);
   }
 
   Future<void> _schedule() async {
+    _addRecipient(_recipientInput.text);
     final body = _body.text.trim();
     if (body.isEmpty) {
       showAuroraSnack(
@@ -179,6 +211,8 @@ class _ComposeScreenState extends State<ComposeScreen> {
 
   Future<void> _send() async {
     if (_sending) return;
+    // Tapping Send does not submit the phone keyboard's current value.
+    _addRecipient(_recipientInput.text);
     final body = _body.text.trim();
     if (_recipients.isEmpty) {
       setState(() => _error = tr("Add at least one recipient"));
@@ -221,6 +255,7 @@ class _ComposeScreenState extends State<ComposeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _recipientInput.dispose();
     _body.dispose();
     _bodyFocus.dispose();
@@ -395,14 +430,24 @@ class _ComposeScreenState extends State<ComposeScreen> {
                   Row(
                     children: [
                       if (_sims.isNotEmpty)
-                        ActionChip(
-                          avatar: const Icon(Icons.sim_card_outlined, size: 15),
-                          label: Text(
-                            _sims.length == 1
-                                ? 'SIM ${_sims.first.slot} · ${_sims.first.name}'
-                                : tr("Choose SIM"),
+                        Flexible(
+                          child: ActionChip(
+                            avatar: const Icon(
+                              Icons.sim_card_outlined,
+                              size: 15,
+                            ),
+                            label: Text(
+                              _simId == null
+                                  ? tr('Choose SIM')
+                                  : MessageSimSource.resolve(
+                                      _simId!,
+                                      _sims,
+                                    ).label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onPressed: _sending ? null : _pickSim,
                           ),
-                          onPressed: _sending ? null : _pickSim,
                         ),
                       const Spacer(),
                       Text(

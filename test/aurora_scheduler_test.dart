@@ -5,6 +5,34 @@ import 'package:qingniao/aurora/aurora_motion.dart';
 
 void main() {
   testWidgets(
+    'ambient clock follows a 30 Hz grid and sleeps after its last listener',
+    (tester) async {
+      final engine = AuroraEngine.instance;
+      engine.configure(
+        motion: AuroraMotionLevel.full,
+        reduce: false,
+        backdrop: true,
+      );
+      engine.resume();
+      engine.setRefreshRate(120);
+      engine.attach(tester);
+      addTearDown(engine.detach);
+      expect(tester.binding.transientCallbackCount, 0);
+      var updates = 0;
+      void observe() => updates++;
+      engine.clock.addListener(observe);
+      await tester.pump();
+      updates = 0;
+      for (var frame = 0; frame < 240; frame++) {
+        await tester.pump(const Duration(microseconds: 8333));
+      }
+      expect(updates, inInclusiveRange(59, 60));
+      engine.clock.removeListener(observe);
+      expect(tester.binding.transientCallbackCount, 0);
+    },
+  );
+
+  testWidgets(
     'app reduced motion bypasses reveal, switch and counter animations',
     (tester) async {
       final engine = AuroraEngine.instance;

@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_settings.dart';
+import '../aurora/aurora_motion.dart';
 import '../aurora/aurora_theme.dart';
 import '../aurora/aurora_widgets.dart';
 import 'format.dart';
@@ -16,6 +17,7 @@ import 'message_hub.dart';
 import 'message_repository.dart';
 import 'message_widgets.dart';
 import 'models.dart';
+import 'sim_identity.dart';
 import 'trash_screen.dart';
 
 class ConversationScreen extends StatefulWidget {
@@ -34,7 +36,8 @@ class ConversationScreen extends StatefulWidget {
   State<ConversationScreen> createState() => _ConversationScreenState();
 }
 
-class _ConversationScreenState extends State<ConversationScreen> {
+class _ConversationScreenState extends State<ConversationScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _body = TextEditingController();
   final FocusNode _focus = FocusNode();
   final ScrollController _scroll = ScrollController();
@@ -45,10 +48,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
   final Set<int> _unreadCodeIds = {};
   StreamSubscription<String>? _changes;
   Timer? _draftTimer;
+  Timer? _changeTimer;
+  Future<void>? _loadFuture;
+  bool _reloadQueued = false;
   AttachmentChoice? _attachment;
   int? _simId;
+  int _simGeneration = 0;
   bool _loading = true;
   bool _sending = false;
+  bool _openingAttachment = false;
   bool _more = true;
   bool _paging = false;
   int _loadGeneration = 0;
@@ -58,22 +66,50 @@ class _ConversationScreenState extends State<ConversationScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _body.addListener(_onComposerChanged);
     _scroll.addListener(_onScroll);
     _initialize();
-    _changes = widget.repository.changes.listen((event) {
-      if (event != 'intent') _load(silent: true);
-    });
+    _changes = widget.repository.changes.listen(
+      (event) {
+        if (event == 'intent' || event == 'sync' || !_foreground) return;
+        _changeTimer ??= Timer(const Duration(milliseconds: 120), () {
+          _changeTimer = null;
+          unawaited(_load(silent: true));
+        });
+      },
+      onError: (Object error) {
+        if (mounted) setState(() => _error = messageError(error));
+      },
+    );
+  }
+
+  bool get _foreground =>
+      WidgetsBinding.instance.lifecycleState == null ||
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshSims());
+      unawaited(_load(silent: true));
+    } else {
+      _changeTimer?.cancel();
+      _changeTimer = null;
+      // Invalidate a pending query before it can mark background messages read.
+      _loadGeneration++;
+      _draftTimer?.cancel();
+      unawaited(_saveDraft());
+      if (_paging) setState(() => _paging = false);
+    }
   }
 
   Future<void> _initialize() async {
     try {
-      final sims = await widget.repository.subscriptions();
+      await _refreshSims();
       final draft = await widget.repository.draft(widget.thread.address);
       if (!mounted) return;
       setState(() {
-        _sims = sims;
-        if (sims.length == 1) _simId = sims.first.id;
         if (draft != null && draft.isNotEmpty && _body.text.isEmpty) {
           _body.text = draft;
         }
@@ -85,6 +121,40 @@ class _ConversationScreenState extends State<ConversationScreen> {
         _loading = false;
         _error = messageError(error);
       });
+    }
+  }
+
+  Future<void> _refreshSims() async {
+    final generation = ++_simGeneration;
+    try {
+      final sims = await widget.repository.subscriptions();
+      if (!mounted || generation != _simGeneration) return;
+      setState(() {
+        _sims = sims;
+        if (!sims.any((sim) => sim.id == _simId)) {
+          _simId = sims.length == 1 ? sims.first.id : null;
+        }
+      });
+    } catch (_) {
+      if (mounted && generation == _simGeneration) {
+        setState(() {
+          _sims = const [];
+          _simId = null;
+        });
+      }
+    }
+  }
+
+  void _jumpToLatest() {
+    if (!_scroll.hasClients) return;
+    if (AuroraMotion.isReduced(context)) {
+      _scroll.jumpTo(0);
+    } else {
+      _scroll.animateTo(
+        0,
+        duration: AuroraMotion.page,
+        curve: AuroraMotion.decelerate,
+      );
     }
   }
 
@@ -107,8 +177,42 @@ class _ConversationScreenState extends State<ConversationScreen> {
     }
   }
 
-  Future<void> _load({bool silent = false, bool older = false}) async {
-    if (older && (_paging || !_more)) return;
+  Future<void> _load({bool silent = false, bool older = false}) {
+    if (!mounted || !_foreground || (older && !_more)) {
+      return Future<void>.value();
+    }
+    _changeTimer?.cancel();
+    _changeTimer = null;
+    if (_loadFuture != null) {
+      if (!older) _reloadQueued = true;
+      return _loadFuture!;
+    }
+    final completion = Completer<void>();
+    _loadFuture = completion.future;
+    unawaited(_drainLoads(completion, silent: silent, older: older));
+    return completion.future;
+  }
+
+  Future<void> _drainLoads(
+    Completer<void> completion, {
+    required bool silent,
+    required bool older,
+  }) async {
+    try {
+      await _loadOnce(silent: silent, older: older);
+      while (_reloadQueued && mounted && _foreground) {
+        _reloadQueued = false;
+        await _loadOnce(silent: true);
+      }
+    } finally {
+      _loadFuture = null;
+      _reloadQueued = false;
+      completion.complete();
+    }
+  }
+
+  Future<void> _loadOnce({bool silent = false, bool older = false}) async {
+    if (!mounted || !_foreground || (older && (_paging || !_more))) return;
     final generation = ++_loadGeneration;
     if (older) setState(() => _paging = true);
     try {
@@ -118,8 +222,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
         beforeDate: older && _messages.isNotEmpty ? _messages.first.date : null,
         limit: 80,
       );
+      if (!mounted || !_foreground || generation != _loadGeneration) return;
       final analyzed = await widget.repository.analyzeMessages(rows);
-      if (!mounted || generation != _loadGeneration) return;
+      if (!mounted || !_foreground || generation != _loadGeneration) return;
       _unreadCodeIds.addAll(
         analyzed
             .where((m) => !m.read && !m.outgoing && m.hasOtp)
@@ -140,7 +245,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
         _paging = false;
         _error = null;
       });
-      if (analyzed.any((message) => !message.read)) {
+      if ((ModalRoute.of(context)?.isCurrent ?? true) &&
+          analyzed.any((message) => !message.read && !message.outgoing)) {
         await widget.repository.markRead(widget.thread.threadId);
         widget.hub.refresh(silent: true);
       }
@@ -189,20 +295,21 @@ class _ConversationScreenState extends State<ConversationScreen> {
       if (!mounted) return;
       _body.clear();
       setState(() => _attachment = null);
-      await _saveDraft();
-      await _load(silent: true);
-      if (_scroll.hasClients) {
-        _scroll.animateTo(
-          0,
-          duration: const Duration(milliseconds: 360),
-          curve: Curves.easeOutQuint,
-        );
-      }
+      // Refreshing history can wait on unrelated provider work. Release the
+      // editor as soon as the modem has accepted the submission.
+      unawaited(_refreshAfterSend());
     } catch (error) {
       if (mounted) setState(() => _error = messageError(error));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  Future<void> _refreshAfterSend() async {
+    await _saveDraft();
+    if (!mounted) return;
+    await _load(silent: true);
+    if (mounted) _jumpToLatest();
   }
 
   Future<void> _schedule() async {
@@ -273,7 +380,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Future<void> _pickSim() async {
-    if (_sims.length < 2) return;
+    await _refreshSims();
+    if (!mounted || _sims.length < 2) return;
     final selected = await showAuroraSheet<int>(
       context: context,
       builder: (context) => Column(
@@ -281,10 +389,10 @@ class _ConversationScreenState extends State<ConversationScreen> {
         children: [
           for (final sim in _sims)
             AuroraSettingTile(
-              title: sim.label,
-              subtitle: sim.carrier.isEmpty
-                  ? tr("Sending number")
-                  : sim.carrier,
+              title: simCardLabel(sim),
+              subtitle:
+                  '${tr('Subscription ID')}: ${sim.id}'
+                  '${sim.carrier.isEmpty ? '' : ' · ${sim.carrier}'}',
               icon: Icons.sim_card_outlined,
               trailing: sim.id == _simId
                   ? Icon(
@@ -298,7 +406,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         ],
       ),
     );
-    if (selected != null) setState(() => _simId = selected);
+    if (selected != null && mounted) setState(() => _simId = selected);
   }
 
   // ignore: unused_element
@@ -396,8 +504,17 @@ class _ConversationScreenState extends State<ConversationScreen> {
             _detailRow(context, tr("Number"), message.address),
             if (message.sender.isNotEmpty)
               _detailRow(context, tr("Sender"), message.sender),
+            _detailRow(
+              context,
+              tr('SIM source'),
+              MessageSimSource.resolve(message.subscriptionId, _sims).label,
+            ),
             if (message.subscriptionId >= 0)
-              _detailRow(context, 'SIM', 'SIM ${message.subscriptionId}'),
+              _detailRow(
+                context,
+                tr('Subscription ID'),
+                '${message.subscriptionId}',
+              ),
             _detailRow(
               context,
               tr("Encoding"),
@@ -552,62 +669,83 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Future<void> _openAttachment(Attachment attachment) async {
-    final bytes = await widget.repository.attachmentData(attachment.uri);
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: .8),
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: bytes == null
-                    ? AspectRatio(
-                        aspectRatio: 4 / 3,
-                        child: ColoredBox(
-                          color: context.colors.surfaceContainerHigh,
-                          child: Center(
-                            child: Text(
-                              attachment.name,
-                              style: context.texts.bodyMedium,
-                            ),
-                          ),
-                        ),
-                      )
-                    : InteractiveViewer(
-                        child: Image.memory(
-                          bytes,
-                          cacheWidth: 1600,
-                          errorBuilder: (_, _, _) => Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Text(
-                              tr("Unable to decode image: {p0}", [
+    if (_openingAttachment) return;
+    _openingAttachment = true;
+    ResizeImage? preview;
+    try {
+      final bytes = await widget.repository.attachmentData(attachment.uri);
+      if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
+      final image = bytes == null
+          ? null
+          : ResizeImage(
+              MemoryImage(bytes),
+              width: 1600,
+              height: 1600,
+              policy: ResizeImagePolicy.fit,
+            );
+      preview = image;
+      await showDialog<void>(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: .8),
+        builder: (context) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: image == null
+                      ? AspectRatio(
+                          aspectRatio: 4 / 3,
+                          child: ColoredBox(
+                            color: context.colors.surfaceContainerHigh,
+                            child: Center(
+                              child: Text(
                                 attachment.name,
-                              ]),
+                                style: context.texts.bodyMedium,
+                              ),
+                            ),
+                          ),
+                        )
+                      : InteractiveViewer(
+                          child: Image(
+                            image: image,
+                            errorBuilder: (_, _, _) => Padding(
+                              padding: const EdgeInsets.all(32),
+                              child: Text(
+                                tr("Unable to decode image: {p0}", [
+                                  attachment.name,
+                                ]),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            AuroraIconButton(
-              icon: Icons.close_rounded,
-              onPressed: () => Navigator.pop(context),
-            ),
-          ],
+              const SizedBox(height: 12),
+              AuroraIconButton(
+                icon: Icons.close_rounded,
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    } catch (error) {
+      if (mounted) showAuroraSnack(context, messageError(error));
+    } finally {
+      _openingAttachment = false;
+      await preview?.evict();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _changeTimer?.cancel();
+    _loadGeneration++;
     _saveDraft();
     _body.removeListener(_onComposerChanged);
     _scroll.removeListener(_onScroll);
@@ -722,6 +860,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                             },
                             child: MessageBubble(
                               message: message,
+                              sims: _sims,
                               groupedTop: entry.groupedTop,
                               groupedBottom: entry.groupedBottom,
                               selected: _selected.contains(message.id),
@@ -762,11 +901,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         child: AuroraIconButton(
                           icon: Icons.keyboard_double_arrow_down_rounded,
                           tooltip: tr("Jump to latest"),
-                          onPressed: () => _scroll.animateTo(
-                            0,
-                            duration: const Duration(milliseconds: 360),
-                            curve: Curves.easeOutQuint,
-                          ),
+                          onPressed: _jumpToLatest,
                         ),
                       ),
                   ],
@@ -833,7 +968,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         break;
       }
     }
-    return sim == null ? tr("Choose SIM") : 'SIM ${sim.slot} · ${sim.name}';
+    return sim == null ? tr("Choose SIM") : simCardLabel(sim);
   }
 
   Widget _selectionBar(BuildContext context) {
@@ -874,11 +1009,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
       final groupedTop =
           sameDay &&
           previous.outgoing == message.outgoing &&
+          previous.subscriptionId == message.subscriptionId &&
+          previous.sender == message.sender &&
           message.date - previous.date < 4 * 60 * 1000;
       final groupedBottom =
           next != null &&
           _sameDay(next.date, message.date) &&
           next.outgoing == message.outgoing &&
+          next.subscriptionId == message.subscriptionId &&
+          next.sender == message.sender &&
           next.date - message.date < 4 * 60 * 1000;
       entries.add(
         _Entry.message(

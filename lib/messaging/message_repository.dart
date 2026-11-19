@@ -422,8 +422,9 @@ Future<List<MessageAnalysis>> analyzeMessagesRust({
 }) => analyzeMessages(bodies: bodies);
 
 String messageError(Object error) => switch (error) {
-  PlatformException(:final message) =>
-    message ?? tr("System messaging service unavailable"),
+  PlatformException(:final message) => tr(
+    message ?? "System messaging service unavailable",
+  ),
   MissingPluginException() => tr("SMS requires an Android phone"),
   _ => tr("Could not complete the action. Try again."),
 };

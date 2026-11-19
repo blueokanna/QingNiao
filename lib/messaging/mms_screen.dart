@@ -20,6 +20,7 @@ class _MmsScreenState extends State<MmsScreen> {
   StreamSubscription<String>? _changes;
   String? _error;
   bool _busy = false, _more = false;
+  bool _openingAttachment = false;
   @override
   void initState() {
     super.initState();
@@ -50,11 +51,25 @@ class _MmsScreenState extends State<MmsScreen> {
   }
 
   Future<void> _preview(Map attachment) async {
+    if (_openingAttachment) return;
+    _openingAttachment = true;
+    ResizeImage? preview;
     try {
       final bytes = await widget.repository.invoke<Uint8List>('mmsImage', {
         'id': int.parse(attachment['id'] as String),
       });
-      if (!mounted || bytes == null) return;
+      if (!mounted ||
+          bytes == null ||
+          ModalRoute.of(context)?.isCurrent == false) {
+        return;
+      }
+      final image = ResizeImage(
+        MemoryImage(bytes),
+        width: 1440,
+        height: 1440,
+        policy: ResizeImagePolicy.fit,
+      );
+      preview = image;
       await showDialog<void>(
         context: context,
         builder: (context) => Dialog(
@@ -63,9 +78,8 @@ class _MmsScreenState extends State<MmsScreen> {
             children: [
               Flexible(
                 child: InteractiveViewer(
-                  child: Image.memory(
-                    bytes,
-                    cacheWidth: 1440,
+                  child: Image(
+                    image: image,
                     errorBuilder: (_, _, _) => Padding(
                       padding: EdgeInsets.all(24),
                       child: Text(tr("Unable to decode image")),
@@ -83,6 +97,9 @@ class _MmsScreenState extends State<MmsScreen> {
       );
     } catch (error) {
       if (mounted) setState(() => _error = messageError(error));
+    } finally {
+      _openingAttachment = false;
+      await preview?.evict();
     }
   }
 

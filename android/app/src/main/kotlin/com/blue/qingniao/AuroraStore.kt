@@ -173,6 +173,21 @@ class AuroraStore(context: Context) : SQLiteOpenHelper(context, "aurora.db", nul
         }
     }
 
+    fun isBlocked(address: String): Boolean {
+        val key = MessageAddress.normalize(address)
+        if (key.isEmpty()) return false
+        return readableDatabase.rawQuery("SELECT address FROM blocked", null).use { cursor ->
+            while (cursor.moveToNext()) {
+                if (MessageAddress.normalize(cursor.getString(0)) == key) return@use true
+            }
+            false
+        }
+    }
+
+    fun isMuted(threadId: Long): Boolean = readableDatabase.rawQuery(
+        "SELECT muted FROM thread_state WHERE thread_id=?", arrayOf(threadId.toString()),
+    ).use { it.moveToFirst() && it.getInt(0) != 0 }
+
     fun block(address: String, note: String = "") {
         writableDatabase.execSQL(
             "INSERT OR REPLACE INTO blocked VALUES(?,?,?)",

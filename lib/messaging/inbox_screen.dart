@@ -8,6 +8,7 @@ import 'trash_screen.dart';
 
 import 'package:material_new_shapes/material_new_shapes.dart';
 
+import '../aurora/aurora_motion.dart';
 import '../aurora/aurora_shapes.dart';
 import '../aurora/aurora_theme.dart';
 import '../aurora/aurora_widgets.dart';
@@ -29,7 +30,7 @@ class InboxScreen extends StatefulWidget {
   State<InboxScreen> createState() => _InboxScreenState();
 }
 
-class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
+class _InboxScreenState extends State<InboxScreen> {
   final TextEditingController _search = TextEditingController();
   final ScrollController _scroll = ScrollController();
   bool _requesting = false;
@@ -42,18 +43,13 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     _search.text = widget.hub.query;
-    WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _openIntent());
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) widget.hub.refresh(silent: true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openIntent();
+    });
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _search.dispose();
     _scroll.dispose();
     super.dispose();
@@ -94,10 +90,29 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
     try {
       final data = await widget.repository.launchIntent();
       final address = '${data['address'] ?? ''}'.trim();
-      if (address.isEmpty || !mounted) return;
+      if (!mounted) return;
+      final body = '${data['body'] ?? ''}';
+      if (data['compose'] == true || body.isNotEmpty) {
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ComposeScreen(
+              repository: widget.repository,
+              hub: widget.hub,
+              initialRecipient: data['recipients'] is List ? null : address,
+              initialRecipients:
+                  (data['recipients'] as List?)?.whereType<String>().toList() ??
+                  const [],
+              initialBody: body,
+            ),
+          ),
+        );
+        await widget.hub.refresh(silent: true);
+        return;
+      }
+      if (address.isEmpty) return;
       await widget.hub.refresh(silent: true);
       if (!mounted || !widget.hub.access.ready) return;
-      final matches = widget.hub.threads.where(
+      final matches = widget.hub.allThreads.where(
         (thread) =>
             thread.address == address || thread.recipients.contains(address),
       );
@@ -288,9 +303,7 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
                 ?.isScrolledUnder ==
             true;
         return AnimatedContainer(
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 240),
+          duration: AuroraMotion.duration(context, AuroraMotion.base),
           decoration: BoxDecoration(
             color: scrolled ? context.colors.surface : Colors.transparent,
             borderRadius: const BorderRadius.vertical(
@@ -438,18 +451,12 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
                       padding: const EdgeInsets.fromLTRB(24, 2, 24, 8),
                       child: Align(
                         alignment: AlignmentDirectional.centerStart,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: AlignmentDirectional.centerStart,
-                          child: Text(
-                            '\u9752\u9e1f\u8854\u661f\u81f3\uff0c\u5c3a\u7d20\u5bc4\u5fc3\u95f4',
-                            maxLines: 1,
-                            softWrap: false,
-                            style: context.texts.bodyMedium?.copyWith(
-                              color: context.colors.onSurfaceVariant,
-                              height: 1.65,
-                              letterSpacing: 2,
-                            ),
+                        child: Text(
+                          '\u9752\u9e1f\u8854\u661f\u81f3\uff0c\u5c3a\u7d20\u5bc4\u5fc3\u95f4',
+                          style: context.texts.bodyMedium?.copyWith(
+                            color: context.colors.onSurfaceVariant,
+                            height: 1.65,
+                            letterSpacing: 2,
                           ),
                         ),
                       ),
@@ -571,44 +578,19 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
           final start = rtl ? left : right;
           final end = rtl ? right : left;
           return Padding(
+            key: ValueKey(thread.threadId),
             padding: const EdgeInsets.only(bottom: 8),
-            child: Dismissible(
-              key: ValueKey('thread-${thread.threadId}'),
-              direction: _selecting || _bulkBusy
-                  ? DismissDirection.none
-                  : start == ThreadSwipeAction.none &&
-                        end == ThreadSwipeAction.none
-                  ? DismissDirection.none
-                  : start == ThreadSwipeAction.none
-                  ? DismissDirection.endToStart
-                  : end == ThreadSwipeAction.none
-                  ? DismissDirection.startToEnd
-                  : DismissDirection.horizontal,
-              resizeDuration: null,
-              dismissThresholds: const {
-                DismissDirection.startToEnd: .38,
-                DismissDirection.endToStart: .38,
-              },
-              background: _swipeBackground(
-                start,
-                AlignmentDirectional.centerStart,
-              ),
-              secondaryBackground: _swipeBackground(
-                end,
-                AlignmentDirectional.centerEnd,
-              ),
-              confirmDismiss: (direction) async {
-                await _swipe(
-                  thread,
-                  direction == DismissDirection.startToEnd ? start : end,
-                );
-                return false;
-              },
+            child: _ConversationSwipe(
+              threadId: thread.threadId,
+              enabled: !_selecting && !_bulkBusy,
+              start: start,
+              end: end,
+              onSwipe: (action) => _swipe(thread, action),
               child: ConversationTile(
                 thread: thread,
                 selected: _selected.contains(thread.threadId),
                 selectionMode: _selecting,
-                showSim: widget.hub.sims.length > 1,
+                sims: widget.hub.sims,
                 onTap: () => _selecting ? _toggle(thread) : _openThread(thread),
                 onLongPress: () => _toggle(thread),
               ),
@@ -618,27 +600,6 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
       ),
     );
   }
-
-  Widget _swipeBackground(
-    ThreadSwipeAction action,
-    AlignmentGeometry alignment,
-  ) => _SwipeBackground(
-    alignment: alignment,
-    color: action == ThreadSwipeAction.trash
-        ? context.colors.errorContainer
-        : context.colors.primaryContainer,
-    foreground: action == ThreadSwipeAction.trash
-        ? context.colors.onErrorContainer
-        : context.colors.onPrimaryContainer,
-    icon: switch (action) {
-      ThreadSwipeAction.trash => Icons.delete_outline_rounded,
-      ThreadSwipeAction.read => Icons.done_all_rounded,
-      ThreadSwipeAction.archive => Icons.archive_outlined,
-      ThreadSwipeAction.pin => Icons.push_pin_outlined,
-      ThreadSwipeAction.none => Icons.block_rounded,
-    },
-    label: swipeActionLabel(action),
-  );
 
   Widget _sectionLabel(BuildContext context, String label) => Padding(
     padding: const EdgeInsets.fromLTRB(24, 12, 24, 6),
@@ -728,39 +689,134 @@ class _InboxScreenState extends State<InboxScreen> with WidgetsBindingObserver {
   }
 }
 
-class _SwipeBackground extends StatelessWidget {
-  const _SwipeBackground({
-    required this.alignment,
-    required this.color,
-    required this.foreground,
-    required this.icon,
-    required this.label,
+class _ConversationSwipe extends StatefulWidget {
+  const _ConversationSwipe({
+    required this.threadId,
+    required this.enabled,
+    required this.start,
+    required this.end,
+    required this.onSwipe,
+    required this.child,
   });
 
-  final AlignmentGeometry alignment;
-  final Color color;
-  final Color foreground;
-  final IconData icon;
-  final String label;
+  final int threadId;
+  final bool enabled;
+  final ThreadSwipeAction start;
+  final ThreadSwipeAction end;
+  final Future<void> Function(ThreadSwipeAction) onSwipe;
+  final Widget child;
+
+  @override
+  State<_ConversationSwipe> createState() => _ConversationSwipeState();
+}
+
+class _ConversationSwipeState extends State<_ConversationSwipe> {
+  final _progress = ValueNotifier<double>(0);
+
+  @override
+  void dispose() {
+    _progress.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Dismissible(
+    key: ValueKey('thread-${widget.threadId}'),
+    direction:
+        !widget.enabled ||
+            (widget.start == ThreadSwipeAction.none &&
+                widget.end == ThreadSwipeAction.none)
+        ? DismissDirection.none
+        : widget.start == ThreadSwipeAction.none
+        ? DismissDirection.endToStart
+        : widget.end == ThreadSwipeAction.none
+        ? DismissDirection.startToEnd
+        : DismissDirection.horizontal,
+    movementDuration: AuroraMotion.duration(context, AuroraMotion.base),
+    resizeDuration: null,
+    dismissThresholds: const {
+      DismissDirection.startToEnd: .38,
+      DismissDirection.endToStart: .38,
+    },
+    onUpdate: (details) => _progress.value = details.progress,
+    background: _SwipeBackground(
+      progress: _progress,
+      action: widget.start,
+      alignment: AlignmentDirectional.centerStart,
+    ),
+    secondaryBackground: _SwipeBackground(
+      progress: _progress,
+      action: widget.end,
+      alignment: AlignmentDirectional.centerEnd,
+    ),
+    confirmDismiss: (direction) async {
+      await widget.onSwipe(
+        direction == DismissDirection.startToEnd ? widget.start : widget.end,
+      );
+      // Repository refresh owns removal; read and pin actions return to rest.
+      return false;
+    },
+    child: widget.child,
+  );
+}
+
+class _SwipeBackground extends StatelessWidget {
+  const _SwipeBackground({
+    required this.progress,
+    required this.action,
+    required this.alignment,
+  });
+
+  final ValueNotifier<double> progress;
+  final ThreadSwipeAction action;
+  final AlignmentDirectional alignment;
 
   @override
   Widget build(BuildContext context) {
-    final left = alignment == AlignmentDirectional.centerStart;
-    return Container(
-      alignment: alignment,
-      padding: EdgeInsetsDirectional.only(
-        start: left ? 24 : 0,
-        end: left ? 0 : 24,
-      ),
-      decoration: ShapeDecoration(
-        color: color,
-        shape: RoundedSuperellipseBorder(
-          borderRadius: BorderRadius.circular(26),
+    final scheme = context.colors;
+    final destructive = action == ThreadSwipeAction.trash;
+    final foreground = destructive
+        ? scheme.onErrorContainer
+        : scheme.onPrimaryContainer;
+    final icon = switch (action) {
+      ThreadSwipeAction.trash => Icons.delete_outline_rounded,
+      ThreadSwipeAction.read => Icons.done_all_rounded,
+      ThreadSwipeAction.archive => Icons.archive_outlined,
+      ThreadSwipeAction.pin => Icons.push_pin_outlined,
+      ThreadSwipeAction.none => Icons.block_rounded,
+    };
+    return LayoutBuilder(
+      builder: (context, constraints) => ValueListenableBuilder<double>(
+        valueListenable: progress,
+        builder: (context, value, child) => Align(
+          alignment: alignment,
+          child: SizedBox(
+            width: constraints.maxWidth * value.clamp(0, 1),
+            height: constraints.maxHeight,
+            // Round the revealed area itself. Dismissible's rectangular clip
+            // alone would cut two square corners into a full-width background.
+            child: AuroraGlass(
+              key: const ValueKey('swipe-action-surface'),
+              radius: ConversationTile.radius,
+              border: false,
+              color: destructive
+                  ? scheme.errorContainer
+                  : scheme.primaryContainer,
+              child: ClipRect(
+                child: OverflowBox(
+                  alignment: alignment,
+                  minWidth: 72,
+                  maxWidth: 72,
+                  child: child,
+                ),
+              ),
+            ),
+          ),
         ),
-      ),
-      child: Tooltip(
-        message: label,
-        child: Icon(icon, color: foreground, size: 24),
+        child: Semantics(
+          label: swipeActionLabel(action),
+          child: Center(child: Icon(icon, color: foreground, size: 24)),
+        ),
       ),
     );
   }

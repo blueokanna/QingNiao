@@ -48,6 +48,7 @@ class AppSettings extends ChangeNotifier {
   bool amoled = false;
   double navigationBlur = 18;
   double navigationOpacity = .78;
+  bool navigationHighlight = true;
   String fontFamily = 'system';
   String localeCode = 'system';
   String launcherIcon = 'bird';
@@ -140,6 +141,7 @@ class AppSettings extends ChangeNotifier {
     lowPowerAurora = values['lowPowerAurora'] == 'true';
     fluidCloud = values['fluidCloud'] != 'false';
     amoled = values['amoled'] == 'true';
+    navigationHighlight = values['navigationHighlight'] != 'false';
     navigationBlur = _boundedNumber(values['navigationBlur'], 18, 0, 32);
     navigationOpacity = _boundedNumber(
       values['navigationOpacity'],
@@ -217,6 +219,15 @@ class AppSettings extends ChangeNotifier {
   void setNavigationOpacity(double value) {
     if (value.isFinite) update(() => navigationOpacity = value.clamp(.55, .95));
   }
+
+  void setNavigationHighlight(bool value) =>
+      update(() => navigationHighlight = value);
+
+  void resetNavigationAppearance() => update(() {
+    navigationBlur = 18;
+    navigationOpacity = .78;
+    navigationHighlight = true;
+  });
 
   void setBubble(AuroraBubbleStyle value) => update(() => bubbleStyle = value);
 
@@ -307,6 +318,7 @@ class AppSettings extends ChangeNotifier {
       'amoled': '$amoled',
       'navigationBlur': '$navigationBlur',
       'navigationOpacity': '$navigationOpacity',
+      'navigationHighlight': '$navigationHighlight',
       'fontFamily': fontFamily,
     };
     for (final entry in values.entries) {

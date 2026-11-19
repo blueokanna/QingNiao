@@ -1,15 +1,15 @@
 [package]
 name = "rust_lib_qingniao"
-version = "0.1.1"
-edition = "2021"
+version = "0.1.2"
+edition = "2024"
 license-file = "../LICENSE"
 
 [lib]
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-flutter_rust_bridge = "=2.13.0"
-snow = { version = "=0.10.0", default-features = false, features = [
+flutter_rust_bridge = "2.13.0"
+snow = { version = "0.10.0", default-features = false, features = [
     "std",
     "default-resolver",
     "use-getrandom",
@@ -24,11 +24,11 @@ sha2 = "0.11.1"
 hkdf = "0.13"
 aes-gcm = "0.11.1"
 x25519-dalek = { version = "3.0", features = ["static_secrets"] }
-rand = "0.10.3"
-zeroize = "1"
+rand = "0.10.4"
+zeroize = "1.9.2"
 once_cell = "1.21.4"
 parking_lot = "0.13"
-uuid = { version = "1.29.2", features = ["v4"] }
+uuid = { version = "1.29.3", features = ["v4"] }
 hex = "0.4"
 
 [lints.rust]

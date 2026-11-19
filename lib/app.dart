@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:qingniao/l10n/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +13,8 @@ import 'aurora/aurora_theme.dart';
 import 'messaging/home_shell.dart';
 import 'messaging/message_hub.dart';
 import 'messaging/message_repository.dart';
+import 'updates/update_controller.dart';
+import 'updates/update_screen.dart';
 
 class QingniaoApp extends StatefulWidget {
   const QingniaoApp({
@@ -29,6 +33,44 @@ class QingniaoApp extends StatefulWidget {
 class _QingniaoAppState extends State<QingniaoApp>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   bool _systemReduceMotion = false;
+  late final UpdateController _updates = UpdateController(widget.repository);
+  final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  int? _announcedUpdate;
+
+  void _onUpdate() {
+    final release = _updates.release;
+    if (!mounted ||
+        release == null ||
+        _updates.phase != 'available' ||
+        _announcedUpdate == release.versionCode) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _updates.release?.versionCode != release.versionCode) {
+        return;
+      }
+      final messenger = _messengerKey.currentState;
+      if (messenger == null) return;
+      _announcedUpdate = release.versionCode;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(tr('Update available: {p0}', [release.versionName])),
+          action: SnackBarAction(
+            label: tr('View update'),
+            onPressed: () {
+              _navigatorKey.currentState?.push(
+                MaterialPageRoute<void>(
+                  builder: (_) => UpdateScreen(controller: _updates),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -36,6 +78,8 @@ class _QingniaoAppState extends State<QingniaoApp>
     AuroraEngine.instance.attach(this);
     _applyMotion();
     widget.settings.addListener(_onSettings);
+    _updates.addListener(_onUpdate);
+    unawaited(_updates.start());
   }
 
   void _onSettings() => _applyMotion();
@@ -70,6 +114,8 @@ class _QingniaoAppState extends State<QingniaoApp>
   @override
   void dispose() {
     widget.settings.removeListener(_onSettings);
+    _updates.removeListener(_onUpdate);
+    _updates.dispose();
     WidgetsBinding.instance.removeObserver(this);
     AuroraEngine.instance.detach();
     super.dispose();
@@ -83,72 +129,77 @@ class _QingniaoAppState extends State<QingniaoApp>
         final settings = widget.settings;
         return AppScope(
           settings: settings,
-          child: MaterialApp(
-            title: tr("Qingniao"),
-            debugShowCheckedModeBanner: false,
-            locale: settings.localeCode == 'system'
-                ? null
-                : Locale(settings.localeCode),
-            supportedLocales: AppStrings.locales,
-            localeListResolutionCallback: AppStrings.resolve,
-            localizationsDelegates: const [
-              AppStringsDelegate(),
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            theme: buildAuroraTheme(
-              brightness: Brightness.light,
-              appearance: settings.appearance,
-            ),
-            darkTheme: buildAuroraTheme(
-              brightness: Brightness.dark,
-              appearance: settings.appearance,
-            ),
-            themeMode: settings.themeMode,
-            builder: (context, child) {
-              final reduce = MediaQuery.disableAnimationsOf(context);
-              if (reduce != _systemReduceMotion) {
-                _systemReduceMotion = reduce;
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) _applyMotion();
-                });
-              }
-              AuroraEngine.instance.setRefreshRate(
-                View.of(context).display.refreshRate,
-              );
-              final media = MediaQuery.of(context);
-              final brightness = Theme.of(context).brightness;
-              return AnnotatedRegion<SystemUiOverlayStyle>(
-                value: brightness == Brightness.dark
-                    ? SystemUiOverlayStyle.light.copyWith(
-                        statusBarColor: Colors.transparent,
-                        systemNavigationBarColor: Colors.transparent,
-                      )
-                    : SystemUiOverlayStyle.dark.copyWith(
-                        statusBarColor: Colors.transparent,
-                        systemNavigationBarColor: Colors.transparent,
+          child: UpdateScope(
+            controller: _updates,
+            child: MaterialApp(
+              navigatorKey: _navigatorKey,
+              scaffoldMessengerKey: _messengerKey,
+              title: tr("Qingniao"),
+              debugShowCheckedModeBanner: false,
+              locale: settings.localeCode == 'system'
+                  ? null
+                  : Locale(settings.localeCode),
+              supportedLocales: AppStrings.locales,
+              localeListResolutionCallback: AppStrings.resolve,
+              localizationsDelegates: const [
+                AppStringsDelegate(),
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              theme: buildAuroraTheme(
+                brightness: Brightness.light,
+                appearance: settings.appearance,
+              ),
+              darkTheme: buildAuroraTheme(
+                brightness: Brightness.dark,
+                appearance: settings.appearance,
+              ),
+              themeMode: settings.themeMode,
+              builder: (context, child) {
+                final reduce = MediaQuery.disableAnimationsOf(context);
+                if (reduce != _systemReduceMotion) {
+                  _systemReduceMotion = reduce;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _applyMotion();
+                  });
+                }
+                AuroraEngine.instance.setRefreshRate(
+                  View.of(context).display.refreshRate,
+                );
+                final media = MediaQuery.of(context);
+                final brightness = Theme.of(context).brightness;
+                return AnnotatedRegion<SystemUiOverlayStyle>(
+                  value: brightness == Brightness.dark
+                      ? SystemUiOverlayStyle.light.copyWith(
+                          statusBarColor: Colors.transparent,
+                          systemNavigationBarColor: Colors.transparent,
+                        )
+                      : SystemUiOverlayStyle.dark.copyWith(
+                          statusBarColor: Colors.transparent,
+                          systemNavigationBarColor: Colors.transparent,
+                        ),
+                  child: MediaQuery(
+                    data: media.copyWith(
+                      textScaler: _effectiveTextScaler(
+                        media.textScaler,
+                        settings.fontScale,
                       ),
-                child: MediaQuery(
-                  data: media.copyWith(
-                    textScaler: _effectiveTextScaler(
-                      media.textScaler,
-                      settings.fontScale,
+                    ),
+                    child: AuroraBackdropScope(
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          const AuroraBackdrop(),
+                          child ?? const SizedBox.shrink(),
+                        ],
+                      ),
                     ),
                   ),
-                  child: AuroraBackdropScope(
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        const AuroraBackdrop(),
-                        child ?? const SizedBox.shrink(),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-            home: RootGate(repository: widget.repository),
+                );
+              },
+              home: RootGate(repository: widget.repository),
+            ),
           ),
         );
       },

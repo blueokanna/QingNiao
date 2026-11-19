@@ -6,6 +6,7 @@ import 'package:qingniao/aurora/aurora_engine.dart';
 import 'package:qingniao/aurora/aurora_tab_transition.dart';
 import 'package:qingniao/l10n/app_strings.dart';
 import 'package:qingniao/messaging/models.dart';
+import 'package:qingniao/messaging/compose_screen.dart';
 
 import 'support/fixture_message_repository.dart';
 
@@ -36,6 +37,36 @@ void main() {
       settings.dispose();
     },
   );
+
+  testWidgets('Compose entry shows an icon and label and opens the editor', (
+    tester,
+  ) async {
+    final settings = AppSettings()
+      ..localeCode = 'en'
+      ..motionLevel = AuroraMotionLevel.reduced;
+    await tester.pumpWidget(
+      QingniaoApp(repository: FixtureMessageRepository(), settings: settings),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    final button = find.byType(FloatingActionButton);
+    expect(button, findsOneWidget);
+    expect(
+      find.descendant(of: button, matching: find.text('Compose')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: button, matching: find.byIcon(Icons.edit_rounded)),
+      findsOneWidget,
+    );
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(find.byType(ComposeScreen), findsOneWidget);
+    expect(find.text('New message'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    settings.dispose();
+  });
 
   testWidgets(
     'Direct tab transitions preserve text and skip unvisited intermediate pages',

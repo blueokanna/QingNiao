@@ -5,35 +5,99 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
-import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.provider.Telephony
-import android.telephony.SubscriptionManager
+import android.util.Log
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 class IncomingSmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_DELIVER_ACTION) return
-        val parts = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
-        if (parts.isEmpty()) return
+        val message = decodeIncomingSms(context, intent) ?: return
+        val app = context.applicationContext
         val pending = goAsync()
-        MessageIo.receiverExecutor.execute {
+        MessageIo.smsIntakeExecutor.execute {
+            var fallbackStarted = false
             try {
-                val address = parts.first().originatingAddress ?: "Unknown number"
-                val body = parts.joinToString("") { it.messageBody ?: "" }
-                val subscription = intent.getIntExtra(SubscriptionManager.EXTRA_SUBSCRIPTION_INDEX, intent.getIntExtra("subscription", -1))
-                try {
-                    Notifications.showSms(context, address, body, subscription, -1L)
-                } catch (_: Exception) {
+                IncomingSmsStore(app).use { it.enqueue(message) }
+                IncomingSmsRecovery.schedule(app)
+                IncomingSmsRecovery.drainSoon(app)
+            } catch (error: Exception) {
+                Log.e("IncomingSms", "Unable to journal incoming SMS: ${error.javaClass.simpleName}")
+                // A private DB error need not mean the system SMS provider is unavailable.
+                // Keep this exceptional broadcast alive until that persistence attempt returns.
+                MessageIo.smsDeliveryExecutor.execute {
+                    try {
+                        check(SmsAccess.isDefaultSmsApp(app))
+                        val saved = SmsRepository.persistIncoming(app, message)
+                        if (!saved.read) {
+                            try {
+                                Notifications.showSms(app, message.address, message.body,
+                                    message.subscriptionId, saved.threadId)
+                            } catch (notificationError: Exception) {
+                                Log.w("IncomingSms", "SMS saved; notification unavailable: ${notificationError.javaClass.simpleName}")
+                            }
+                        }
+                    } catch (saveError: Exception) {
+                        Log.e("IncomingSms", "Both SMS storage paths failed: ${saveError.javaClass.simpleName}")
+                        try {
+                            MessageNotifications.show(app, "", "Unable to save message. Check permissions and storage.", 9023)
+                        } catch (_: Exception) { }
+                    } finally {
+                        pending.finish()
+                    }
                 }
-                val saved = context.contentResolver.insert(Telephony.Sms.Inbox.CONTENT_URI, ContentValues().apply {
-                    put("address", address); put("body", body); put("date", System.currentTimeMillis())
-                    put("date_sent", parts.first().timestampMillis); put("read", 0); put("seen", 0)
-                    put("sub_id", subscription)
-                })
-            } catch (_: Exception) {
-                MessageNotifications.show(context, "", "Unable to save message. Check permissions and storage.", 9023)
-            } finally { pending.finish() }
+                fallbackStarted = true
+            } finally {
+                // Never finish SMS_DELIVER on a timer before the journal commits. Normal
+                // receiver work is local persistence only; a provider stall belongs to the job.
+                if (!fallbackStarted) pending.finish()
+            }
+        }
+    }
+}
+
+private val receivedTimes = AtomicLong(0)
+
+internal fun decodeIncomingSms(context: Context, intent: Intent): IncomingSms? = try {
+    val parts = Telephony.Sms.Intents.getMessagesFromIntent(intent)
+    if (parts.isNullOrEmpty()) null else {
+        val subscription = SimSubscriptions.incomingId(context, intent)
+        val first = parts.first()
+        IncomingSms(
+            IncomingSms.key(parts.map { requireNotNull(it.pdu) }, intent.getStringExtra("format"),
+                subscription, SimSubscriptions.incomingSlot(intent)),
+            first.originatingAddress ?: "Unknown number",
+            parts.joinToString("") { it.messageBody.orEmpty() },
+            receivedTimes.updateAndGet { maxOf(System.currentTimeMillis(), it + 1) },
+            first.timestampMillis, subscription,
+            first.serviceCenterAddress, first.protocolIdentifier, first.isReplyPathPresent,
+        )
+    }
+} catch (error: Exception) {
+    Log.w("IncomingSms", "Invalid SMS broadcast: ${error.javaClass.simpleName}")
+    null
+}
+
+/** Only for notification-only SMS_RECEIVED; it never acknowledges the durable SMS_DELIVER handoff. */
+internal class SmsBroadcastCompletion(private val pending: BroadcastReceiver.PendingResult) {
+    private val finished = AtomicBoolean(false)
+    private val handler = Handler(Looper.getMainLooper())
+    private val timeout = Runnable {
+        Log.w("IncomingSms", "SMS broadcast handoff exceeded its time budget")
+        finish()
+    }
+
+    init { handler.postDelayed(timeout, 8_000) }
+
+    fun finish() {
+        if (finished.compareAndSet(false, true)) {
+            handler.removeCallbacks(timeout)
+            pending.finish()
         }
     }
 }

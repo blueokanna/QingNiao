@@ -10,6 +10,7 @@ class QingniaoApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         FirebaseConfiguration.initialize(this)
+        IncomingSmsRecovery.restore(this)
     }
 }
 

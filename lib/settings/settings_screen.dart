@@ -14,6 +14,8 @@ import 'appearance_screen.dart';
 import 'device_compatibility_screen.dart';
 import 'blocked_screen.dart';
 import 'sync_screen.dart';
+import '../updates/update_controller.dart';
+import '../updates/update_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -119,6 +121,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final settings = AppScope.of(context);
+    final updates = UpdateScope.maybeOf(context);
     final hub = widget.hub;
     final access = hub.access;
     final scheme = context.colors;
@@ -142,27 +145,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: tr("SMS permissions"),
             children: [
               AuroraSettingTile(
-                title: access.defaultApp
+                title: access.ready
                     ? tr("Default SMS app is ready")
+                    : access.defaultApp
+                    ? tr('SMS access needs attention')
                     : tr("Set as default SMS app"),
-                subtitle: access.defaultApp
+                subtitle: access.ready
                     ? tr("SMS reading, receiving and sending are available")
+                    : access.defaultApp
+                    ? tr(
+                        'Grant SMS permissions to receive and display messages',
+                      )
                     : tr(
                         "Only the default SMS app can write to the system message store",
                       ),
-                icon: access.defaultApp
+                icon: access.ready
                     ? Icons.verified_rounded
                     : Icons.sms_outlined,
-                trailing: access.defaultApp
+                trailing: access.ready
                     ? Icon(
                         Icons.check_circle_rounded,
                         color: scheme.primary,
                         size: 20,
                       )
                     : null,
-                onTap: access.defaultApp
-                    ? null
-                    : (_busy ? null : _requestAccess),
+                onTap: access.ready ? null : (_busy ? null : _requestAccess),
                 showDivider: true,
               ),
               AuroraSettingTile(
@@ -172,6 +179,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     : tr("Notifications are not allowed"),
                 icon: Icons.notifications_active_outlined,
                 onTap: () => widget.repository.openNotificationSettings(),
+                showDivider: true,
+              ),
+              AuroraSettingTile(
+                title: tr('SIM information'),
+                subtitle: access.readPhoneState
+                    ? tr('SIM names and eSIM details are available')
+                    : tr(
+                        'Allow phone access to identify the SIM for each message',
+                      ),
+                icon: Icons.sim_card_outlined,
+                onTap: () => widget.repository.openAppSettings(),
                 showDivider: true,
               ),
               AuroraSettingTile(
@@ -492,13 +510,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: AuroraSection(
             title: tr("About"),
             children: [
+              if (updates != null)
+                AuroraSettingTile(
+                  title: tr('App updates'),
+                  subtitle: updates.release == null
+                      ? tr('Check for updates')
+                      : tr('Update available: {p0}', [
+                          updates.release!.versionName,
+                        ]),
+                  icon: Icons.system_update_rounded,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => UpdateScreen(controller: updates),
+                    ),
+                  ),
+                  showDivider: true,
+                ),
               AuroraSettingTile(
                 title: tr("Qingniao"),
                 subtitle: tr('Version {p0}', [
-                  const String.fromEnvironment(
-                    'FLUTTER_BUILD_NAME',
-                    defaultValue: 'dev',
-                  ),
+                  updates?.versionName.isNotEmpty == true
+                      ? updates!.versionName
+                      : '—',
                 ]),
                 icon: Icons.info_outline_rounded,
                 onTap: () => showAuroraSheet<void>(
@@ -545,7 +578,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onPressed: () => showLicensePage(
                             context: context,
                             applicationName: tr("Qingniao"),
-                            applicationVersion: '0.4.0',
+                            applicationVersion: updates?.versionName,
                           ),
                           icon: const Icon(Icons.code_rounded, size: 18),
                           label: Text(tr("Open-source licenses")),

@@ -70,7 +70,8 @@ void main() {
     // The host has no emoji font; borrow the Windows one so fixture copy that
     // contains emoji does not render as tofu. It must be a separate family:
     // Flutter falls back per family, not per glyph inside one family.
-    final emoji = Platform.environment['QINGNIAO_PREVIEW_EMOJI_FONT'] ??
+    final emoji =
+        Platform.environment['QINGNIAO_PREVIEW_EMOJI_FONT'] ??
         r'C:\Windows\Fonts\seguiemj.ttf';
     if (File(emoji).existsSync()) {
       await _loadFont('PreviewEmoji', [emoji]);
@@ -81,66 +82,77 @@ void main() {
   testWidgets('render README preview screens', (tester) async {
     if (Platform.environment['QINGNIAO_RENDER_PREVIEW'] != '1') return;
 
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.resetPhysicalSize);
-    addTearDown(tester.view.resetDevicePixelRatio);
+    // Test bindings replace Material shadows with outlines by default. Render
+    // the actual shadows so previews do not invent a thick border around FABs.
+    final previousShadows = debugDisableShadows;
+    debugDisableShadows = false;
+    try {
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-    final repository = FixtureMessageRepository();
-    final hub = MessageHub(repository)..start();
-    addTearDown(hub.dispose);
+      final repository = FixtureMessageRepository();
+      final hub = MessageHub(repository)..start();
+      addTearDown(hub.dispose);
 
-    final threads = await repository.conversations();
-    final conversation = threads.firstWhere(
-      (thread) => thread.displayName == '设计小组',
-      orElse: () => threads.first,
-    );
-
-    for (final brightness in Brightness.values) {
-      final suffix = brightness == Brightness.dark ? 'dark' : 'light';
-
-      await _shoot(
-        tester,
-        name: 'home_inbox_$suffix',
-        repository: repository,
-        brightness: brightness,
-        child: HomeShell(repository: repository, hub: hub),
+      final threads = await repository.conversations();
+      final conversation = threads.firstWhere(
+        (thread) => thread.displayName == '设计小组',
+        orElse: () => threads.first,
       );
-      await _shoot(
-        tester,
-        name: 'conversation_$suffix',
-        repository: repository,
-        brightness: brightness,
-        child: ConversationScreen(
+
+      for (final brightness in Brightness.values) {
+        final suffix = brightness == Brightness.dark ? 'dark' : 'light';
+
+        await _shoot(
+          tester,
+          name: 'home_inbox_$suffix',
           repository: repository,
-          hub: hub,
-          thread: conversation,
-        ),
-      );
-      await _shoot(
-        tester,
-        name: 'otp_$suffix',
-        repository: repository,
-        brightness: brightness,
-        // Same chrome as HomeShell's second tab, so the capture is opaque.
-        child: AuroraScaffold(body: OtpScreen(repository: repository, hub: hub)),
-      );
-      await _shoot(
-        tester,
-        name: 'settings_$suffix',
-        repository: repository,
-        brightness: brightness,
-        child: AuroraScaffold(
-          body: SettingsScreen(repository: repository, hub: hub),
-        ),
-      );
-      await _shoot(
-        tester,
-        name: 'navigation_appearance_$suffix',
-        repository: repository,
-        brightness: brightness,
-        size: const Size(412, 520),
-        child: const AuroraScaffold(body: NavigationAppearance()),
-      );
+          brightness: brightness,
+          child: HomeShell(repository: repository, hub: hub),
+        );
+        await _shoot(
+          tester,
+          name: 'conversation_$suffix',
+          repository: repository,
+          brightness: brightness,
+          child: ConversationScreen(
+            repository: repository,
+            hub: hub,
+            thread: conversation,
+          ),
+        );
+        await _shoot(
+          tester,
+          name: 'otp_$suffix',
+          repository: repository,
+          brightness: brightness,
+          // Same chrome as HomeShell's second tab, so the capture is opaque.
+          child: AuroraScaffold(
+            body: OtpScreen(repository: repository, hub: hub),
+          ),
+        );
+        await _shoot(
+          tester,
+          name: 'settings_$suffix',
+          repository: repository,
+          brightness: brightness,
+          child: AuroraScaffold(
+            body: SettingsScreen(repository: repository, hub: hub),
+          ),
+        );
+        await _shoot(
+          tester,
+          name: 'navigation_appearance_$suffix',
+          repository: repository,
+          brightness: brightness,
+          size: const Size(412, 520),
+          child: const AuroraScaffold(body: NavigationAppearance()),
+        );
+      }
+    } finally {
+      // The binding checks painting invariants before registered tear-downs.
+      debugDisableShadows = previousShadows;
     }
   });
 }
@@ -190,7 +202,8 @@ Future<void> _shoot(
 
   await tester.runAsync(() async {
     final boundary =
-        boundaryKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+        boundaryKey.currentContext!.findRenderObject()!
+            as RenderRepaintBoundary;
     final image = await boundary.toImage(pixelRatio: 3);
     final data = await image.toByteData(format: ui.ImageByteFormat.png);
     final target = File('build/preview/$name.png');

@@ -29,17 +29,28 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   Timer? _syncTimer;
   bool _syncing = false;
   int _syncTick = 0;
+  int _intentTick = 0;
+  int _syncGeneration = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     widget.hub.addListener(_onHubChanged);
+    widget.hub.setForeground(_foreground);
     widget.hub.start();
     _startForegroundSync();
   }
 
+  bool get _foreground =>
+      WidgetsBinding.instance.lifecycleState == null ||
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
   void _onHubChanged() {
+    if (_intentTick != widget.hub.intentTick) {
+      _intentTick = widget.hub.intentTick;
+      if (mounted) _select(0);
+    }
     if (_syncTick == widget.hub.syncTick) return;
     _syncTick = widget.hub.syncTick;
     _sync.invalidateState();
@@ -47,17 +58,15 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 
   Future<void> _startForegroundSync() async {
+    final generation = ++_syncGeneration;
+    _syncTimer?.cancel();
+    _syncTimer = null;
+    if (!_foreground) return;
     try {
-      final status = await _sync.status(refresh: false);
-      if (!mounted) return;
-      _syncTimer?.cancel();
-      _syncTimer = null;
-      if (status['enabled'] != true ||
-          (WidgetsBinding.instance.lifecycleState != null &&
-              WidgetsBinding.instance.lifecycleState !=
-                  AppLifecycleState.resumed)) {
-        return;
-      }
+      // Reading the switch does not require generating crypto keys or peers.
+      final state = await _sync.state();
+      if (!mounted || generation != _syncGeneration || !_foreground) return;
+      if (!state.enabled) return;
       _syncTimer = Timer.periodic(
         const Duration(minutes: 2),
         (_) => _syncNow(),
@@ -67,7 +76,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 
   Future<void> _syncNow() async {
-    if (_syncing) return;
+    if (_syncing || !mounted || !_foreground) return;
     _syncing = true;
     try {
       await _sync.syncNow();
@@ -80,10 +89,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    widget.hub.setForeground(state == AppLifecycleState.resumed);
     if (state == AppLifecycleState.resumed) {
       _sync.invalidateState();
       _startForegroundSync();
     } else {
+      _syncGeneration++;
       _syncTimer?.cancel();
       _syncTimer = null;
     }
@@ -139,6 +150,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                   padding: const EdgeInsetsDirectional.only(bottom: 4),
                   child: AuroraFab(
                     icon: Icons.edit_rounded,
+                    label: tr("Compose"),
                     tooltip: tr("Compose"),
                     onTap: _compose,
                   ),

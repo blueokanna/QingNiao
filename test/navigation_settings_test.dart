@@ -24,6 +24,32 @@ void main() {
     },
   );
   test(
+    'Navigation highlight defaults on, persists both states and resets',
+    () async {
+      final repository = FixtureMessageRepository();
+      final settings = await AppSettings.load(repository);
+      expect(settings.navigationHighlight, isTrue);
+      settings.setNavigationHighlight(false);
+      final disabled = await AppSettings.load(repository);
+      expect(disabled.navigationHighlight, isFalse);
+      settings.setNavigationHighlight(true);
+      final enabled = await AppSettings.load(repository);
+      expect(enabled.navigationHighlight, isTrue);
+      settings.setNavigationHighlight(false);
+      settings.setNavigationBlur(0);
+      settings.setNavigationOpacity(.55);
+      settings.resetNavigationAppearance();
+      final reset = await AppSettings.load(repository);
+      expect(reset.navigationHighlight, isTrue);
+      expect(reset.navigationBlur, 18);
+      expect(reset.navigationOpacity, .78);
+      for (final value in [settings, disabled, enabled, reset]) {
+        value.dispose();
+      }
+    },
+  );
+
+  test(
     'Navigation customization survives reload and rejects nonfinite data',
     () async {
       final repository = FixtureMessageRepository();

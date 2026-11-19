@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- Flutter generates Windows SDK paths here. Java Properties accepts the
+         drive colon after '=', and Flutter already escapes the backslashes. -->
+    <issue id="PropertyEscape">
+        <ignore path="../local.properties" />
+    </issue>
+</lint>

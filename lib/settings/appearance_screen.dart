@@ -354,6 +354,7 @@ class _PreviewBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MessageBubble(
+      showSim: false,
       message: SmsMessage(
         id: outgoing ? 2 : 1,
         threadId: 1,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'aurora_engine.dart';
+import 'aurora_motion.dart';
 
 class AuroraTabTransition extends StatefulWidget {
   const AuroraTabTransition({
@@ -28,14 +29,24 @@ class _AuroraTabTransitionState extends State<AuroraTabTransition> {
   late final Set<int> _visited = {widget.index};
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (AuroraMotion.isReduced(context) ||
+        !TickerMode.valuesOf(context).enabled) {
+      for (var i = 0; i < _springs.length; i++) {
+        _springs[i].jumpTo(i == widget.index ? 1 : 0);
+      }
+    }
+  }
+
+  @override
   void didUpdateWidget(AuroraTabTransition oldWidget) {
     super.didUpdateWidget(oldWidget);
     assert(widget.children.length == _springs.length);
     if (oldWidget.index == widget.index) return;
     _visited.add(widget.index);
-    final reduce =
-        AuroraEngine.instance.reduceMotion ||
-        MediaQuery.disableAnimationsOf(context);
+    final reduce = AuroraMotion.isReduced(context) ||
+        !TickerMode.valuesOf(context).enabled;
     for (var i = 0; i < _springs.length; i++) {
       final target = i == widget.index ? 1.0 : 0.0;
       if (reduce) {
@@ -65,9 +76,12 @@ class _AuroraTabTransitionState extends State<AuroraTabTransition> {
               key: ValueKey(i),
               animation: _springs[i],
               child: RepaintBoundary(
-                child: TickerMode(
-                  enabled: i == widget.index,
-                  child: widget.children[i],
+                child: ExcludeFocus(
+                  excluding: i != widget.index,
+                  child: TickerMode(
+                    enabled: i == widget.index,
+                    child: widget.children[i],
+                  ),
                 ),
               ),
               builder: (context, child) {

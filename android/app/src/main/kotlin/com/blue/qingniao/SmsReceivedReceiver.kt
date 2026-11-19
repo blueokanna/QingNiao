@@ -4,25 +4,32 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
-import android.telephony.SubscriptionManager
+import android.util.Log
 
-
+/** SMS_RECEIVED is notification-only: the default SMS app owns provider persistence. */
 class SmsReceivedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
         if (SmsAccess.isDefaultSmsApp(context)) return
-        val parts = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
-        if (parts.isEmpty()) return
-        val address = parts.first().originatingAddress ?: "Unknown number"
-        val body = parts.joinToString("") { it.messageBody ?: "" }
-        if (body.isEmpty()) return
-        val subscription = intent.getIntExtra(
-            SubscriptionManager.EXTRA_SUBSCRIPTION_INDEX,
-            intent.getIntExtra("subscription", -1),
-        )
+        val message = decodeIncomingSms(context, intent) ?: return
+        if (message.body.isEmpty()) return
+        val app = context.applicationContext
+        val completion = SmsBroadcastCompletion(goAsync())
         try {
-            Notifications.showSms(context, address, body, subscription, -1L)
-        } catch (_: Exception) {
+            MessageIo.notificationExecutor.execute {
+                try {
+                    if (!SmsAccess.isDefaultSmsApp(app)) {
+                        Notifications.showSms(app, message.address, message.body, message.subscriptionId, -1L)
+                    }
+                } catch (error: Exception) {
+                    Log.w("IncomingSms", "SMS notification unavailable: ${error.javaClass.simpleName}")
+                } finally {
+                    completion.finish()
+                }
+            }
+        } catch (error: Exception) {
+            Log.w("IncomingSms", "SMS notification queue unavailable: ${error.javaClass.simpleName}")
+            completion.finish()
         }
     }
 }

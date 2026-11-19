@@ -93,6 +93,7 @@ class AuroraGlass extends StatelessWidget {
     this.color,
     this.gradient,
     this.border = true,
+    this.borderColor,
     this.height,
     this.width,
     this.clip = true,
@@ -106,6 +107,7 @@ class AuroraGlass extends StatelessWidget {
   final Color? color;
   final List<Color>? gradient;
   final bool border;
+  final Color? borderColor;
   final double? height;
   final double? width;
   final bool clip;
@@ -146,7 +148,10 @@ class AuroraGlass extends StatelessWidget {
       foregroundDecoration: border
           ? ShapeDecoration(
               shape: shape.copyWith(
-                side: BorderSide(color: aurora.hairline, width: 1),
+                side: BorderSide(
+                  color: borderColor ?? aurora.hairline,
+                  width: 1,
+                ),
               ),
             )
           : null,
@@ -194,35 +199,45 @@ class _AuroraPressableState extends State<AuroraPressable> {
   @override
   Widget build(BuildContext context) {
     final radius = widget.borderRadius ?? BorderRadius.circular(24);
-    return Listener(
-      onPointerDown: (_) => _spring.animateTo(1),
-      onPointerUp: (_) => _spring.animateTo(0),
-      onPointerCancel: (_) => _spring.animateTo(0),
-      child: AnimatedBuilder(
-        animation: _spring,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: radius,
-            onTap: widget.onTap == null
-                ? null
-                : () {
-                    if (widget.haptic) HapticFeedback.selectionClick();
-                    widget.onTap!();
-                  },
-            onLongPress: widget.onLongPress == null
-                ? null
-                : () {
-                    if (widget.haptic) HapticFeedback.mediumImpact();
-                    widget.onLongPress!();
-                  },
-            child: widget.child,
-          ),
+    final enabled = widget.onTap != null || widget.onLongPress != null;
+    final animate =
+        enabled &&
+        widget.enableFeedback &&
+        !AuroraMotion.isReduced(context) &&
+        TickerMode.valuesOf(context).enabled;
+    if (!animate) _spring.jumpTo(0);
+    return AnimatedBuilder(
+      animation: _spring,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: radius,
+          enableFeedback: widget.enableFeedback,
+          onHighlightChanged: animate
+              ? (highlighted) => _spring.animateTo(highlighted ? 1 : 0)
+              : null,
+          onTap: widget.onTap == null
+              ? null
+              : () {
+                  if (widget.haptic && widget.enableFeedback) {
+                    HapticFeedback.selectionClick();
+                  }
+                  widget.onTap!();
+                },
+          onLongPress: widget.onLongPress == null
+              ? null
+              : () {
+                  if (widget.haptic && widget.enableFeedback) {
+                    HapticFeedback.mediumImpact();
+                  }
+                  widget.onLongPress!();
+                },
+          child: widget.child,
         ),
-        builder: (context, child) => Transform.scale(
-          scale: 1 - _spring.value * widget.pressedScale,
-          child: child,
-        ),
+      ),
+      builder: (context, child) => Transform.scale(
+        scale: animate ? 1 - _spring.value * widget.pressedScale : 1,
+        child: child,
       ),
     );
   }
@@ -385,7 +400,7 @@ class AuroraSearchField extends StatefulWidget {
 
 class _AuroraSearchFieldState extends State<AuroraSearchField> {
   late final FocusNode _focus = FocusNode();
-  late final TextEditingController _controller =
+  late TextEditingController _controller =
       widget.controller ?? TextEditingController();
   bool _hasText = false;
 
@@ -400,6 +415,19 @@ class _AuroraSearchFieldState extends State<AuroraSearchField> {
   void _onText() {
     final has = _controller.text.isNotEmpty;
     if (has != _hasText) setState(() => _hasText = has);
+  }
+
+  @override
+  void didUpdateWidget(AuroraSearchField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.controller == oldWidget.controller) return;
+    final previous = _controller;
+    previous.removeListener(_onText);
+    _controller =
+        widget.controller ?? TextEditingController.fromValue(previous.value);
+    if (oldWidget.controller == null) previous.dispose();
+    _hasText = _controller.text.isNotEmpty;
+    _controller.addListener(_onText);
   }
 
   @override
@@ -592,12 +620,14 @@ Future<T?> showAuroraSheet<T>({
     useSafeArea: false,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black.withValues(alpha: .46),
-    sheetAnimationStyle: const AnimationStyle(
-      duration: AuroraMotion.sheet,
-      curve: AuroraMotion.decelerate,
-      reverseDuration: AuroraMotion.base,
-      reverseCurve: AuroraMotion.accelerate,
-    ),
+    sheetAnimationStyle: AuroraMotion.isReduced(context)
+        ? AnimationStyle.noAnimation
+        : const AnimationStyle(
+            duration: AuroraMotion.sheet,
+            curve: AuroraMotion.decelerate,
+            reverseDuration: AuroraMotion.base,
+            reverseCurve: AuroraMotion.accelerate,
+          ),
     builder: (context) => AuroraSheetSurface(child: builder(context)),
   );
 }
@@ -1087,6 +1117,7 @@ class AuroraNavBar extends StatelessWidget {
     required this.onSelected,
     this.blurSigma,
     this.surfaceOpacity,
+    this.highlight,
   });
 
   final int index;
@@ -1094,6 +1125,7 @@ class AuroraNavBar extends StatelessWidget {
   final ValueChanged<int> onSelected;
   final double? blurSigma;
   final double? surfaceOpacity;
+  final bool? highlight;
 
   // Integer slider steps bound this cache to 33 small filter objects.
   static final _blurFilters = <int, ui.ImageFilter>{};
@@ -1127,50 +1159,110 @@ class AuroraNavBar extends StatelessWidget {
               sigmaY: sigma.toDouble(),
             ),
           ),
-          child: NavigationBar(
-            selectedIndex: index,
-            onDestinationSelected: onSelected,
-            animationDuration: MediaQuery.disableAnimationsOf(context)
-                ? Duration.zero
-                : AuroraMotion.base,
-            height: 80,
-            backgroundColor: scheme.surfaceContainer.withValues(
-              alpha: tintOpacity,
-            ),
-            surfaceTintColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            elevation: 0,
-            indicatorShape: RoundedSuperellipseBorder(
-              borderRadius: BorderRadius.circular(18),
-            ),
-            destinations: [
-              for (final destination in destinations)
-                GestureDetector(
-                  onLongPress: destination.onLongPress,
-                  child: Semantics(
+          child: CustomPaint(
+            key: const ValueKey('navigation-capsule-surface'),
+            foregroundPainter:
+                (highlight ?? settings?.navigationHighlight ?? true)
+                ? _NavigationEdgePainter(
+                    dark: Theme.of(context).brightness == Brightness.dark,
+                    highContrast: MediaQuery.highContrastOf(context),
+                  )
+                : null,
+            child: NavigationBar(
+              selectedIndex: index,
+              onDestinationSelected: onSelected,
+              animationDuration: AuroraMotion.duration(
+                context,
+                AuroraMotion.base,
+              ),
+              height: 80,
+              backgroundColor: scheme.surfaceContainer.withValues(
+                alpha: tintOpacity,
+              ),
+              surfaceTintColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              elevation: 0,
+              indicatorShape: RoundedSuperellipseBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              destinations: [
+                for (final destination in destinations)
+                  GestureDetector(
                     onLongPress: destination.onLongPress,
-                    child: NavigationDestination(
-                      tooltip: destination.onLongPress == null ? null : '',
-                      icon: Badge.count(
-                        count: destination.badge,
-                        isLabelVisible: destination.badge > 0,
-                        child: Icon(destination.icon),
+                    child: Semantics(
+                      onLongPress: destination.onLongPress,
+                      child: NavigationDestination(
+                        tooltip: destination.onLongPress == null ? null : '',
+                        icon: Badge.count(
+                          count: destination.badge,
+                          isLabelVisible: destination.badge > 0,
+                          child: Icon(destination.icon),
+                        ),
+                        selectedIcon: Badge.count(
+                          count: destination.badge,
+                          isLabelVisible: destination.badge > 0,
+                          child: Icon(destination.selectedIcon),
+                        ),
+                        label: destination.label,
                       ),
-                      selectedIcon: Badge.count(
-                        count: destination.badge,
-                        isLabelVisible: destination.badge > 0,
-                        child: Icon(destination.selectedIcon),
-                      ),
-                      label: destination.label,
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+/// A static specular rim: no animation or extra offscreen compositing layer.
+class _NavigationEdgePainter extends CustomPainter {
+  const _NavigationEdgePainter({
+    required this.dark,
+    required this.highContrast,
+  });
+
+  final bool dark;
+  final bool highContrast;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bounds = Offset.zero & size;
+    final rim = RRect.fromRectAndRadius(
+      bounds.deflate(1),
+      const Radius.circular(39),
+    );
+    // A quiet outer keyline gives the white highlight definition on light glass.
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(bounds.deflate(.4), const Radius.circular(39.6)),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = .8
+        ..color = Colors.black.withValues(alpha: dark ? .22 : .1),
+    );
+    canvas.drawRRect(
+      rim,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = highContrast ? 1.8 : 1.4
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: dark ? .8 : .98),
+            Colors.white.withValues(alpha: dark ? .42 : .76),
+            Colors.white.withValues(alpha: dark ? .1 : .3),
+            Colors.white.withValues(alpha: dark ? .4 : .72),
+          ],
+          stops: const [0, .36, .66, 1],
+        ).createShader(bounds),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_NavigationEdgePainter oldDelegate) =>
+      dark != oldDelegate.dark || highContrast != oldDelegate.highContrast;
 }
 
 class AuroraNavDestination {
@@ -1209,6 +1301,25 @@ class AuroraFab extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = context.colors;
     final aurora = context.aurora;
+    if (label != null) {
+      return FloatingActionButton.extended(
+        onPressed: onTap,
+        tooltip: tooltip,
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        elevation: 3,
+        shape: RoundedSuperellipseBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        icon: Icon(icon, size: 24),
+        label: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.sizeOf(context).width * .55,
+          ),
+          child: Text(label!, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+      );
+    }
     final content = AuroraPressable(
       onTap: onTap,
       borderRadius: BorderRadius.circular(size / 2),

@@ -7,17 +7,14 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
-
-
 object SmsSendWatchdog {
     private const val TAG = "QingniaoSms"
     private const val DELAY_MS = 90_000L
-    private const val STALE_MS = 5 * 60_000L
 
-    fun schedule(context: Context, id: Long) {
+    fun schedule(context: Context, id: Long, at: Long = System.currentTimeMillis() + DELAY_MS) {
         runCatching {
             val alarm = context.getSystemService(AlarmManager::class.java)
-            alarm.set(AlarmManager.RTC, System.currentTimeMillis() + DELAY_MS, pending(context, id))
+            alarm.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending(context, id))
         }
     }
 
@@ -27,27 +24,49 @@ object SmsSendWatchdog {
         }
     }
 
-    
     fun failIfPending(context: Context, id: Long): Boolean = try {
-        val row = context.contentResolver.query(
-            android.content.ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, id),
-            arrayOf("type"),
+        MessageStore(context).use { store -> reconcile(context, store, id) }
+    } catch (_: Exception) { false }
+
+    private fun reconcile(context: Context, store: MessageStore, id: Long): Boolean = try {
+        val uri = android.content.ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, id)
+        val row = checkNotNull(context.contentResolver.query(
+            uri,
+            arrayOf("type", "date"),
             null,
             null,
             null,
-        )?.use { if (it.moveToFirst()) it.getInt(0) else null }
-        if (row != null && row == Telephony.Sms.MESSAGE_TYPE_OUTBOX) {
-            context.contentResolver.update(
-                android.content.ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, id),
-                ContentValues().apply {
-                    put("type", Telephony.Sms.MESSAGE_TYPE_FAILED)
-                    put("status", Telephony.Sms.STATUS_FAILED)
-                },
-                null,
-                null,
-            )
-            Log.d(TAG, "watchdog marked $id failed")
-            true
+        )).use { if (it.moveToFirst()) it.getInt(0) to it.getLong(1) else null }
+        if (row == null) {
+            store.forgetOutgoing(id)
+            false
+        } else if (row.first in setOf(Telephony.Sms.MESSAGE_TYPE_OUTBOX, Telephony.Sms.MESSAGE_TYPE_QUEUED)) {
+            // A receipt may be durable even if the provider write failed or the process died.
+            val delivered = store.receiptState(id, "delivered")
+            val sent = store.receiptState(id, "sent")
+                ?: delivered?.takeIf { it == Telephony.Sms.MESSAGE_TYPE_SENT }
+            if (sent == null && System.currentTimeMillis() - row.second < DELAY_MS) {
+                schedule(context, id, row.second + DELAY_MS)
+                false
+            } else {
+                val state = sent ?: Telephony.Sms.MESSAGE_TYPE_FAILED
+                val updated = context.contentResolver.update(
+                    uri,
+                    ContentValues().apply {
+                        put("type", state)
+                        put("status", when {
+                            state == Telephony.Sms.MESSAGE_TYPE_FAILED || delivered == Telephony.Sms.MESSAGE_TYPE_FAILED -> Telephony.Sms.STATUS_FAILED
+                            delivered == Telephony.Sms.MESSAGE_TYPE_SENT -> Telephony.Sms.STATUS_COMPLETE
+                            else -> Telephony.Sms.STATUS_PENDING
+                        })
+                    },
+                    "type IN (4,6)",
+                    null,
+                )
+                if (updated > 0) cancel(context, id)
+                Log.d(TAG, "watchdog reconciled $id type=$state")
+                updated > 0
+            }
         } else {
             false
         }
@@ -55,12 +74,20 @@ object SmsSendWatchdog {
         false
     }
 
-    
     fun sweep(context: Context) {
         try {
             MessageStore(context).use { store ->
-                for (id in store.outgoingIds()) {
-                    if (isStale(context, id)) failIfPending(context, id)
+                val tracked = store.outgoingIds().toHashSet()
+                if (tracked.isEmpty()) return
+                // Query only pending rows, rather than probing every historical sent message
+                // on each foreground recovery tick.
+                context.contentResolver.query(
+                    Telephony.Sms.CONTENT_URI, arrayOf("_id"), "type IN (4,6)", null, null,
+                )?.use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(0)
+                        if (id in tracked) reconcile(context, store, id)
+                    }
                 }
             }
         } catch (_: Exception) {
@@ -75,17 +102,6 @@ object SmsSendWatchdog {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    fun isStale(context: Context, id: Long): Boolean = try {
-        context.contentResolver.query(
-            android.content.ContentUris.withAppendedId(Telephony.Sms.CONTENT_URI, id),
-            arrayOf("date"),
-            null,
-            null,
-            null,
-        )?.use { if (it.moveToFirst()) System.currentTimeMillis() - it.getLong(0) > STALE_MS else false } ?: false
-    } catch (_: Exception) {
-        false
-    }
 }
 
 class SmsSendTimeoutReceiver : android.content.BroadcastReceiver() {

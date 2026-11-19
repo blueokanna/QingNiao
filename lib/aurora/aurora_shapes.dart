@@ -1,10 +1,11 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show ValueListenable;
+import 'package:flutter/foundation.dart' show ValueListenable, listEquals;
 import 'package:flutter/material.dart';
 import 'package:material_new_shapes/material_new_shapes.dart';
 
 import 'aurora_engine.dart';
+import 'aurora_motion.dart';
 import '../app/app_settings.dart';
 import 'aurora_theme.dart';
 
@@ -105,8 +106,7 @@ class AuroraAvatar extends StatelessWidget {
         AuroraShapes.avatars[(AuroraShapes.avatars.indexOf(base) + 1) %
             AuroraShapes.avatars.length];
     final animate =
-        !MediaQuery.disableAnimationsOf(context) &&
-        !AuroraEngine.instance.reduceMotion &&
+        !AuroraMotion.isReduced(context) &&
         TickerMode.valuesOf(context).enabled &&
         (AppScope.maybeOf(context)?.morphShapes ?? true);
     final initials = _initials(label, seed);
@@ -161,14 +161,13 @@ class AuroraAvatar extends StatelessWidget {
     if (heroTag != null) {
       avatar = Hero(
         tag: heroTag!,
-        flightShuttleBuilder:
-            (context, animation, direction, fromContext, toContext) =>
-                AuroraAvatarFlight(
-                  animation: animation,
-                  seed: seed,
-                  size: size,
-                  label: label,
-                ),
+        flightShuttleBuilder: (
+          context,
+          animation,
+          direction,
+          fromContext,
+          toContext,
+        ) => AuroraAvatar(seed: seed, size: size, label: label, icon: icon),
         child: avatar,
       );
     }
@@ -186,30 +185,6 @@ String _initials(String? label, String seed) {
     return digits.length >= 2 ? digits.substring(digits.length - 2) : digits;
   }
   return String.fromCharCode(source.runes.first).toUpperCase();
-}
-
-class AuroraAvatarFlight extends StatelessWidget {
-  const AuroraAvatarFlight({
-    super.key,
-    required this.animation,
-    required this.seed,
-    required this.size,
-    this.label,
-  });
-
-  final Animation<double> animation;
-  final String seed;
-  final double size;
-  final String? label;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (context, _) =>
-          AuroraAvatar(seed: seed, size: size, label: label),
-    );
-  }
 }
 
 class _ShapeAvatarPainter extends CustomPainter {
@@ -233,18 +208,36 @@ class _ShapeAvatarPainter extends CustomPainter {
   final Color ring;
   final Color? glow;
 
+  late final _fill = Paint();
+  late final _outline = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.1
+    ..color = ring;
+  Size? _shaderSize;
+
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final path = AuroraShapes.morph(start, end)
-        .toPath(
-          progress: clock == null
-              ? progress
-              : (1 - math.cos(clock!.value * math.pi / 7 + phase)) / 2,
-          rotationPivotX: .5,
-          rotationPivotY: .5,
-        )
-        .transform(Matrix4.diagonal3Values(size.width, size.height, 1).storage);
+    if (_shaderSize != size) {
+      _shaderSize = size;
+      _fill.shader = LinearGradient(
+        colors: colors,
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(Offset.zero & size);
+    }
+    final path = clock == null && progress == 0
+        ? AuroraShapes.path(start, size)
+        : AuroraShapes.morph(start, end)
+              .toPath(
+                progress: clock == null
+                    ? progress
+                    : (1 - math.cos(clock!.value * math.pi / 7 + phase)) / 2,
+                rotationPivotX: .5,
+                rotationPivotY: .5,
+              )
+              .transform(
+                Matrix4.diagonal3Values(size.width, size.height, 1).storage,
+              );
     if (glow != null) {
       canvas.drawPath(
         path,
@@ -253,22 +246,8 @@ class _ShapeAvatarPainter extends CustomPainter {
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
       );
     }
-    canvas.drawPath(
-      path,
-      Paint()
-        ..shader = LinearGradient(
-          colors: colors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ).createShader(rect),
-    );
-    canvas.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.1
-        ..color = ring,
-    );
+    canvas.drawPath(path, _fill);
+    canvas.drawPath(path, _outline);
   }
 
   @override
@@ -278,7 +257,7 @@ class _ShapeAvatarPainter extends CustomPainter {
       old.progress != progress ||
       old.clock != clock ||
       old.phase != phase ||
-      old.colors != colors ||
+      !listEquals(old.colors, colors) ||
       old.ring != ring ||
       old.glow != glow;
 }
@@ -412,7 +391,7 @@ class _ContainerPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ContainerPainter old) =>
       old.shape != shape ||
-      old.gradient != gradient ||
+      !listEquals(old.gradient, gradient) ||
       old.color != color ||
       old.border != border ||
       old.glow != glow ||
@@ -420,73 +399,52 @@ class _ContainerPainter extends CustomPainter {
       old.rotate != rotate;
 }
 
-class AuroraBloom extends StatefulWidget {
+class AuroraBloom extends StatelessWidget {
   const AuroraBloom({super.key, this.size = 120, this.static = false});
 
   final double size;
   final bool static;
 
   @override
-  State<AuroraBloom> createState() => _AuroraBloomState();
-}
-
-class _AuroraBloomState extends State<AuroraBloom> {
-  late final ValueListenable<double> _clock = AuroraEngine.instance.clock;
-  late final RoundedPolygon _shape = AuroraShapes.bloom;
-
-  @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     final aurora = Theme.of(context).extension<AuroraColors>() ?? _fallback;
+    final animate =
+        !static &&
+        !AuroraMotion.isReduced(context) &&
+        TickerMode.valuesOf(context).enabled;
     return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: _clock,
-        builder: (context, _) {
-          final t = AuroraEngine.instance.reduceMotion || widget.static
-              ? 0.0
-              : _clock.value;
-          final path = AuroraShapes.rotatedPath(
-            _shape,
-            Size.square(widget.size),
-            t * .12,
-          );
-          return CustomPaint(
-            size: Size.square(widget.size),
-            painter: _BloomPainter(
-              path: path,
-              phase: t,
-              a: aurora.auroraA,
-              b: aurora.auroraB,
-              surface: colors.surface,
-            ),
-          );
-        },
+      child: CustomPaint(
+        size: Size.square(size),
+        painter: _BloomPainter(
+          clock: animate ? AuroraEngine.instance.clock : null,
+          a: aurora.auroraA,
+          b: aurora.auroraB,
+        ),
       ),
     );
   }
 }
 
 class _BloomPainter extends CustomPainter {
-  _BloomPainter({
-    required this.path,
-    required this.phase,
-    required this.a,
-    required this.b,
-    required this.surface,
-  });
+  _BloomPainter({required this.a, required this.b, this.clock})
+    : super(repaint: clock);
 
-  final Path path;
-  final double phase;
+  final ValueListenable<double>? clock;
   final Color a;
   final Color b;
-  final Color surface;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final phase = clock?.value ?? 0;
+    final basePath = AuroraShapes.rotatedPath(
+      AuroraShapes.bloom,
+      size,
+      phase * .12,
+    );
     final rect = Offset.zero & size;
     for (var layer = 0; layer < 3; layer++) {
       final scale = 1 - layer * .17;
-      final path = this.path.transform(
+      final path = basePath.transform(
         Matrix4.diagonal3Values(scale, scale, 1).storage,
       );
       final center = size.width / 2;
@@ -521,7 +479,7 @@ class _BloomPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BloomPainter old) =>
-      old.phase != phase || old.path != path || old.a != a || old.b != b;
+      old.clock != clock || old.a != a || old.b != b;
 }
 
 final AuroraColors _fallback = AuroraColors(

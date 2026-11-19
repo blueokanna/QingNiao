@@ -7,17 +7,22 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Existing v-prefixed tag for a draft GitHub Release; leave empty for validation only
+        description: Existing v-prefixed stable tag for a draft GitHub Release; requires production
         required: false
         type: string
       production:
-        description: Build with the production signing key
+        description: Build with the production signing key (required for a release draft)
         required: true
         default: false
         type: boolean
 
 permissions:
   contents: read
+
+# Tag pushes do not publish releases. A maintainer reviews and publishes the draft.
+concurrency:
+  group: android-delivery-${{ inputs.release_tag || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   android:
@@ -33,7 +38,51 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: ${{ inputs.release_tag || github.ref }}
+          fetch-depth: 0
           persist-credentials: false
+      # Existing source tags may predate release verification tooling. Use the
+      # tools from this workflow's commit, while building the exact source tag.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .delivery-tools
+          sparse-checkout: tool
+          persist-credentials: false
+      - name: Validate release request and source version
+        id: version
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          PRODUCTION: ${{ inputs.production || false }}
+        run: |
+          args=(version --pubspec pubspec.yaml --github-output "$GITHUB_OUTPUT")
+          if [[ -n "$RELEASE_TAG" ]]; then
+            if [[ "$PRODUCTION" != 'true' ]]; then
+              echo '::error::A Release draft requires production signing; debug APKs cannot be releases.'
+              exit 1
+            fi
+            args+=(--tag "$RELEASE_TAG")
+          fi
+          python3 .delivery-tools/tool/generate_release_metadata.py "${args[@]}"
+          if [[ -n "$RELEASE_TAG" ]]; then
+            test "$(git rev-parse HEAD)" = "$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")"
+          fi
+      - name: Validate production credentials
+        if: ${{ inputs.production == true }}
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          CERT_SHA256: ${{ secrets.ANDROID_SIGNING_CERT_SHA256 }}
+        run: |
+          for name in KEYSTORE_BASE64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD CERT_SHA256; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing production credential: $name"
+              exit 1
+            fi
+          done
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: temurin
@@ -47,31 +96,31 @@ jobs:
           persist-credentials: false
       - name: Initialize Android SDK and install pinned packages
         shell: bash
-        run: bash tool/setup_android_sdk.sh
+        run: bash .delivery-tools/tool/setup_android_sdk.sh
       - name: Install pinned Rust toolchain and expose Flutter
         shell: bash
         run: |
           echo "$GITHUB_WORKSPACE/.toolchains/flutter/bin" >> "$GITHUB_PATH"
           echo "FLUTTER_ROOT=$GITHUB_WORKSPACE/.toolchains/flutter" >> "$GITHUB_ENV"
-          rustup toolchain install 1.99.1 --profile minimal
-          rustup target add --toolchain 1.99.1 aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
+          rustup target add --toolchain "$RUSTUP_TOOLCHAIN" aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
       - name: Verify Flutter SDK identity
         shell: bash
         run: |
-          python3 tool/check_flutter_sdk.py --sdk-root "$FLUTTER_ROOT" --version "$FLUTTER_VERSION" --revision "$FLUTTER_REVISION"
+          python3 .delivery-tools/tool/check_flutter_sdk.py --sdk-root "$FLUTTER_ROOT" --version "$FLUTTER_VERSION" --revision "$FLUTTER_REVISION"
           flutter config --no-analytics
           flutter config --android-sdk "$ANDROID_HOME"
           mkdir -p build/verification
           flutter --version --machine > build/verification/ci-flutter-version.json
-          python3 tool/check_flutter_sdk.py --sdk-root "$FLUTTER_ROOT" --version "$FLUTTER_VERSION" --revision "$FLUTTER_REVISION" --metadata build/verification/ci-flutter-version.json --dart-version "$DART_VERSION"
-      - name: Validate source
+          python3 .delivery-tools/tool/check_flutter_sdk.py --sdk-root "$FLUTTER_ROOT" --version "$FLUTTER_VERSION" --revision "$FLUTTER_REVISION" --metadata build/verification/ci-flutter-version.json --dart-version "$DART_VERSION"
+      - name: Validate source and delivery tooling
         shell: bash
         run: |
           flutter pub get --enforce-lockfile
           dart run tool/check_localization.dart
           python3 tool/generate_android_strings.py --check
           python3 tool/check_sms_contract.py
-          python3 -m unittest discover -s tool/tests -p 'test_*.py'
+          python3 -m unittest discover -s .delivery-tools/tool/tests -p 'test_*.py'
           flutter analyze
           flutter test
           cargo test --locked --manifest-path rust/Cargo.toml
@@ -82,21 +131,29 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          test -n "$KEYSTORE_BASE64"
           umask 077
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/qingniao-release.jks"
+          test -s "$RUNNER_TEMP/qingniao-release.jks"
       - name: Build and inspect APK
         shell: bash
         env:
           PRODUCTION: ${{ inputs.production || false }}
+          VERSION_NAME: ${{ steps.version.outputs.version_name }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
           QINGNIAO_KEYSTORE_PATH: ${{ runner.temp }}/qingniao-release.jks
           QINGNIAO_STORE_PASSWORD: ${{ inputs.production && secrets.ANDROID_STORE_PASSWORD || '' }}
           QINGNIAO_KEY_ALIAS: ${{ inputs.production && secrets.ANDROID_KEY_ALIAS || '' }}
           QINGNIAO_KEY_PASSWORD: ${{ inputs.production && secrets.ANDROID_KEY_PASSWORD || '' }}
         run: |
-          if [[ "$PRODUCTION" == 'true' ]]; then mode=release; else mode=debug; fi
-          flutter build apk --"$mode"
-          python3 tool/verify_android_pages.py "build/app/outputs/flutter-apk/app-$mode.apk" --report build/native-pages.json
+          if [[ "$PRODUCTION" == 'true' ]]; then
+            mode=release
+            # Match tool/build-release.ps1: tests can leave a dev-only registrant.
+            rm -f android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+          else
+            mode=debug
+          fi
+          flutter build apk --"$mode" --build-name "$VERSION_NAME" --build-number "$VERSION_CODE" --target-platform android-arm,android-arm64,android-x64
+          python3 .delivery-tools/tool/verify_android_pages.py "build/app/outputs/flutter-apk/app-$mode.apk" --report build/native-pages.json
           (cd android && chmod +x gradlew && ./gradlew testDebugUnitTest lintDebug --no-daemon)
           mkdir -p build/delivery
           cp build/native-pages.json build/delivery/native-pages.json
@@ -104,9 +161,24 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 4 "build/delivery/qingniao-$mode.apk"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "build/delivery/qingniao-$mode.apk" > build/delivery/signature.txt
           git rev-parse HEAD > build/delivery/source-commit.txt
+          git -C .delivery-tools rev-parse HEAD > build/delivery/delivery-tools-commit.txt
           flutter --version --machine > build/delivery/flutter-version.json
           rustc --version > build/delivery/rust-version.txt
           (cd build/delivery && sha256sum *.apk > SHA256SUMS)
+      - name: Verify production APK and create update metadata
+        if: ${{ inputs.production == true }}
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
+          QINGNIAO_SIGNING_CERT_SHA256: ${{ secrets.ANDROID_SIGNING_CERT_SHA256 }}
+        run: |
+          python3 .delivery-tools/tool/generate_release_metadata.py create \
+            --pubspec pubspec.yaml --tag "$RELEASE_TAG" \
+            --apk build/delivery/qingniao-release.apk \
+            --apkanalyzer "$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" \
+            --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
+            --output build/delivery/update.json \
+            --signature-report build/delivery/signature.txt
       - name: Remove signing material
         if: always()
         shell: bash
@@ -132,24 +204,27 @@ jobs:
           retention-days: 14
 
   release:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' && inputs.production == true }}
     needs: android
     runs-on: ubuntu-24.04
     permissions:
       contents: write
       actions: read
     steps:
-      - name: Create draft release from verified artifact
+      - name: Create production release draft from verified artifact
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
           RELEASE_TAG: ${{ inputs.release_tag }}
-          PRODUCTION: ${{ inputs.production }}
         run: |
-          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$ ]]
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
           gh run download "$RUN_ID" --name qingniao-android --dir delivery
-          flags=(--draft --verify-tag)
-          if [[ "$PRODUCTION" != 'true' ]]; then flags+=(--prerelease); fi
-          gh release create "$RELEASE_TAG" delivery/* "${flags[@]}" --title "青鸟短信 $RELEASE_TAG" --notes 'Android APK, source commit, toolchain versions, certificate fingerprint and SHA-256 checksums are attached. See the device compatibility matrix before deployment.'
+          test -s delivery/qingniao-release.apk
+          test -s delivery/update.json
+          (cd delivery && sha256sum --check SHA256SUMS)
+          # create fails if the release already exists; never overwrite published assets.
+          gh release create "$RELEASE_TAG" delivery/* --draft --verify-tag \
+            --title "青鸟短信 $RELEASE_TAG" \
+            --notes 'Production-signed universal Android APK and update.json are attached with verification reports. Review docs/releases.md, test the APK, then publish this draft as a stable release and mark it latest to enable in-app updates.'

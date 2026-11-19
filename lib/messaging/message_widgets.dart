@@ -2,6 +2,7 @@ import '../messaging/sensitive_clipboard.dart';
 
 import 'package:qingniao/l10n/app_strings.dart';
 
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
@@ -16,6 +17,7 @@ import '../aurora/aurora_theme.dart';
 import '../aurora/aurora_widgets.dart';
 import 'format.dart';
 import 'models.dart';
+import 'sim_identity.dart';
 
 class ConversationTile extends StatelessWidget {
   const ConversationTile({
@@ -23,12 +25,16 @@ class ConversationTile extends StatelessWidget {
     required this.thread,
     this.onTap,
     this.onLongPress,
-    this.showSim = false,
+    this.showSim = true,
+    this.sims = const [],
     this.selected = false,
     this.selectionMode = false,
   });
 
+  static const radius = 26.0;
+
   final ThreadSummary thread;
+  final List<SimCard> sims;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final bool showSim;
@@ -39,139 +45,169 @@ class ConversationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = context.colors;
     final unread = thread.unread;
-    return RepaintBoundary(
-      child: AuroraGlass(
-        radius: 26,
-        border: false,
-        color: selected
-            ? scheme.secondaryContainer
-            : scheme.surfaceContainerLow,
-        child: AuroraPressable(
-          onTap: onTap,
-          onLongPress: onLongPress,
-          borderRadius: BorderRadius.circular(26),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
-            child: Row(
-              children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    if (selectionMode)
-                      SizedBox(
-                        width: 54,
-                        height: 54,
-                        child: Icon(
-                          selected
-                              ? Icons.check_circle_rounded
-                              : Icons.radio_button_unchecked_rounded,
-                          color: selected ? scheme.primary : scheme.outline,
-                        ),
-                      )
-                    else
-                      AuroraAvatar(
-                        seed: thread.address,
-                        size: 54,
-                        unread: unread > 0,
-                        label: thread.isGroup ? null : thread.title,
-                        icon: thread.isGroup ? Icons.groups_2_rounded : null,
-                        heroTag: 'thread-avatar-${thread.threadId}',
-                      ),
-                    if (unread > 0)
-                      PositionedDirectional(
-                        end: -4,
-                        top: -4,
-                        child: AuroraBadge(count: unread, small: true),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 13),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+    final largeText = MediaQuery.textScalerOf(context).scale(14) > 19;
+    final timestamp = Text(
+      MessageFormat.inboxTime(thread.date),
+      style: context.texts.labelSmall?.copyWith(
+        color: unread > 0 ? scheme.primary : scheme.onSurfaceVariant,
+        fontWeight: unread > 0 ? FontWeight.w700 : FontWeight.w500,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+    );
+    return Semantics(
+      selected: selectionMode ? selected : null,
+      child: RepaintBoundary(
+        child: AuroraGlass(
+          radius: radius,
+          border: selected || unread > 0,
+          borderColor: scheme.primary.withValues(alpha: selected ? .4 : .16),
+          color: selected
+              ? scheme.secondaryContainer
+              : unread > 0
+              ? Color.alphaBlend(
+                  scheme.primary.withValues(alpha: .045),
+                  scheme.surfaceContainerLow,
+                )
+              : scheme.surfaceContainerLow,
+          child: AuroraPressable(
+            onTap: onTap,
+            onLongPress: onLongPress,
+            borderRadius: BorderRadius.circular(radius),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+              child: Row(
+                crossAxisAlignment: largeText
+                    ? CrossAxisAlignment.start
+                    : CrossAxisAlignment.center,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
                     children: [
-                      Row(
-                        children: [
-                          if (thread.pinned)
-                            Padding(
-                              padding: const EdgeInsetsDirectional.only(end: 4),
-                              child: Icon(
-                                Icons.push_pin_rounded,
-                                size: 13,
-                                color: scheme.primary,
-                              ),
-                            ),
-                          Expanded(
-                            child: Text(
-                              thread.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.texts.titleMedium?.copyWith(
-                                fontWeight: unread > 0
-                                    ? FontWeight.w700
-                                    : FontWeight.w600,
-                                color: scheme.onSurface,
-                              ),
-                            ),
+                      if (selectionMode)
+                        SizedBox(
+                          width: 54,
+                          height: 54,
+                          child: Icon(
+                            selected
+                                ? Icons.check_circle_rounded
+                                : Icons.radio_button_unchecked_rounded,
+                            color: selected ? scheme.primary : scheme.outline,
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            MessageFormat.inboxTime(thread.date),
-                            style: context.texts.labelSmall?.copyWith(
-                              color: unread > 0
-                                  ? scheme.primary
-                                  : scheme.onSurfaceVariant,
-                              fontWeight: unread > 0
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          if (thread.hasMms)
-                            Padding(
-                              padding: const EdgeInsetsDirectional.only(end: 5),
-                              child: Icon(
-                                Icons.image_outlined,
-                                size: 14,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                          Expanded(
-                            child: Text(
-                              _previewText(thread),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.texts.bodyMedium?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                                fontWeight: unread > 0
-                                    ? FontWeight.w500
-                                    : FontWeight.w400,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (thread.hasOtp || showSim) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            if (thread.hasOtp) ...[
-                              OtpChip(code: thread.otp!, compact: true),
-                              const SizedBox(width: 6),
-                            ],
-                            if (showSim)
-                              SimBadge(subscriptionId: thread.subscriptionId),
-                          ],
+                        )
+                      else
+                        AuroraAvatar(
+                          seed: thread.address,
+                          size: 54,
+                          unread: unread > 0,
+                          label: thread.isGroup ? null : thread.title,
+                          icon: thread.isGroup ? Icons.groups_2_rounded : null,
+                          heroTag: 'thread-avatar-${thread.threadId}',
                         ),
-                      ],
+                      if (unread > 0)
+                        PositionedDirectional(
+                          end: -4,
+                          top: -4,
+                          child: Semantics(
+                            label: '${tr('Unread')}: $unread',
+                            excludeSemantics: true,
+                            child: AuroraBadge(count: unread, small: true),
+                          ),
+                        ),
                     ],
                   ),
-                ),
-              ],
+                  const SizedBox(width: 13),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            if (thread.pinned)
+                              Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                  end: 4,
+                                ),
+                                child: Icon(
+                                  Icons.push_pin_rounded,
+                                  semanticLabel: tr('Pinned'),
+                                  size: 13,
+                                  color: scheme.primary,
+                                ),
+                              ),
+                            Expanded(
+                              child: Text(
+                                thread.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: context.texts.titleMedium?.copyWith(
+                                  fontWeight: unread > 0
+                                      ? FontWeight.w700
+                                      : FontWeight.w600,
+                                  color: scheme.onSurface,
+                                ),
+                              ),
+                            ),
+                            if (!largeText) ...[
+                              const SizedBox(width: 8),
+                              timestamp,
+                            ],
+                          ],
+                        ),
+                        if (largeText) ...[
+                          const SizedBox(height: 3),
+                          timestamp,
+                        ],
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            if (thread.hasMms)
+                              Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                  end: 5,
+                                ),
+                                child: Icon(
+                                  Icons.image_outlined,
+                                  size: 14,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            Expanded(
+                              child: Text(
+                                _previewText(thread),
+                                maxLines: largeText ? 2 : 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: context.texts.bodyMedium?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                  fontWeight: unread > 0
+                                      ? FontWeight.w500
+                                      : FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (thread.hasOtp || showSim) ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              if (thread.hasOtp)
+                                OtpChip(code: thread.otp!, compact: true),
+                              if (showSim)
+                                SimBadge(
+                                  subscriptionId: thread.subscriptionId,
+                                  sims: sims,
+                                ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -188,28 +224,59 @@ class ConversationTile extends StatelessWidget {
 }
 
 class SimBadge extends StatelessWidget {
-  const SimBadge({super.key, required this.subscriptionId});
+  const SimBadge({
+    super.key,
+    required this.subscriptionId,
+    this.sims = const [],
+    this.inverted = false,
+  });
 
   final int subscriptionId;
+  final List<SimCard> sims;
+  final bool inverted;
 
   @override
   Widget build(BuildContext context) {
-    if (subscriptionId < 0) return const SizedBox.shrink();
+    final source = MessageSimSource.resolve(subscriptionId, sims);
     final scheme = context.colors;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: ShapeDecoration(
-        color: scheme.tertiaryContainer.withValues(alpha: .55),
-        shape: RoundedSuperellipseBorder(
-          borderRadius: BorderRadius.circular(99),
-        ),
-      ),
-      child: Text(
-        'SIM ${subscriptionId == 0 ? 1 : subscriptionId}',
-        style: context.texts.labelSmall?.copyWith(
-          color: scheme.onTertiaryContainer,
-          fontSize: 9.5,
-          fontWeight: FontWeight.w600,
+    final foreground = inverted
+        ? context.aurora.outgoingText.withValues(alpha: .88)
+        : scheme.onSurfaceVariant;
+    return Semantics(
+      label: '${tr('SIM source')}: ${source.description}',
+      excludeSemantics: true,
+      child: Tooltip(
+        message: source.description,
+        excludeFromSemantics: true,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+          decoration: ShapeDecoration(
+            color: inverted
+                ? context.aurora.outgoingText.withValues(alpha: .1)
+                : scheme.surfaceContainerHighest.withValues(alpha: .65),
+            shape: RoundedSuperellipseBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.sim_card_outlined, size: 12, color: foreground),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  source.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.texts.labelSmall?.copyWith(
+                    color: foreground,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -297,15 +364,34 @@ class OtpChip extends StatefulWidget {
 
 class _OtpChipState extends State<OtpChip> {
   bool _copied = false;
+  Timer? _reset;
+
+  @override
+  void didUpdateWidget(OtpChip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.code != widget.code) {
+      _reset?.cancel();
+      _copied = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _reset?.cancel();
+    super.dispose();
+  }
 
   Future<void> _copy() async {
-    await SensitiveClipboard.copy(widget.code);
+    final code = widget.code;
+    await SensitiveClipboard.copy(code);
+    if (!mounted || widget.code != code) return;
     HapticFeedback.mediumImpact();
-    if (!mounted) return;
+    _reset?.cancel();
     setState(() => _copied = true);
+    _reset = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _copied = false);
+    });
     widget.onCopied?.call();
-    await Future<void>.delayed(const Duration(milliseconds: 1500));
-    if (mounted) setState(() => _copied = false);
   }
 
   @override
@@ -316,7 +402,7 @@ class _OtpChipState extends State<OtpChip> {
         tooltip: _copied ? tr('Copied') : tr('Copy'),
         onPressed: _copy,
         icon: AnimatedSwitcher(
-          duration: AuroraMotion.fast,
+          duration: AuroraMotion.duration(context, AuroraMotion.fast),
           child: Icon(
             _copied ? Icons.check_rounded : Icons.copy_rounded,
             key: ValueKey(_copied),
@@ -324,54 +410,75 @@ class _OtpChipState extends State<OtpChip> {
         ),
       );
     }
-    return AuroraPressable(
+    return Semantics(
+      button: true,
+      label: '${tr('Copy')}: ${widget.code}',
+      value: _copied ? tr('Copied') : null,
       onTap: _copy,
-      pressedScale: .05,
-      borderRadius: BorderRadius.circular(14),
-      child: AnimatedContainer(
-        duration: AuroraMotion.base,
-        padding: EdgeInsets.symmetric(
-          horizontal: widget.compact ? 8 : 12,
-          vertical: widget.compact ? 3 : 7,
-        ),
-        decoration: ShapeDecoration(
-          color: widget.inverted
-              ? aurora.outgoingText.withValues(alpha: _copied ? .26 : .16)
-              : aurora.otpSoft,
-          shape: RoundedSuperellipseBorder(
-            borderRadius: BorderRadius.circular(widget.compact ? 10 : 14),
-            side: BorderSide(color: aurora.otp.withValues(alpha: .22)),
+      excludeSemantics: true,
+      child: AuroraPressable(
+        onTap: _copy,
+        haptic: false,
+        pressedScale: .025,
+        borderRadius: BorderRadius.circular(14),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+          child: Center(
+            widthFactor: 1,
+            heightFactor: 1,
+            child: AnimatedContainer(
+              duration: AuroraMotion.duration(context, AuroraMotion.base),
+              padding: EdgeInsets.symmetric(
+                horizontal: widget.compact ? 8 : 12,
+                vertical: widget.compact ? 3 : 7,
+              ),
+              decoration: ShapeDecoration(
+                color: widget.inverted
+                    ? aurora.outgoingText.withValues(alpha: _copied ? .26 : .16)
+                    : aurora.otpSoft,
+                shape: RoundedSuperellipseBorder(
+                  borderRadius: BorderRadius.circular(widget.compact ? 10 : 14),
+                  side: BorderSide(color: aurora.otp.withValues(alpha: .22)),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedSwitcher(
+                    duration: AuroraMotion.duration(context, AuroraMotion.fast),
+                    transitionBuilder: (child, animation) => ScaleTransition(
+                      scale: animation,
+                      child: FadeTransition(opacity: animation, child: child),
+                    ),
+                    child: Icon(
+                      _copied
+                          ? Icons.check_rounded
+                          : Icons.content_copy_rounded,
+                      key: ValueKey(_copied),
+                      size: widget.compact ? 11 : 14,
+                      color: widget.inverted ? aurora.outgoingText : aurora.otp,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Flexible(
+                    child: Text(
+                      widget.code,
+                      style: TextStyle(
+                        fontSize: widget.compact ? 11 : 13.5,
+                        height: 1.2,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                        color: widget.inverted
+                            ? aurora.outgoingText
+                            : aurora.otp,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedSwitcher(
-              duration: AuroraMotion.fast,
-              transitionBuilder: (child, animation) => ScaleTransition(
-                scale: animation,
-                child: FadeTransition(opacity: animation, child: child),
-              ),
-              child: Icon(
-                _copied ? Icons.check_rounded : Icons.content_copy_rounded,
-                key: ValueKey(_copied),
-                size: widget.compact ? 11 : 14,
-                color: widget.inverted ? aurora.outgoingText : aurora.otp,
-              ),
-            ),
-            const SizedBox(width: 5),
-            Text(
-              widget.code,
-              style: TextStyle(
-                fontSize: widget.compact ? 11 : 13.5,
-                height: 1.2,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.2,
-                color: widget.inverted ? aurora.outgoingText : aurora.otp,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -382,6 +489,8 @@ class MessageBubble extends StatelessWidget {
   const MessageBubble({
     super.key,
     required this.message,
+    this.sims = const [],
+    this.showSim = true,
     this.groupedTop = false,
     this.groupedBottom = false,
     this.selected = false,
@@ -394,6 +503,8 @@ class MessageBubble extends StatelessWidget {
   });
 
   final SmsMessage message;
+  final List<SimCard> sims;
+  final bool showSim;
   final bool groupedTop;
   final bool groupedBottom;
   final bool selected;
@@ -488,13 +599,11 @@ class MessageBubble extends StatelessWidget {
               ),
             ),
             if (outgoing) _DeliveryMark(state: message.delivery, onDark: true),
-            if (outgoing && message.subscriptionId >= 0)
-              Text(
-                'SIM ${message.subscriptionId == 0 ? 1 : message.subscriptionId}',
-                style: TextStyle(
-                  fontSize: 9.5,
-                  color: context.aurora.outgoingText.withValues(alpha: .55),
-                ),
+            if (showSim)
+              SimBadge(
+                subscriptionId: message.subscriptionId,
+                sims: sims,
+                inverted: outgoing,
               ),
           ],
         ),
@@ -591,7 +700,7 @@ class MessageBubble extends StatelessWidget {
   }
 }
 
-class _MessageText extends StatelessWidget {
+class _MessageText extends StatefulWidget {
   const _MessageText({
     required this.message,
     required this.outgoing,
@@ -603,20 +712,74 @@ class _MessageText extends StatelessWidget {
   final ValueChanged<String>? onOpenLink;
 
   @override
+  State<_MessageText> createState() => _MessageTextState();
+}
+
+class _MessageTextState extends State<_MessageText> {
+  static final _urlPattern = RegExp(r'https?://[^\s<>()（）]+');
+  final _recognizers = <String, TapGestureRecognizer>{};
+  final _links = <(int, String)>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _parseLinks();
+  }
+
+  @override
+  void didUpdateWidget(_MessageText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.message.body != widget.message.body ||
+        (oldWidget.onOpenLink == null) != (widget.onOpenLink == null)) {
+      _disposeLinks();
+      _parseLinks();
+    }
+  }
+
+  void _parseLinks() {
+    for (final match in _urlPattern.allMatches(widget.message.body)) {
+      var url = match.group(0)!;
+      while (url.isNotEmpty && '.,;:!?，。；：！？'.contains(url[url.length - 1])) {
+        url = url.substring(0, url.length - 1);
+      }
+      _links.add((match.start, url));
+      if (widget.onOpenLink != null) {
+        _recognizers.putIfAbsent(
+          url,
+          () =>
+              TapGestureRecognizer()
+                ..onTap = () => widget.onOpenLink?.call(url),
+        );
+      }
+    }
+  }
+
+  void _disposeLinks() {
+    for (final recognizer in _recognizers.values) {
+      recognizer.dispose();
+    }
+    _recognizers.clear();
+    _links.clear();
+  }
+
+  @override
+  void dispose() {
+    _disposeLinks();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final message = widget.message;
+    final outgoing = widget.outgoing;
     final scheme = context.colors;
     final base = DefaultTextStyle.of(context).style;
     final spans = <InlineSpan>[];
     final body = message.body;
-    final matches = RegExp(r'https?://[^\s<>()（）]+').allMatches(body).toList();
     var cursor = 0;
-    for (final match in matches) {
-      if (match.start > cursor) {
-        spans.add(TextSpan(text: body.substring(cursor, match.start)));
-      }
-      var url = match.group(0)!;
-      while (url.isNotEmpty && '.,;:!?，。；：！？'.contains(url[url.length - 1])) {
-        url = url.substring(0, url.length - 1);
+    for (final (start, url) in _links) {
+      if (start > cursor) {
+        spans.add(TextSpan(text: body.substring(cursor, start)));
       }
       spans.add(
         TextSpan(
@@ -628,11 +791,10 @@ class _MessageText extends StatelessWidget {
                 (outgoing ? context.aurora.outgoingText : scheme.primary)
                     .withValues(alpha: .5),
           ),
-          recognizer: TapGestureRecognizer()
-            ..onTap = () => onOpenLink?.call(url),
+          recognizer: _recognizers[url],
         ),
       );
-      cursor = match.start + url.length;
+      cursor = start + url.length;
     }
     if (cursor < body.length) spans.add(TextSpan(text: body.substring(cursor)));
 
@@ -640,7 +802,10 @@ class _MessageText extends StatelessWidget {
     if (otp != null && otp.isNotEmpty) {
       for (var index = 0; index < spans.length; index++) {
         final span = spans[index];
-        if (span is TextSpan && span.text != null && span.text!.contains(otp)) {
+        if (span is TextSpan &&
+            span.recognizer == null &&
+            span.text != null &&
+            span.text!.contains(otp)) {
           final text = span.text!;
           final at = text.indexOf(otp);
           spans[index] = TextSpan(
@@ -932,30 +1097,37 @@ class MessageComposer extends StatelessWidget {
                       ),
                     const Spacer(),
                     if (simLabel != null)
-                      AuroraPressable(
-                        onTap: enabled ? onPickSim : null,
-                        borderRadius: BorderRadius.circular(12),
-                        child: AuroraGlass(
-                          radius: 11,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 5,
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.sim_card_outlined,
-                                size: 12,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                simLabel!,
-                                style: context.texts.labelSmall?.copyWith(
-                                  fontSize: 10.5,
+                      Flexible(
+                        child: AuroraPressable(
+                          onTap: enabled ? onPickSim : null,
+                          borderRadius: BorderRadius.circular(12),
+                          child: AuroraGlass(
+                            radius: 11,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 12,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.sim_card_outlined,
+                                  size: 12,
+                                  color: scheme.onSurfaceVariant,
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    simLabel!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: context.texts.labelSmall?.copyWith(
+                                      fontSize: 10.5,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -1120,7 +1292,7 @@ class _SendButton extends StatelessWidget {
         onTap: enabled ? onTap : null,
         borderRadius: BorderRadius.circular(24),
         child: AnimatedContainer(
-          duration: AuroraMotion.base,
+          duration: AuroraMotion.duration(context, AuroraMotion.base),
           curve: AuroraMotion.emphasized,
           width: 46,
           height: 46,

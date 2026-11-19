@@ -26,15 +26,23 @@ class MessageStore(context: Context) : SQLiteOpenHelper(context, "message_state.
     fun outgoingIds(): List<Long> = readableDatabase.rawQuery("SELECT message_id FROM outgoing", null).use { cursor ->
         buildList { while (cursor.moveToNext()) add(cursor.getLong(0)) }
     }
-    fun forgetOutgoing(id: Long) { writableDatabase.delete("outgoing", "message_id=?", arrayOf(id.toString())) }
+    fun forgetOutgoing(id: Long) {
+        writableDatabase.delete("outgoing", "message_id=?", arrayOf(id.toString()))
+        writableDatabase.delete("receipts", "message_id=?", arrayOf(id.toString()))
+    }
     fun receipt(id: Long, part: Int, phase: String, success: Boolean): Int? {
         val db = writableDatabase
         val count = db.rawQuery("SELECT parts FROM outgoing WHERE message_id=?", arrayOf(id.toString())).use { if (it.moveToFirst()) it.getInt(0) else return null }
         if (part !in 0 until count || phase !in setOf("sent", "delivered")) return null
         db.execSQL("INSERT OR IGNORE INTO receipts VALUES (?,?,?,?)", arrayOf<Any>(id, part, phase, if (success) 1 else 0))
+        return receiptState(id, phase)
+    }
+    fun receiptState(id: Long, phase: String): Int? {
+        val db = readableDatabase
+        val count = db.rawQuery("SELECT parts FROM outgoing WHERE message_id=?", arrayOf(id.toString())).use { if (it.moveToFirst()) it.getInt(0) else return null }
         return db.rawQuery("SELECT COUNT(*), MIN(success) FROM receipts WHERE message_id=? AND phase=?", arrayOf(id.toString(), phase)).use {
             it.moveToFirst()
-            if (it.getInt(1) == 0) 5 else if (it.getInt(0) == count) 2 else null
+            if (it.getInt(0) == 0) null else if (it.getInt(1) == 0) 5 else if (it.getInt(0) == count) 2 else null
         }
     }
 }

@@ -20,13 +20,49 @@ class MainActivity : FlutterActivity() {
     private val cadence by lazy { DisplayCadence(this) }
     private val appearance by lazy { AppearanceBridge(this) }
     private val aurora by lazy { AuroraBridge(this) }
+    private val appUpdates by lazy { AppUpdateBridge(this) }
     private val handler = Handler(Looper.getMainLooper())
     private var events: EventChannel.EventSink? = null
     private var pendingAccess: MethodChannel.Result? = null
     private var pendingSelection: MethodChannel.Result? = null
+    private var observingMessages = false
+    private var resumed = false
     private val changed = Runnable { events?.success("messages") }
+    private val recoverOutgoing = object : Runnable {
+        override fun run() {
+            if (!resumed) return
+            val appContext = applicationContext
+            MessageIo.receiverExecutor.execute { SmsSendWatchdog.sweep(appContext) }
+            handler.postDelayed(this, 30_000)
+        }
+    }
     private val observer = object : ContentObserver(handler) {
-        override fun onChange(selfChange: Boolean) { handler.removeCallbacks(changed); handler.postDelayed(changed, 180) }
+        override fun onChange(selfChange: Boolean) {
+            // A continuous burst must still produce refreshes instead of postponing forever.
+            if (!handler.hasCallbacks(changed)) handler.postDelayed(changed, 180)
+        }
+    }
+
+    private fun stopMessageObserver() {
+        if (observingMessages) contentResolver.unregisterContentObserver(observer)
+        observingMessages = false
+        handler.removeCallbacks(changed)
+    }
+
+    private fun updateMessageObserver() {
+        if (!resumed || events == null || !SmsAccess.granted(this, Manifest.permission.READ_SMS)) {
+            stopMessageObserver()
+            return
+        }
+        if (observingMessages) return
+        try {
+            contentResolver.registerContentObserver(Uri.parse("content://mms-sms"), true, observer)
+            observingMessages = true
+            contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, observer)
+            contentResolver.registerContentObserver(Telephony.Mms.CONTENT_URI, true, observer)
+        } catch (_: SecurityException) {
+            stopMessageObserver()
+        }
     }
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -34,17 +70,22 @@ class MainActivity : FlutterActivity() {
 
         val appContext = applicationContext
         MessageIo.executor.execute {
-            SmsSendWatchdog.sweep(appContext)
             try { ScheduledMessageAlarms.restore(appContext) }
             catch (_: Exception) { android.util.Log.w("ScheduleRecovery", "Unable to restore scheduled alarms") }
         }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.blue.qingniao/messages").setMethodCallHandler(::handle)
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, "com.blue.qingniao/changes").setStreamHandler(object : EventChannel.StreamHandler {
-            override fun onListen(arguments: Any?, sink: EventChannel.EventSink) { events = sink }
-            override fun onCancel(arguments: Any?) { events = null }
+            override fun onListen(arguments: Any?, sink: EventChannel.EventSink) {
+                events = sink
+                updateMessageObserver()
+                sink.success("messages")
+                sink.success("intent")
+            }
+            override fun onCancel(arguments: Any?) {
+                events = null
+                stopMessageObserver()
+            }
         })
-        contentResolver.registerContentObserver(Uri.parse("content://mms-sms"), true, observer)
-        contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, observer)
     }
     private fun access() = mapOf(
         "defaultApp" to SmsAccess.isDefaultSmsApp(this),
@@ -52,6 +93,8 @@ class MainActivity : FlutterActivity() {
         "sendSms" to SmsAccess.granted(this, Manifest.permission.SEND_SMS),
         "receiveSms" to SmsAccess.granted(this, Manifest.permission.RECEIVE_SMS),
         "readContacts" to SmsAccess.granted(this, Manifest.permission.READ_CONTACTS),
+        "readPhoneState" to SmsAccess.granted(this, Manifest.permission.READ_PHONE_STATE),
+        "readPhoneNumbers" to SmsAccess.granted(this, Manifest.permission.READ_PHONE_NUMBERS),
         "notifications" to getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled(),
         "roleAvailable" to SmsAccess.roleAvailable(this),
         "systemSmsPackage" to Telephony.Sms.getDefaultSmsPackage(this)
@@ -68,6 +111,7 @@ class MainActivity : FlutterActivity() {
             result.error("appearance_unavailable", "Unable to read appearance settings", null)
             return
         }
+        if (appUpdates.handle(call, result)) return
         if (aurora.handle(call, result)) return
         when (call.method) {
             "copySensitive" -> {
@@ -121,16 +165,22 @@ class MainActivity : FlutterActivity() {
                 return
             }
             "launchIntent" -> {
-                val address = intent.getStringExtra("address") ?: intent.data?.takeIf { it.scheme in setOf("sms", "smsto", "mms", "mmsto") }?.schemeSpecificPart?.substringBefore('?')
-                result.success(mapOf("address" to address, "body" to intent.getStringExtra("sms_body")))
-
-                if (!address.isNullOrBlank()) Notifications.cancel(this, address.hashCode())
+                val request = SmsComposeRequest.parse(
+                    intent.action, intent.dataString, intent.getStringExtra("address"),
+                    intent.getStringArrayExtra(Intent.EXTRA_EMAIL)?.toList().orEmpty(),
+                    intent.getCharSequenceExtra("sms_body")?.toString(),
+                    intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString(),
+                )
+                val address = intent.getStringExtra("address")
+                result.success(request?.fields() ?: mapOf("address" to address))
+                if (request == null && !address.isNullOrBlank()) Notifications.cancelForAddress(this, address)
                 intent = Intent(this, MainActivity::class.java)
                 return
             }
             "settings" -> { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))); result.success(null); return }
         }
-        MessageIo.executor.execute {
+        val executor = if (call.method == "send") MessageIo.smsSendExecutor else MessageIo.executor
+        executor.execute {
             try {
                 requireAccess()
                 val value: Any? = MessageStore(this).use { store ->
@@ -143,16 +193,13 @@ class MainActivity : FlutterActivity() {
                         "sendMms" -> { MmsTransport.send(this, requireNotNull(call.argument<List<String>>("recipients")), requireNotNull(call.argument("body")), call.argument<Number>("subscriptionId")?.toInt() ?: SubscriptionManager.getDefaultSmsSubscriptionId(), call.argument<String>("attachment")?.let(Uri::parse)); null }
                         "messages" -> repository.messages(call.argument<Number>("threadId")?.toLong(), call.argument<Number>("before")?.toLong() ?: Long.MAX_VALUE, trash = call.argument<Boolean>("trash") == true)
                         "markRead" -> { repository.markRead(requireNotNull(call.argument<Number>("threadId")).toLong()); null }
-                        "send" -> SmsTransport.send(this, store, requireNotNull(call.argument("address")), requireNotNull(call.argument("body")), call.argument<Number>("subscriptionId")?.toInt() ?: SubscriptionManager.getDefaultSmsSubscriptionId())
+                        "send" -> SmsTransport.send(this, store, requireNotNull(call.argument("address")), requireNotNull(call.argument("body")), call.argument<Number>("subscriptionId")?.toInt() ?: -1)
                         "hide" -> { store.hide(requireNotNull(call.argument<Number>("id")).toLong()); null }
                         "restore" -> { store.restore(requireNotNull(call.argument<Number>("id")).toLong()); null }
                         "delete" -> { repository.delete(requireNotNull(call.argument<Number>("id")).toLong()); null }
                         "draft" -> store.draft(requireNotNull(call.argument("address")))
                         "saveDraft" -> { store.saveDraft(requireNotNull(call.argument("address")), requireNotNull(call.argument("body"))); null }
-                        "subscriptions" -> {
-                            if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) emptyList<Map<String, Any>>()
-                            else getSystemService(SubscriptionManager::class.java).activeSubscriptionInfoList.orEmpty().map { mapOf("id" to it.subscriptionId, "name" to it.displayName.toString(), "slot" to it.simSlotIndex + 1) }
-                        }
+                        "subscriptions" -> SimSubscriptions.cards(this)
                         else -> throw IllegalArgumentException("Unsupported operation")
                     }
                 }
@@ -205,20 +252,43 @@ class MainActivity : FlutterActivity() {
     }
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 72) { pendingAccess?.success(access()); pendingAccess = null }
+        if (requestCode == 72) {
+            pendingAccess?.success(access())
+            pendingAccess = null
+            updateMessageObserver()
+            IncomingSmsRecovery.restore(applicationContext)
+        }
     }
-    override fun onResume() { super.onResume(); cadence.resume() }
-    override fun onPause() { cadence.pause(); super.onPause() }
+    override fun onResume() {
+        super.onResume()
+        resumed = true
+        handler.removeCallbacks(recoverOutgoing)
+        handler.post(recoverOutgoing)
+        cadence.resume()
+        updateMessageObserver()
+        // Catch changes made while backgrounded, including a permission/default-role change.
+        handler.removeCallbacks(changed)
+        handler.post(changed)
+        IncomingSmsRecovery.restore(applicationContext)
+    }
+    override fun onPause() {
+        resumed = false
+        handler.removeCallbacks(recoverOutgoing)
+        stopMessageObserver()
+        cadence.pause()
+        super.onPause()
+    }
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent); setIntent(intent)
         events?.success(if (intent.getBooleanExtra("remoteSync", false)) "sync" else "intent")
     }
     override fun onDestroy() {
+        handler.removeCallbacks(recoverOutgoing)
         cadence.pause()
         PushGateway.onSignal = null
-        contentResolver.unregisterContentObserver(observer)
-        handler.removeCallbacks(changed)
+        stopMessageObserver()
         aurora.cancelPending()
+        appUpdates.close()
         events = null
         pendingAccess?.error("activity_closed", "Permission request ended. Try again.", null)
         pendingAccess = null

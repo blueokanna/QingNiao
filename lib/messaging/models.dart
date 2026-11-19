@@ -22,23 +22,34 @@ class SimCard {
     required this.name,
     this.number = '',
     this.carrier = '',
+    this.isEmbedded = false,
   });
 
+  /// Android subscription ID. This is never a slot number.
   final int id;
+
+  /// One-based logical SIM slot; zero means the platform did not supply a slot.
+  /// An eSIM uses a logical slot too; this does not imply a physical card tray.
   final int slot;
   final String name;
   final String number;
   final String carrier;
+  final bool isEmbedded;
 
-  String get label =>
-      number.isEmpty ? 'SIM $slot · $name' : 'SIM $slot · $number';
+  String get label {
+    final kind = isEmbedded ? 'eSIM' : 'SIM';
+    final source = slot > 0 ? '$kind $slot' : kind;
+    final detail = number.isNotEmpty ? number : name;
+    return detail.isEmpty ? source : '$source · $detail';
+  }
 
   factory SimCard.fromMap(Map<dynamic, dynamic> map) => SimCard(
     id: _int(map['id'], -1),
-    slot: _int(map['slot'], 1),
-    name: _string(map['name'], 'SIM'),
+    slot: _int(map['slot']).clamp(0, 0x7fffffff).toInt(),
+    name: _string(map['name']),
     number: _string(map['number']),
     carrier: _string(map['carrier']),
+    isEmbedded: _bool(map['isEmbedded']),
   );
 }
 
@@ -351,6 +362,8 @@ class AccessState {
     this.sendSms = false,
     this.receiveSms = false,
     this.readContacts = false,
+    this.readPhoneState = false,
+    this.readPhoneNumbers = false,
     this.notifications = false,
     this.roleAvailable = true,
   });
@@ -360,6 +373,8 @@ class AccessState {
   final bool sendSms;
   final bool receiveSms;
   final bool readContacts;
+  final bool readPhoneState;
+  final bool readPhoneNumbers;
   final bool notifications;
   final bool roleAvailable;
 
@@ -371,6 +386,8 @@ class AccessState {
     sendSms: _bool(map?['sendSms']),
     receiveSms: _bool(map?['receiveSms']),
     readContacts: _bool(map?['readContacts']),
+    readPhoneState: _bool(map?['readPhoneState']),
+    readPhoneNumbers: _bool(map?['readPhoneNumbers']),
     notifications: _bool(map?['notifications']),
     roleAvailable: map?['roleAvailable'] != false,
   );

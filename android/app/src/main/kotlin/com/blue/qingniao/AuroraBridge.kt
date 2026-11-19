@@ -354,7 +354,7 @@ class AuroraBridge(private val activity: Activity) {
                 val date = cursor.getLong(4)
                 val type = cursor.getInt(5)
                 val read = cursor.getInt(6) != 0
-                val subId = cursor.getInt(7)
+                val subId = (if (cursor.isNull(7)) -1 else cursor.getInt(7))
                 val key = normalize(address)
                 if (key in blocked) continue
                 val conversation = threads.getOrPut(threadId) {
@@ -378,7 +378,7 @@ class AuroraBridge(private val activity: Activity) {
                 val threadId = cursor.getLong(1)
                 val date = cursor.getLong(2) * 1000
                 val box = cursor.getInt(3)
-                val subId = cursor.getInt(4)
+                val subId = if (cursor.isNull(4)) -1 else cursor.getInt(4)
                 val subject = cursor.getString(5) ?: ""
                 val read = cursor.getInt(6) != 0
                 val address = mmsAddress(id) ?: "Unknown number"
@@ -391,6 +391,7 @@ class AuroraBridge(private val activity: Activity) {
                 if (!read && box == 1) conversation.unread += 1
                 if (date > conversation.date) {
                     conversation.date = date
+                    conversation.subId = subId
                     conversation.preview = subject
                     conversation.type = typeForBox(box)
                 }
@@ -462,7 +463,7 @@ class AuroraBridge(private val activity: Activity) {
     private data class Conversation(
         val threadId: Long,
         val address: String,
-        val subId: Int,
+        var subId: Int,
         var date: Long,
         var preview: String,
         var type: Int,
@@ -471,10 +472,7 @@ class AuroraBridge(private val activity: Activity) {
         var count: Int = 0,
     )
 
-    private fun normalize(value: String): String {
-        val number = android.telephony.PhoneNumberUtils.normalizeNumber(value)
-        return if (number.startsWith("00")) "+${number.substring(2)}" else number
-    }
+    private fun normalize(value: String): String = MessageAddress.normalize(value)
 
     private fun contacts(): Map<String, String> {
         val cached = contactsCache
@@ -525,7 +523,7 @@ class AuroraBridge(private val activity: Activity) {
                         "date" to cursor.getLong(4),
                         "type" to cursor.getInt(5),
                         "read" to (cursor.getInt(6) != 0),
-                        "subscriptionId" to cursor.getInt(7),
+                        "subscriptionId" to (if (cursor.isNull(7)) -1 else cursor.getInt(7)),
                         "status" to cursor.getInt(8),
                         "mms" to false,
                         "attachments" to emptyList<Map<String, Any?>>(),
@@ -562,7 +560,7 @@ class AuroraBridge(private val activity: Activity) {
                         "date" to date,
                         "type" to typeForBox(box),
                         "read" to (cursor.getInt(6) != 0),
-                        "subscriptionId" to cursor.getInt(4),
+                        "subscriptionId" to (if (cursor.isNull(4)) -1 else cursor.getInt(4)),
                         "status" to -1,
                         "mms" to true,
                         "attachments" to parts.attachments,
@@ -684,7 +682,7 @@ class AuroraBridge(private val activity: Activity) {
             null,
         )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
         if (address != null) {
-            Notifications.cancel(context, address.hashCode())
+            Notifications.cancelForAddress(context, address)
         }
     }
 
@@ -725,26 +723,7 @@ class AuroraBridge(private val activity: Activity) {
     }
 
 
-    private fun subscriptions(): List<Map<String, Any?>> {
-        if (context.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) return emptyList()
-        val manager = context.getSystemService(SubscriptionManager::class.java)
-        return try { manager.activeSubscriptionInfoList.orEmpty().map { info ->
-            val number = if (context.checkSelfPermission(Manifest.permission.READ_PHONE_NUMBERS) == PackageManager.PERMISSION_GRANTED) {
-                if (Build.VERSION.SDK_INT >= 33) manager.getPhoneNumber(info.subscriptionId)
-                else {
-                    @Suppress("DEPRECATION")
-                    info.number.orEmpty()
-                }
-            } else ""
-            mapOf(
-                "id" to info.subscriptionId,
-                "slot" to info.simSlotIndex + 1,
-                "name" to (info.displayName?.toString() ?: "SIM"),
-                "number" to number,
-                "carrier" to (info.carrierName?.toString() ?: ""),
-            )
-        } } catch (_: SecurityException) { emptyList() }
-    }
+    private fun subscriptions(): List<Map<String, Any?>> = SimSubscriptions.cards(context)
 
     private fun attachmentData(uri: String): ByteArray {
         val parsed = Uri.parse(uri)
@@ -936,7 +915,7 @@ class AuroraBridge(private val activity: Activity) {
                             put("date", cursor.getLong(4))
                             put("type", cursor.getInt(5))
                             put("read", cursor.getInt(6) != 0)
-                            put("subscriptionId", cursor.getInt(7))
+                            put("subscriptionId", (if (cursor.isNull(7)) -1 else cursor.getInt(7)))
                         })
                     }
                 }
@@ -1076,7 +1055,7 @@ class AuroraBridge(private val activity: Activity) {
                         "body" to body,
                         "date" to cursor.getLong(4),
                         "type" to cursor.getInt(5),
-                        "subscriptionId" to cursor.getInt(6),
+                        "subscriptionId" to (if (cursor.isNull(6)) -1 else cursor.getInt(6)),
                     ),
                 )
             }

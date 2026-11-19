@@ -105,15 +105,35 @@ class AuroraSpring extends ChangeNotifier {
   }
 }
 
+class _AmbientClock extends ValueNotifier<double> {
+  _AmbientClock(this.onActivity) : super(0);
+
+  final VoidCallback onActivity;
+  bool get observed => hasListeners;
+
+  @override
+  void addListener(VoidCallback listener) {
+    final wasObserved = observed;
+    super.addListener(listener);
+    if (!wasObserved) onActivity();
+  }
+
+  @override
+  void removeListener(VoidCallback listener) {
+    super.removeListener(listener);
+    if (!observed) onActivity();
+  }
+}
+
 /// Coordinates app-owned springs and the backdrop; Flutter owns route tickers.
 class AuroraEngine extends ChangeNotifier {
   AuroraEngine._() {
-    _clock = ValueNotifier<double>(0);
+    _clock = _AmbientClock(_syncTicker);
   }
 
   static final AuroraEngine instance = AuroraEngine._();
 
-  late final ValueNotifier<double> _clock;
+  late final _AmbientClock _clock;
   ValueListenable<double> get clock => _clock;
 
   final Set<AuroraSpring> _springs = <AuroraSpring>{};
@@ -124,6 +144,7 @@ class AuroraEngine extends ChangeNotifier {
   Duration? _lastElapsed;
   double _refreshRate = 60;
   double _elapsedSeconds = 0;
+  int _ambientFrame = 0;
   bool _scrolling = false;
   bool _paused = false;
   bool _reduceMotion = false;
@@ -191,7 +212,8 @@ class AuroraEngine extends ChangeNotifier {
       _activeSnapshot = null;
     }
     final needed =
-        !_reduceMotion && (_backdropEnabled || _activeSprings.isNotEmpty);
+        !_reduceMotion &&
+        ((_backdropEnabled && _clock.observed) || _activeSprings.isNotEmpty);
     if (needed && !_ticker!.isActive) {
       _lastElapsed = null;
       _ticker!.start();
@@ -293,10 +315,14 @@ class AuroraEngine extends ChangeNotifier {
       }
     }
 
-    if (_backdropEnabled &&
-        !_reduceMotion &&
-        _elapsedSeconds - _clock.value >= 1 / 30) {
-      _clock.value = _elapsedSeconds;
+    if (_backdropEnabled && !_reduceMotion && _clock.observed) {
+      // Use a fixed time grid so microsecond rounding does not repeatedly
+      // turn four 120 Hz frames into a five-frame ambient interval.
+      final frame = ((_elapsedSeconds + .0005) * 30).floor();
+      if (frame != _ambientFrame) {
+        _ambientFrame = frame;
+        _clock.value = _elapsedSeconds;
+      }
     }
     _syncTicker();
   }

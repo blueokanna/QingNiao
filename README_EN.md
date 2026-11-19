@@ -14,6 +14,7 @@ Qingniao combines a Flutter Material 3 Expressive interface, Kotlin integration 
 | --- | --- |
 | Supported platform | Android 12 and later (API 31+) |
 | Application ID | `com.blue.qingniao` |
+| Source version | **0.1.2** · Android versionCode **2** |
 | Stack | Flutter / Dart · Kotlin · Rust |
 | Design | Material 3 components, Expressive shapes and Aurora motion |
 | License | [PolyForm Small Business License 1.0.0](LICENSE) |
@@ -27,28 +28,45 @@ Qingniao combines a Flutter Material 3 Expressive interface, Kotlin integration 
 </p>
 
 <p align="center">
-  <img src="docs/images/preview-dark.png" alt="Qingniao dark and AMOLED theme: inbox, conversation and settings">
+  <img src="docs/images/preview-dark.png" alt="Qingniao 0.1.2 dark theme: inbox, conversation and settings">
 </p>
 
 <p align="center">
-  <img src="docs/images/preview-navigation.png" alt="Navigation appearance: blur strength and surface opacity">
+  <img src="docs/images/preview-navigation.png" alt="Qingniao 0.1.2 navigation appearance: white edge-highlight switch, blur strength and surface opacity">
 </p>
 
-<p align="center"><sub>Rendered off-screen from the real widget tree by <code>test/preview_screens_test.dart</code>; conversation content comes from test fixtures.</sub></p>
+<p align="center"><sub>Version 0.1.2 screens rendered from the real widget tree by <code>test/preview_screens_test.dart</code> and arranged by <code>tool/compose_previews.py</code>. Messages and SIM details are test fixtures, not device data.</sub></p>
+
+Version 0.1.2 adds persistent incoming-message recovery and a GitHub Release update flow, fixes sending to typed numbers and prefilling external SMS links, and refines per-message SIM/eSIM labels, rounded swipe actions, the labeled compose button and optional navigation highlights. See [reliability and performance notes](docs/reliability-and-performance.md) for implementation and validation scope. Check [GitHub Releases](https://github.com/blueokanna/qingniao/releases) for published APKs.
+
+<details>
+<summary>Regenerate the previews in PowerShell</summary>
+
+Run from the repository root with Pillow installed in your Python environment.
+
+```powershell
+$env:QINGNIAO_RENDER_PREVIEW = '1'
+flutter test test/preview_screens_test.dart
+Remove-Item Env:QINGNIAO_RENDER_PREVIEW
+python tool/compose_previews.py
+```
+
+</details>
 
 ## Features
 
 | Area | Capabilities |
 | --- | --- |
-| SMS and MMS | Default SMS role, dual SIM, multipart messages, send/delivery states, mixed SMS/MMS threads, group recipients and attachment previews |
+| SMS and MMS | Default SMS role, dual-SIM/eSIM source labels, persistent incoming-message recovery, multipart messages, send/delivery states, mixed SMS/MMS threads, group recipients and attachment previews |
 | Conversations | Search, pagination, drafts, selection, pinning, archiving, blocking and configurable swipe actions |
 | Unread messages | Long-press Messages in the bottom navigation to mark all messages read; long-press Codes to handle only code conversations; the Codes badge shows the unread count |
 | Verification codes | On-device extraction, one-tap copying, sensitive clipboard marking and optional recycling after reading |
 | Trash | Restore, permanent deletion and retention; local records are preserved when provider deletion cannot be confirmed |
 | Scheduling | Persistent tasks, system alarms and startup/reboot recovery, with fallback scheduling without exact-alarm access |
 | Notifications | Reply, mark read and copy-code actions; the system controls the final presentation of enhanced notifications |
-| Personalization | System dynamic colors, six reference palettes, light/dark and AMOLED themes, navigation blur controls, three adaptive icons and font selection |
+| Personalization | System dynamic colors, six reference palettes, light/dark and AMOLED themes, navigation blur and highlight controls, three adaptive icons and font selection |
 | Languages and accessibility | Ten language catalogs, RTL, system font scaling and reduced-motion support |
+| App updates | Stable GitHub Releases, automatic foreground checks, download progress, package/signature verification and system-confirmed installation |
 
 Recycling applies only to codes unread when loaded and fully visible in a foreground conversation for about two seconds. Scrolling, backgrounding or entering selection interrupts the timer. Marking all read does not trigger recycling, and notification expiry does not delete a message. Missed scheduled messages remain available for review instead of being sent in a burst after reboot.
 
@@ -58,7 +76,7 @@ Recycling applies only to codes unread when loaded and fully visible in a foregr
 
 The interface uses Material 3 components, tonal surfaces and Expressive shapes, with slow avatar morphs. Dynamic colors read Android system tones and reduce chroma to 80% in HCT color space while aiming to retain hue and tone; the final output remains subject to gamut constraints. Manual reference palettes are independent of this adjustment.
 
-The bottom capsule uses clipped, live Gaussian backdrop blur, compositing the current scene rather than a background screenshot. Appearance → Navigation appearance provides a **0–32** blur range and **55%–95%** surface opacity. Changes preview while dragging and persist on release; zero disables blur. High-contrast mode increases the surface overlay opacity.
+The bottom capsule uses clipped, live Gaussian backdrop blur, compositing the current scene rather than a background screenshot. Appearance → Navigation appearance provides a **0–32** blur range and **55%–95%** surface opacity. Changes preview while dragging and persist on release; zero disables blur. The edge-highlight switch controls a fine white rim, enabled by default and adjusted for light and dark themes; disabling it retains the base outline. High-contrast mode increases the surface overlay opacity.
 
 ### Rust and the GPU starfield
 
@@ -84,6 +102,7 @@ Some OnePlus / ColorOS versions filter third-party apps from the default SMS sel
 | --- | --- |
 | [`lib/aurora`](lib/aurora) | Themes, shared components, springs, shapes and ambient scheduling |
 | [`lib/messaging`](lib/messaging) | Conversations, codes, composer, MMS and trash |
+| [`lib/updates`](lib/updates) | Update scheduling, download state and installation entry point |
 | [`lib/settings`](lib/settings), [`lib/sync`](lib/sync) | Settings and sync client |
 | [`android/app/src/main/kotlin`](android/app/src/main/kotlin) | Default roles, Telephony, SIMs, notifications, permissions and scheduling |
 | [`rust/src`](rust/src) | Message analysis, search, MMS codecs, starfield parameters and cryptographic modules |
@@ -131,7 +150,7 @@ Run `./gradlew testDebugUnitTest lintDebug` from `android` for native tests and 
 python tool/verify_android_pages.py build/app/outputs/flutter-apk/app-debug.apk
 ```
 
-Alignment checks do not replace runtime validation on a device with 16 KB pages. Localization checks cover key and placeholder consistency across ten catalogs, not translation completeness; some newer settings use English fallback outside Chinese and English.
+Alignment checks do not replace runtime validation on a device with 16 KB pages. Update, SIM and navigation settings have translations in all ten catalogs. Localization checks validate keys and placeholders; language quality and device layouts still need review.
 
 After changing a Rust bridge interface, regenerate bindings through the repository's Android entry point:
 
@@ -174,7 +193,7 @@ powershell -File tool/build-release.ps1 -SplitAbi
 powershell -File tool/build-release.ps1 -Bundle
 ```
 
-Release builds fail without signing credentials instead of falling back to development signing. Update the version code in `pubspec.yaml` before release and verify the final certificate, SHA-256 and artifact. Do not run tests that update plugin registration concurrently with a release build. CI produces verification artifacts and can create a draft Release through a manual workflow; consult the workflow for its inputs.
+The manual Android delivery workflow builds a production-signed APK and `update.json` and can attach both to a Release draft. After publication as Latest, the app checks at startup, on resume and every five minutes in the foreground. A failed check extends the automatic retry interval to 30 minutes. Settings lets users check immediately, disable automatic checks or download an update for Android to install with their confirmation. See the [release and update guide](docs/releases.md) for signing and publication.
 
 ## Optional networking
 

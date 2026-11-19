@@ -106,6 +106,16 @@ class _NavigationAppearanceState extends State<NavigationAppearance> {
             ),
           ),
         ),
+        SwitchListTile.adaptive(
+          key: const ValueKey('navigation-highlight-toggle'),
+          title: Text(tr('Edge highlight')),
+          subtitle: Text(
+            tr('A fine white highlight along the navigation capsule'),
+          ),
+          secondary: const Icon(Icons.highlight_outlined),
+          value: settings.navigationHighlight,
+          onChanged: settings.setNavigationHighlight,
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
@@ -137,8 +147,7 @@ class _NavigationAppearanceState extends State<NavigationAppearance> {
               ),
               TextButton(
                 onPressed: () {
-                  settings.setNavigationBlur(18);
-                  settings.setNavigationOpacity(.78);
+                  settings.resetNavigationAppearance();
                   setState(() {
                     _blur = null;
                     _opacity = null;

@@ -27,6 +27,11 @@ object Notifications {
     const val GROUP = "com.blue.qingniao.MESSAGES"
     const val SUMMARY_ID = 4100
     private const val POST_PROMOTED = "android.permission.POST_PROMOTED_NOTIFICATIONS"
+    private const val EXTRA_ADDRESS = "qingniao.message.address"
+    internal const val EXTRA_TAG = "qingniao.notification.tag"
+
+    private fun channelId(subscriptionId: Int): String =
+        if (SmsSubscriptionIdentity.validId(subscriptionId)) "messages_$subscriptionId" else "messages_unknown"
 
     fun showSms(
         context: Context,
@@ -39,10 +44,16 @@ object Notifications {
         if (!AppPrefs.bool(prefs, "notifications", true)) return
         val preview = AppPrefs.bool(prefs, "preview", true)
         val manager = context.getSystemService(NotificationManager::class.java)
-        val channelId = "messages_${subscriptionId.coerceAtLeast(0)}"
+        if (!manager.areNotificationsEnabled()) return
+        // Blocking suppresses alerts, not the durable inbox copy; unblocking restores visibility.
+        AuroraStore(context).use { store ->
+            if (store.isBlocked(address) || (threadId >= 0 && store.isMuted(threadId))) return
+        }
+        val channelId = channelId(subscriptionId)
+        val simLabel = SimSubscriptions.notificationLabel(context, subscriptionId)
         val channel = NotificationChannel(
             channelId,
-            if (subscriptionId >= 0) "SMS · SIM $subscriptionId" else "SMS",
+            simLabel,
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
             description = LocalizedResources.text(context, R.string.notification_messages)
@@ -51,8 +62,10 @@ object Notifications {
         }
         manager.createNotificationChannel(channel)
 
-        val id = address.hashCode()
+        val identity = MessageNotificationIdentity.of(address, subscriptionId)
+        val id = identity.id
         val open = Intent(context, MainActivity::class.java)
+            .setData(Uri.parse(identity.actionUri("open")))
             .putExtra("address", address)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         val contentIntent = PendingIntent.getActivity(
@@ -63,6 +76,8 @@ object Notifications {
         )
 
         val replyIntent = Intent(context, ReplyReceiver::class.java)
+            .setData(Uri.parse(identity.actionUri("reply")))
+            .putExtra(EXTRA_TAG, identity.tag)
             .putExtra("address", address)
             .putExtra("sub", subscriptionId)
             .putExtra("notif", id)
@@ -80,6 +95,8 @@ object Notifications {
         ).addRemoteInput(remoteInput).build()
 
         val readIntent = Intent(context, MarkReadReceiver::class.java)
+            .setData(Uri.parse(identity.actionUri("read")))
+            .putExtra(EXTRA_TAG, identity.tag)
             .putExtra("address", address)
             .putExtra("thread", threadId)
             .putExtra("notif", id)
@@ -102,6 +119,8 @@ object Notifications {
                 context,
                 id + 2,
                 Intent(context, CopyOtpReceiver::class.java)
+                    .setData(Uri.parse(identity.actionUri("copy")))
+                    .putExtra(EXTRA_TAG, identity.tag)
                     .putExtra("code", code)
                     .putExtra("notif", id),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
@@ -116,6 +135,8 @@ object Notifications {
         }
         val builder = Notification.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_message)
+            .setSubText(simLabel)
+            .addExtras(android.os.Bundle().apply { putString(EXTRA_ADDRESS, address) })
             .setContentTitle(address)
             .setContentText(text)
             .setStyle(Notification.BigTextStyle().bigText(text))
@@ -152,21 +173,24 @@ object Notifications {
             .setAutoCancel(true)
             .build()
         try {
-            manager.notify(id, builder.build())
+            manager.notify(identity.tag, id, builder.build())
             manager.notify(SUMMARY_ID, summary)
-            if (promoted) scheduleExpiry(context, id)
+            if (promoted) scheduleExpiry(context, identity)
         } catch (_: SecurityException) {
         }
     }
 
     
-    private fun scheduleExpiry(context: Context, id: Int) {
+    private fun scheduleExpiry(context: Context, identity: MessageNotificationIdentity) {
         try {
             val alarm = context.getSystemService(AlarmManager::class.java)
             val pending = PendingIntent.getBroadcast(
                 context,
-                id,
-                Intent(context, NotificationExpiryReceiver::class.java).putExtra("id", id),
+                identity.id,
+                Intent(context, NotificationExpiryReceiver::class.java)
+                    .setData(Uri.parse(identity.actionUri("expiry")))
+                    .putExtra(EXTRA_TAG, identity.tag)
+                    .putExtra("id", identity.id),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
             alarm.set(AlarmManager.RTC, System.currentTimeMillis() + 15 * 60 * 1000L, pending)
@@ -186,11 +210,12 @@ object Notifications {
         val prefs = context.getSharedPreferences("appearance", Context.MODE_PRIVATE)
         if (!AppPrefs.bool(prefs, "notifications", true)) return
         val manager = context.getSystemService(NotificationManager::class.java)
-        val channelId = "messages_${subscriptionId.coerceAtLeast(0)}"
+        val channelId = channelId(subscriptionId)
+        val simLabel = SimSubscriptions.notificationLabel(context, subscriptionId)
         manager.createNotificationChannel(
             NotificationChannel(
                 channelId,
-                if (subscriptionId >= 0) "SMS · SIM $subscriptionId" else "SMS",
+                simLabel,
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
                 description = LocalizedResources.text(context, R.string.notification_messages)
@@ -209,6 +234,7 @@ object Notifications {
         )
         val builder = Notification.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_message)
+            .setSubText(simLabel)
             .setContentTitle(address.ifBlank { "MMS" })
             .setContentText(text)
             .setStyle(Notification.BigTextStyle().bigText(text))
@@ -268,24 +294,43 @@ object Notifications {
         return AppPrefs.bool(prefs, "fluidCloud", true) && canPromote(context)
     }
 
-    fun markReplied(context: Context, address: String, notificationId: Int) {
-        val manager = context.getSystemService(NotificationManager::class.java)
-        manager.cancel(notificationId)
+    fun markReplied(context: Context, address: String, notificationId: Int, tag: String? = null) {
+        cancel(context, notificationId, tag)
         Handler(Looper.getMainLooper()).post {
             Toast.makeText(context, "Replied to $address", Toast.LENGTH_SHORT).show()
         }
     }
 
-    fun cancel(context: Context, notificationId: Int) {
+    /** A conversation can contain receipts on several subscriptions. */
+    fun cancelForAddress(context: Context, address: String) {
         val manager = context.getSystemService(NotificationManager::class.java)
-        manager.cancel(notificationId)
+        try {
+            manager.activeNotifications.filter { status ->
+                val notification = status.notification
+                notification.extras.getString(EXTRA_ADDRESS) == address ||
+                    // Match legacy untagged SMS only; a coincidentally equal progress ID
+                    // or another sender's hash must not clear an unrelated notification.
+                    (status.tag == null && status.id == address.hashCode() &&
+                        notification.category == Notification.CATEGORY_MESSAGE &&
+                        notification.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() == address)
+            }.forEach { manager.cancel(it.tag, it.id) }
+            clearSummaryIfEmpty(manager)
+        } catch (_: Exception) { }
+    }
+
+    fun cancel(context: Context, notificationId: Int, tag: String? = null) {
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.cancel(tag, notificationId)
+        clearSummaryIfEmpty(manager)
+    }
+
+    private fun clearSummaryIfEmpty(manager: NotificationManager) {
         try {
             val remaining = manager.activeNotifications.any { status ->
-                status.id != SUMMARY_ID && status.notification.group == GROUP
+                (status.id != SUMMARY_ID || status.tag != null) && status.notification.group == GROUP
             }
             if (!remaining) manager.cancel(SUMMARY_ID)
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) { }
     }
 }
 
@@ -302,7 +347,7 @@ private fun extractOtp(context: Context, body: String): String? {
     val lower = body.lowercase()
     val keywords = context.resources.getStringArray(R.array.verification_keywords)
     if (keywords.none { lower.contains(it) }) return null
-    val candidates = Regex("(?<!\\d)(\\d{4,8})(?!\\d)").findAll(body).toList()
+    val candidates = Regex("(?<!\\d)(\\d{4,8})(?!\\d)").findAll(body).take(2).toList()
     if (candidates.size != 1) return null
     val code = candidates.first().groupValues[1]
     if (code.length == 4 && (code.startsWith("19") || code.startsWith("20"))) return null
@@ -318,7 +363,8 @@ class CopyOtpReceiver : BroadcastReceiver() {
             putBoolean("android.content.extra.IS_SENSITIVE", true)
         }
         clipboard.setPrimaryClip(clip)
-        Notifications.cancel(context, intent.getIntExtra("notif", code.hashCode()))
+        Notifications.cancel(context, intent.getIntExtra("notif", code.hashCode()),
+            intent.getStringExtra(Notifications.EXTRA_TAG))
         if (Build.VERSION.SDK_INT < 33) Handler(Looper.getMainLooper()).post {
             Toast.makeText(context, LocalizedResources.text(context, R.string.notification_code_copied), Toast.LENGTH_SHORT).show()
         }
@@ -345,7 +391,7 @@ class ReplyReceiver : BroadcastReceiver() {
                     }
                     SmsTransport.send(context, store, address, text, subscription)
                 }
-                Notifications.markReplied(context, address, notificationId)
+                Notifications.markReplied(context, address, notificationId, intent.getStringExtra(Notifications.EXTRA_TAG))
             } catch (error: Exception) {
                 MessageNotifications.show(
                     context,
@@ -391,7 +437,8 @@ class MarkReadReceiver : BroadcastReceiver() {
                     arrayOf(address),
                 )
             }
-            Notifications.cancel(context, notificationId)
+            if (address != null) Notifications.cancelForAddress(context, address)
+            else Notifications.cancel(context, notificationId, intent.getStringExtra(Notifications.EXTRA_TAG))
         } catch (_: Exception) {
         }
     }

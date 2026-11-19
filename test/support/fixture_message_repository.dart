@@ -32,6 +32,8 @@ class FixtureMessageRepository extends MessageRepository {
     sendSms: true,
     receiveSms: true,
     readContacts: true,
+    readPhoneState: true,
+    readPhoneNumbers: true,
     notifications: true,
   );
 
@@ -271,6 +273,7 @@ class FixtureMessageRepository extends MessageRepository {
     SimCard(
       id: 2,
       slot: 2,
+      isEmbedded: true,
       name: '\u8054\u901a',
       number: '186 8888 6666',
       carrier: '\u4e2d\u56fd\u8054\u901a',

@@ -22,14 +22,14 @@ class ConversationOperations(private val context: Context) {
                     "thread_id IN (${chunk.joinToString { "?" }})", args, null)?.use { cursor ->
                     val addresses = mutableSetOf<String>()
                     while (cursor.moveToNext()) cursor.getString(0)?.let(addresses::add)
-                    addresses.forEach { Notifications.cancel(context, it.hashCode()) }
+                    addresses.forEach { Notifications.cancelForAddress(context, it) }
                 }
             }
         }
         if (ids == null) {
             val manager = context.getSystemService(NotificationManager::class.java)
             manager.activeNotifications.filter { it.notification.group == Notifications.GROUP }
-                .forEach { Notifications.cancel(context, it.id) }
+                .forEach { Notifications.cancel(context, it.id, it.tag) }
         }
         return changed
     }
