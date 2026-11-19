@@ -14,7 +14,7 @@
 | --- | --- |
 | 支持平台 | Android 12 及以上（API 31+） |
 | 应用包名 | `com.blue.qingniao` |
-| 当前源码版本 | **0.1.2** · Android versionCode **2** |
+| 当前源码版本 | **0.1.2** · Android versionCode **4009** |
 | 技术栈 | Flutter / Dart · Kotlin · Rust |
 | 设计 | Material 3 组件、Expressive 形状与 Aurora 动效 |
 | 许可证 | [PolyForm Small Business License 1.0.0](LICENSE) |

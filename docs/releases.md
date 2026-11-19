@@ -12,9 +12,9 @@
 | `release_tag` 非空但 `production=false` | 立即失败，不能用 Debug APK 创建 Release |
 | 推送 Git 标签 | 不触发发布；需要维护者手动运行工作流 |
 
-当前源码版本为 **`0.1.2+2`**：`versionName=0.1.2`、`versionCode=2`，对应发布标签 **`v0.1.2`**。这表示源码的发布目标，不表示远端标签或正式 APK 已发布。工作流只接受稳定版 `v<major>.<minor>.<patch>`，不接受 `-rc` 或 `+build` 标签后缀。标签对应 `+` 前的版本名，build number 从该标签的 `pubspec.yaml` 读取，并必须与最终 APK 清单中的 Android 版本代码完全相等。构建时显式传入两个版本值，随后再从 APK 独立读回校验。
+当前源码版本为 **`0.1.2+4009`**，Android 清单使用 `versionName=0.1.2` 和 `versionCode=4009`，对应标签 **`v0.1.2`**。工作流只接受形如 `v<major>.<minor>.<patch>` 的稳定版标签，从该标签的 `pubspec.yaml` 读取版本名和 build number，构建后再与 APK 清单逐项核对。
 
-每次后续发布都应递增 build number，并使用新的版本名和标签，例如 **`0.1.3+3` → `v0.1.3`**。0.1.2 的版本代码从旧源码的 1 提升至 2；发布前仍需核对实际已分发 APK。`versionCode` 必须高于已发布版本，否则已安装应用不会获得升级；只改版本名不算升级。当前发布器与更新器统一接受 **`1..2100000000`**，与本工程 Flutter/Gradle 的普通 `versionCode` 配置保持一致，不支持非零 `versionCodeMajor`。Android 侧仍以 `longVersionCode` 读取已安装包，避免溢出导致错误升级或降级判断。
+旧版按 ABI 分包曾使用架构偏移，已核对的 arm64 设备上 0.1.1 的实际 `versionCode` 为 2008，历史 x86_64 APK 的版本代码进入了 4000 段。0.1.2 的统一包使用 4009。后续发布需要高于所有已分发 APK 的实际版本代码；若只发布统一包，下一版可用 **`0.1.3+4010` → `v0.1.3`**。发布器与更新器接受 **`1..2100000000`**，Android 侧以 `longVersionCode` 读取已安装版本。
 
 已有标签固定其源码；工作区未提交改动及之后的提交不会被旧标签包含。工作流从运行该工作流的提交（`github.workflow_sha`）单独检出 `tool` 目录作发布验证，所以旧标签也能使用新校验，但应用仍严格由标签源码构建。若旧版 APK 不含在线更新器，用户需先手动安装同签名的 0.1.2。创建 `v0.1.2` 前应提交本次完整改动，不应移动已发布标签。
 
@@ -47,7 +47,7 @@
 | --- | --- |
 | `schemaVersion` | 整数 `1` |
 | `versionName` | `pubspec.yaml` 的 `+` 前部分，当前为 `"0.1.2"` |
-| `versionCode` | JSON 正整数，当前支持 `1..2100000000`，与最终 APK 的 `longVersionCode` 一致，当前为 `2` |
+| `versionCode` | JSON 正整数，当前支持 `1..2100000000`，与最终 APK 的 `longVersionCode` 一致，当前为 `4009` |
 | `apkName` | 固定 `"qingniao-release.apk"` |
 | `sha256` | 实际附件完整字节的 SHA-256，64 位小写十六进制 |
 | `size` | 实际附件大小，正整数字节数，不超过更新器的 256 MiB 下载上限 |

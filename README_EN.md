@@ -14,7 +14,7 @@ Qingniao combines a Flutter Material 3 Expressive interface, Kotlin integration 
 | --- | --- |
 | Supported platform | Android 12 and later (API 31+) |
 | Application ID | `com.blue.qingniao` |
-| Source version | **0.1.2** · Android versionCode **2** |
+| Source version | **0.1.2** · Android versionCode **4009** |
 | Stack | Flutter / Dart · Kotlin · Rust |
 | Design | Material 3 components, Expressive shapes and Aurora motion |
 | License | [PolyForm Small Business License 1.0.0](LICENSE) |

@@ -1,7 +1,7 @@
 name: qingniao
 description: "Local-first Android SMS and MMS with a Rust core and Material 3 Expressive interface."
 publish_to: "none"
-version: 0.1.2+2
+version: 0.1.2+4009
 
 environment:
   sdk: ^3.13.7
